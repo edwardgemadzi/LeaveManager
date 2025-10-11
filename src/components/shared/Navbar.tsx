@@ -65,6 +65,9 @@ export default function Navbar() {
                             <Link href="/leader/settings" className="nav-tab">
                               Settings
                             </Link>
+                            <Link href="/leader/profile" className="nav-tab">
+                              Profile
+                            </Link>
                           </>
                         ) : (
                   <>
@@ -76,6 +79,9 @@ export default function Navbar() {
                     </Link>
                     <Link href="/member/calendar" className="nav-tab">
                       Calendar
+                    </Link>
+                    <Link href="/member/profile" className="nav-tab">
+                      Profile
                     </Link>
                   </>
                 )}
@@ -129,6 +135,9 @@ export default function Navbar() {
                   <Link href="/leader/settings" className="block px-4 py-3 text-white/90 hover:text-white hover:bg-white/10 rounded-xl text-sm font-medium transition-all duration-200">
                     Settings
                   </Link>
+                  <Link href="/leader/profile" className="block px-4 py-3 text-white/90 hover:text-white hover:bg-white/10 rounded-xl text-sm font-medium transition-all duration-200">
+                    Profile
+                  </Link>
                 </>
               ) : (
                 <>
@@ -140,6 +149,9 @@ export default function Navbar() {
                   </Link>
                   <Link href="/member/calendar" className="block px-4 py-3 text-white/90 hover:text-white hover:bg-white/10 rounded-xl text-sm font-medium transition-all duration-200">
                     Calendar
+                  </Link>
+                  <Link href="/member/profile" className="block px-4 py-3 text-white/90 hover:text-white hover:bg-white/10 rounded-xl text-sm font-medium transition-all duration-200">
+                    Profile
                   </Link>
                 </>
               )}

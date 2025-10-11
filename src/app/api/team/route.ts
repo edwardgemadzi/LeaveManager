@@ -60,6 +60,7 @@ export async function GET(request: NextRequest) {
         fullName: member.fullName,
         role: member.role,
         shiftSchedule: member.shiftSchedule,
+        shiftTag: member.shiftTag,
       })),
     };
     
