@@ -231,7 +231,7 @@ export default function LeaderMembersPage() {
                                   <h5 className="text-sm font-medium text-gray-700 mb-3">Edit Shift Schedule</h5>
                                   <ShiftScheduleBuilder 
                                     onScheduleChange={setTempSchedule}
-                                    initialSchedule={tempSchedule}
+                                    initialSchedule={tempSchedule || undefined}
                                   />
                                 </div>
                                 <div className="flex space-x-2">

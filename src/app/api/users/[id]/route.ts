@@ -30,7 +30,8 @@ export async function GET(
     }
 
     // Remove sensitive data
-    const { password: _, ...safeUserData } = userData;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, ...safeUserData } = userData;
 
     return NextResponse.json({ user: safeUserData });
   } catch (error) {

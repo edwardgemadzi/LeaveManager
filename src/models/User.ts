@@ -40,13 +40,25 @@ export class UserModel {
     const users = db.collection<User>('users');
     console.log('UserModel.findByTeamId - searching for teamId:', teamId);
     
-    // Use $or to search for both string and ObjectId teamId in a single query
-    const results = await users.find({
-      $or: [
-        { teamId: teamId },
-        { teamId: new ObjectId(teamId) }
-      ]
-    }).toArray();
+    // Search for teamId (handle both string and ObjectId cases)
+    let results;
+    try {
+      // Try to find with string teamId first
+      results = await users.find({ teamId: teamId }).toArray();
+      
+      // If no results and teamId looks like an ObjectId, try with ObjectId
+      if (results.length === 0 && ObjectId.isValid(teamId)) {
+        // Use type assertion to handle ObjectId in query
+        const objectIdResults = await users.find({ 
+          // @ts-expect-error - ObjectId type compatibility issue
+          teamId: new ObjectId(teamId)
+        }).toArray();
+        results = objectIdResults;
+      }
+    } catch {
+      // If ObjectId conversion fails, just use string search
+      results = await users.find({ teamId: teamId }).toArray();
+    }
     
     // Remove duplicates based on _id
     const uniqueResults = results.filter((user, index, self) => 

@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { Calendar, momentLocalizer, View, Views } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { LeaveRequest, User, ShiftSchedule } from '@/types';
-import { getWorkingDays, isWorkingDay } from '@/lib/leaveCalculations';
+import { LeaveRequest, User } from '@/types';
+import { getWorkingDays } from '@/lib/leaveCalculations';
 
 const localizer = momentLocalizer(moment);
 

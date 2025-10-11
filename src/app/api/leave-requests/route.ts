@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTokenFromRequest, verifyToken } from '@/lib/auth';
 import { LeaveRequestModel } from '@/models/LeaveRequest';
 import { TeamModel } from '@/models/Team';
+import { UserModel } from '@/models/User';
 import { CreateLeaveRequest } from '@/types';
 
 export async function GET(request: NextRequest) {

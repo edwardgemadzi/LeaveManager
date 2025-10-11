@@ -20,7 +20,6 @@ export default function MemberProfilePage() {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const token = localStorage.getItem('token');
         const userData = JSON.parse(localStorage.getItem('user') || '{}');
         
         if (userData._id) {

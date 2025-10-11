@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTokenFromRequest, verifyToken } from '@/lib/auth';
 import { UserModel } from '@/models/User';
 import { ShiftSchedule } from '@/types';
-import { ObjectId } from 'mongodb';
 
 export async function PATCH(
   request: NextRequest,
@@ -53,9 +52,7 @@ export async function PATCH(
     const targetTeamId = targetUser.teamId;
     const teamIdsMatch = userTeamId === targetTeamId || 
                         userTeamId === targetTeamId?.toString() || 
-                        targetTeamId === userTeamId?.toString() ||
-                        (targetTeamId instanceof ObjectId && targetTeamId.toString() === userTeamId) ||
-                        (userTeamId instanceof ObjectId && userTeamId.toString() === targetTeamId);
+                        targetTeamId === userTeamId?.toString();
     
     console.log('Schedule API - Team ID comparison:', { 
       userTeamId, 
