@@ -3,16 +3,21 @@
 import { useState, useEffect } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
-import { User } from '@/types';
+import { User, Team } from '@/types';
 
 export default function LeaderProfilePage() {
   const [user, setUser] = useState<User | null>(null);
+  const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [updatingProfile, setUpdatingProfile] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
+  });
+  const [profileForm, setProfileForm] = useState({
+    fullName: '',
   });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -20,10 +25,34 @@ export default function LeaderProfilePage() {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const userData = JSON.parse(localStorage.getItem('user') || '{}');
-        
-        if (userData._id) {
-          setUser(userData);
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        // Fetch fresh user data from API
+        const userResponse = await fetch('/api/users/profile', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          setUser(userData.user);
+          setProfileForm({
+            fullName: userData.user.fullName || '',
+          });
+        }
+
+        // Fetch team data
+        const teamResponse = await fetch('/api/team', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (teamResponse.ok) {
+          const teamData = await teamResponse.json();
+          setTeam(teamData.team);
         }
       } catch (error) {
         console.error('Error fetching user data:', error);
@@ -86,6 +115,49 @@ export default function LeaderProfilePage() {
     }
   };
 
+  const handleProfileUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setMessage('');
+
+    if (!profileForm.fullName.trim()) {
+      setError('Full name is required');
+      return;
+    }
+
+    setUpdatingProfile(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/users/profile', {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fullName: profileForm.fullName.trim(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setUser(data.user);
+        setMessage('Profile updated successfully!');
+        // Update localStorage with new data
+        localStorage.setItem('user', JSON.stringify(data.user));
+      } else {
+        setError(data.error || 'Failed to update profile');
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      setError('Network error. Please try again.');
+    } finally {
+      setUpdatingProfile(false);
+    }
+  };
+
   if (loading) {
     return (
       <ProtectedRoute requiredRole="leader">
@@ -117,19 +189,30 @@ export default function LeaderProfilePage() {
               <div className="p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-6">Profile Information</h2>
                 
-                <div className="space-y-4">
+                <form onSubmit={handleProfileUpdate} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Username</label>
                     <p className="mt-1 text-sm text-gray-900 bg-gray-50 px-3 py-2 rounded-md">
                       {user?.username}
                     </p>
+                    <p className="mt-1 text-xs text-gray-500">Username cannot be changed</p>
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Full Name</label>
-                    <p className="mt-1 text-sm text-gray-900 bg-gray-50 px-3 py-2 rounded-md">
-                      {user?.fullName || 'Not set'}
-                    </p>
+                    <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
+                      Full Name
+                    </label>
+                    <input
+                      type="text"
+                      id="fullName"
+                      required
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      value={profileForm.fullName}
+                      onChange={(e) => setProfileForm({
+                        ...profileForm,
+                        fullName: e.target.value
+                      })}
+                    />
                   </div>
                   
                   <div>
@@ -138,6 +221,15 @@ export default function LeaderProfilePage() {
                       👑 Team Leader
                     </p>
                   </div>
+
+                  {team && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Team</label>
+                      <p className="mt-1 text-sm text-gray-900 bg-gray-50 px-3 py-2 rounded-md">
+                        {team.name}
+                      </p>
+                    </div>
+                  )}
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Member Since</label>
@@ -145,7 +237,15 @@ export default function LeaderProfilePage() {
                       {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown'}
                     </p>
                   </div>
-                </div>
+
+                  <button
+                    type="submit"
+                    disabled={updatingProfile}
+                    className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                  >
+                    {updatingProfile ? 'Updating...' : 'Update Profile'}
+                  </button>
+                </form>
               </div>
             </div>
 
