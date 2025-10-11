@@ -53,6 +53,8 @@ JWT_SECRET=your-super-secret-jwt-key-at-least-32-characters-long
 NEXTAUTH_URL=https://your-app-name.vercel.app
 ```
 
+**⚠️ IMPORTANT**: Replace `username`, `password`, and `cluster` with your actual MongoDB Atlas credentials.
+
 ## 🔍 Security Audit Checklist
 
 Before deploying to production:

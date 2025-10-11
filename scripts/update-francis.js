@@ -1,7 +1,12 @@
 const { MongoClient } = require('mongodb');
 
-// Use the same connection string as in the app
-const uri = process.env.MONGODB_URI || 'mongodb+srv://edward:edward123@cluster0.8qjqj.mongodb.net/leave-manager?retryWrites=true&w=majority';
+// Use environment variable for MongoDB connection
+const uri = process.env.MONGODB_URI;
+
+if (!uri) {
+  console.error('MONGODB_URI environment variable is required');
+  process.exit(1);
+}
 
 async function updateFrancis() {
   const client = new MongoClient(uri);
