@@ -6,7 +6,7 @@ export interface EmailNotification {
   to: string;
   subject: string;
   body: string;
-  type: 'leave_approved' | 'leave_rejected' | 'leave_requested' | 'leave_reminder';
+  type: 'leave_approved' | 'leave_rejected' | 'leave_requested' | 'leave_reminder' | 'password_reset';
 }
 
 export class EmailService {
@@ -135,6 +135,35 @@ export class EmailService {
         Leave Manager System
       `,
       type: 'leave_requested'
+    };
+
+    return this.sendNotification(notification);
+  }
+
+  async sendPasswordResetNotification(
+    userEmail: string,
+    userName: string,
+    resetUrl: string
+  ): Promise<boolean> {
+    const notification: EmailNotification = {
+      to: userEmail,
+      subject: '🔐 Password Reset Request',
+      body: `
+        Dear ${userName},
+        
+        You have requested to reset your password for Leave Manager.
+        
+        Click the link below to reset your password:
+        ${resetUrl}
+        
+        This link will expire in 15 minutes.
+        
+        If you did not request this password reset, please ignore this email.
+        
+        Best regards,
+        Leave Manager Team
+      `,
+      type: 'password_reset'
     };
 
     return this.sendNotification(notification);
