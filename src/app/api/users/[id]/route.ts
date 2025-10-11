@@ -30,7 +30,7 @@ export async function GET(
     }
 
     // Remove sensitive data
-    const { password, ...safeUserData } = userData;
+    const { password: _, ...safeUserData } = userData;
 
     return NextResponse.json({ user: safeUserData });
   } catch (error) {
@@ -69,7 +69,7 @@ export async function PATCH(
     }
 
     // Build update object
-    const updateData: any = {};
+    const updateData: { fullName?: string; shiftTag?: string } = {};
     if (fullName) updateData.fullName = fullName;
     if (shiftTag) updateData.shiftTag = shiftTag;
 

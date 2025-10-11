@@ -318,7 +318,7 @@ export default function LeaderMembersPage() {
             <p><strong>🌙 Night Shift:</strong> Members who primarily work during night hours</p>
             <p><strong>🔄 Mixed Shifts:</strong> Members who work both day and night shifts</p>
             <p className="mt-2 text-blue-700">
-              <strong>Note:</strong> Shift tags help with concurrent leave management - members with different shift tags can take leave simultaneously without affecting coverage. Team leaders don't need shift tags as they manage the team.
+              <strong>Note:</strong> Shift tags help with concurrent leave management - members with different shift tags can take leave simultaneously without affecting coverage. Team leaders don&apos;t need shift tags as they manage the team.
             </p>
           </div>
         </div>

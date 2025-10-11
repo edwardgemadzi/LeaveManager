@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { LeaveRequest, Team, User } from '@/types';
-import { calculateLeaveBalance, countWorkingDays } from '@/lib/leaveCalculations';
+import { calculateLeaveBalance } from '@/lib/leaveCalculations';
 
 export default function LeaderDashboard() {
   const [team, setTeam] = useState<Team | null>(null);
