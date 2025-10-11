@@ -40,33 +40,17 @@ export class UserModel {
     const users = db.collection<User>('users');
     console.log('UserModel.findByTeamId - searching for teamId:', teamId);
     
-    // Search for teamId (handle both string and ObjectId cases)
-    let results;
-    try {
-      // Try to find with string teamId first
-      results = await users.find({ teamId: teamId }).toArray();
-      
-      // If no results and teamId looks like an ObjectId, try with ObjectId
-      if (results.length === 0 && ObjectId.isValid(teamId)) {
-        // Use type assertion to handle ObjectId in query
-        const objectIdResults = await users.find({ 
-          // @ts-expect-error - ObjectId type compatibility issue
-          teamId: new ObjectId(teamId)
-        }).toArray();
-        results = objectIdResults;
-      }
-    } catch {
-      // If ObjectId conversion fails, just use string search
-      results = await users.find({ teamId: teamId }).toArray();
-    }
+    // Handle both string and ObjectId teamIds
+    const results = await users.find({
+      $or: [
+        { teamId: teamId },
+        // @ts-expect-error - ObjectId type compatibility issue
+        { teamId: new ObjectId(teamId) }
+      ]
+    }).toArray();
     
-    // Remove duplicates based on _id
-    const uniqueResults = results.filter((user, index, self) => 
-      index === self.findIndex(u => u._id.toString() === user._id.toString())
-    );
-    
-    console.log('UserModel.findByTeamId - found users:', uniqueResults.map(u => ({ id: u._id, username: u.username, teamId: u.teamId })));
-    return uniqueResults;
+    console.log('UserModel.findByTeamId - found users:', results.map(u => ({ id: u._id, username: u.username, teamId: u.teamId })));
+    return results;
   }
 
   static async updateShiftSchedule(userId: string, shiftSchedule: ShiftSchedule): Promise<void> {
