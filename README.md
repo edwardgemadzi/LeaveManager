@@ -1,36 +1,161 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Leave Manager
+
+A comprehensive leave management application built with Next.js, MongoDB, and Tailwind CSS. This application allows team leaders to manage their team's leave requests and team members to submit and track their leave requests.
+
+## Features
+
+### Team Leaders
+- Create and manage teams
+- Approve or reject leave requests from team members
+- Make requests on behalf of team members
+- View team calendar with all leave requests
+- Configure team settings (concurrent leave limits, max leave per year)
+- Dashboard with team overview and pending requests
+
+### Team Members
+- Join existing teams using team username
+- Submit leave requests with custom shift schedules
+- View personal leave balance and request history
+- Access team calendar to see all team leave requests
+- Dashboard with personal leave information
+
+### Shared Features
+- Team-specific calendar highlighting leave requests
+- Role-based access control
+- JWT authentication
+- Responsive design with Tailwind CSS
+- Shift schedule support for different work patterns
+
+## Tech Stack
+
+- **Frontend**: Next.js 14 with App Router, TypeScript, Tailwind CSS
+- **Backend**: Next.js API Routes
+- **Database**: MongoDB Atlas
+- **Authentication**: JWT tokens
+- **Calendar**: React Big Calendar
+- **Styling**: Tailwind CSS
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
+- Node.js 18+ 
+- MongoDB Atlas account
+- npm or yarn
+
+### Installation
+
+1. Clone the repository:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone <repository-url>
+cd LeaveManager
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Install dependencies:
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Set up environment variables:
+Create a `.env.local` file in the root directory:
+```env
+MONGODB_URI=your_mongodb_atlas_connection_string
+JWT_SECRET=your_super_secret_jwt_key_change_this_in_production
+NEXTAUTH_URL=http://localhost:3000
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Run the development server:
+```bash
+npm run dev
+```
 
-## Learn More
+5. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-To learn more about Next.js, take a look at the following resources:
+## Deployment on Vercel
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+This application is optimized for deployment on Vercel's free hobby plan:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Push your code to GitHub
+2. Connect your repository to Vercel
+3. Add your environment variables in Vercel dashboard
+4. Deploy!
 
-## Deploy on Vercel
+### Environment Variables for Vercel:
+- `MONGODB_URI`: Your MongoDB Atlas connection string
+- `JWT_SECRET`: A secure random string for JWT signing
+- `NEXTAUTH_URL`: Your Vercel deployment URL (auto-set by Vercel)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Usage
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### For Team Leaders:
+1. Register as a team leader and create a new team
+2. Share your team username with team members
+3. Configure team settings (leave limits)
+4. Review and approve/reject leave requests
+5. Monitor team calendar
+
+### For Team Members:
+1. Register as a team member using your team's username
+2. Set up your shift schedule during registration
+3. Submit leave requests
+4. View your leave balance and request history
+5. Check team calendar for conflicts
+
+## Database Schema
+
+### Users Collection
+- `_id`: Unique identifier
+- `username`: User's login username
+- `password`: Hashed password
+- `role`: 'leader' or 'member'
+- `teamId`: Reference to team
+- `shiftSchedule`: Work pattern for members
+- `createdAt`: Registration timestamp
+
+### Teams Collection
+- `_id`: Unique identifier
+- `name`: Team display name
+- `teamUsername`: Unique team identifier for joining
+- `leaderId`: Reference to team leader
+- `settings`: Team configuration (leave limits)
+- `createdAt`: Team creation timestamp
+
+### LeaveRequests Collection
+- `_id`: Unique identifier
+- `userId`: Reference to user making request
+- `teamId`: Reference to team
+- `startDate`: Leave start date
+- `endDate`: Leave end date
+- `reason`: Leave reason
+- `status`: 'pending', 'approved', or 'rejected'
+- `requestedBy`: For leader requests on behalf of members
+- `createdAt`: Request timestamp
+- `updatedAt`: Last update timestamp
+
+## API Endpoints
+
+### Authentication
+- `POST /api/auth/login` - User login
+- `POST /api/auth/register-leader` - Team leader registration
+- `POST /api/auth/register-member` - Team member registration
+
+### Leave Requests
+- `GET /api/leave-requests?teamId={id}` - Get team leave requests
+- `POST /api/leave-requests` - Create leave request
+- `PATCH /api/leave-requests/{id}` - Update request status (leaders only)
+
+### Team Management
+- `GET /api/team` - Get team information and members
+- `PATCH /api/team` - Update team settings (leaders only)
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## License
+
+This project is licensed under the MIT License.
