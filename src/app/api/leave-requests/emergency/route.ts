@@ -3,9 +3,17 @@ import { getTokenFromRequest, verifyToken } from '@/lib/auth';
 import { LeaveRequestModel } from '@/models/LeaveRequest';
 import { UserModel } from '@/models/User';
 import bcrypt from 'bcrypt';
+import { emergencyRateLimit } from '@/lib/rateLimit';
+import { validateRequest, schemas } from '@/lib/validation';
 
 export async function POST(request: NextRequest) {
   try {
+    // Apply rate limiting for emergency requests
+    const rateLimitResponse = emergencyRateLimit(request);
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const token = getTokenFromRequest(request);
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -16,16 +24,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden - Leaders only' }, { status: 403 });
     }
 
-    const { memberId, startDate, endDate, reason, password, isEmergency } = await request.json();
-
-    // Validate required fields
-    if (!memberId || !startDate || !endDate || !reason || !password) {
-      return NextResponse.json({ error: 'All fields are required' }, { status: 400 });
+    const body = await request.json();
+    
+    // Validate input
+    const validation = validateRequest(schemas.emergencyRequest, body);
+    if (!validation.isValid) {
+      return NextResponse.json(
+        { error: 'Invalid input', details: validation.errors },
+        { status: 400 }
+      );
     }
 
-    if (!isEmergency) {
-      return NextResponse.json({ error: 'This endpoint is for emergency requests only' }, { status: 400 });
-    }
+    const { memberId, startDate, endDate, reason, password } = validation.data;
 
     // Verify the leader's password
     const leader = await UserModel.findById(user.id);

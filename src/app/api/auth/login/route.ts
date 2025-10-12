@@ -3,18 +3,29 @@ import bcrypt from 'bcryptjs';
 import { UserModel } from '@/models/User';
 import { generateToken } from '@/lib/auth';
 import { LoginRequest } from '@/types';
+import { authRateLimit } from '@/lib/rateLimit';
+import { validateRequest, schemas } from '@/lib/validation';
 
 export async function POST(request: NextRequest) {
   try {
-    const body: LoginRequest = await request.json();
-    const { username, password } = body;
+    // Apply rate limiting
+    const rateLimitResponse = authRateLimit(request);
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
 
-    if (!username || !password) {
+    const body: LoginRequest = await request.json();
+    
+    // Validate input
+    const validation = validateRequest(schemas.login, body);
+    if (!validation.isValid) {
       return NextResponse.json(
-        { error: 'Username and password are required' },
+        { error: 'Invalid input', details: validation.errors },
         { status: 400 }
       );
     }
+
+    const { username, password } = validation.data;
 
     const user = await UserModel.findByUsername(username);
     console.log('Login API - Found user:', user ? 'Yes' : 'No');
