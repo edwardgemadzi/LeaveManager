@@ -192,6 +192,10 @@ export default function TeamCalendar({ teamId, members }: CalendarProps) {
       if (reason.includes('medical')) return '#6f42c1'; // Purple
       if (reason.includes('family')) return '#20c997'; // Green
       if (reason.includes('personal')) return '#6c757d'; // Gray
+      if (reason.includes('maternity') || reason.includes('paternity')) return '#e83e8c'; // Pink
+      if (reason.includes('bereavement')) return '#6c757d'; // Dark Gray
+      if (reason.includes('study') || reason.includes('education')) return '#20c997'; // Teal Green
+      if (reason.includes('religious')) return '#ffc107'; // Yellow
       if (reason.includes('emergency')) return '#dc3545'; // Red
       
       // Default color based on status if reason not recognized
@@ -296,7 +300,7 @@ export default function TeamCalendar({ teamId, members }: CalendarProps) {
       {/* Legend */}
       <div className="mt-6 space-y-3">
         <h4 className="text-sm font-semibold text-gray-800 mb-2">Leave Request Types:</h4>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 text-sm">
           <div className="flex items-center">
             <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#17a2b8' }}></div>
             <span className="text-gray-700">🏖️ Vacation</span>
@@ -316,6 +320,22 @@ export default function TeamCalendar({ teamId, members }: CalendarProps) {
           <div className="flex items-center">
             <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#6c757d' }}></div>
             <span className="text-gray-700">👤 Personal</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#e83e8c' }}></div>
+            <span className="text-gray-700">👶 Maternity/Paternity</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#6c757d' }}></div>
+            <span className="text-gray-700">🕊️ Bereavement</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#20c997' }}></div>
+            <span className="text-gray-700">📚 Study/Education</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#ffc107' }}></div>
+            <span className="text-gray-700">⛪ Religious</span>
           </div>
           <div className="flex items-center">
             <div className="w-4 h-4 rounded mr-2 font-bold" style={{ backgroundColor: '#dc3545' }}></div>
