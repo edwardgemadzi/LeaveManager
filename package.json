@@ -12,6 +12,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.5",
     "@types/react-big-calendar": "^1.8.9",
+    "@vercel/analytics": "^1.5.0",
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",
     "moment": "^2.30.1",
