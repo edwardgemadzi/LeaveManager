@@ -46,18 +46,12 @@ export default function ShiftScheduleBuilder({ onScheduleChange, initialSchedule
     return newPattern;
   };
 
-  // Initialize x/x values from existing pattern if available (only once)
+  // Initialize component (don't try to extract from existing patterns)
   useEffect(() => {
-    if (initialSchedule?.type === 'rotating' && initialSchedule.pattern && !isInitialized) {
-      const workingCount = initialSchedule.pattern.filter(day => day).length;
-      const offCount = initialSchedule.pattern.filter(day => !day).length;
-      setDaysOn(workingCount);
-      setDaysOff(offCount);
-      setIsInitialized(true);
-    } else if (!initialSchedule && !isInitialized) {
+    if (!isInitialized) {
       setIsInitialized(true);
     }
-  }, [initialSchedule, isInitialized]);
+  }, [isInitialized]);
 
   // Update pattern when x/x inputs change (but not during initialization)
   useEffect(() => {
