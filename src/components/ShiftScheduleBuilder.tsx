@@ -31,7 +31,6 @@ export default function ShiftScheduleBuilder({ onScheduleChange, initialSchedule
 
   // Function to generate pattern based on x/x inputs
   const generatePattern = (on: number, off: number): boolean[] => {
-    const totalDays = on + off;
     const newPattern: boolean[] = [];
     
     // Add working days
