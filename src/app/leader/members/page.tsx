@@ -221,7 +221,7 @@ export default function LeaderMembersPage() {
                           Username: {member.username}
                         </p>
                         <p className="text-sm text-gray-600">
-                          Joined: {new Date(member.createdAt).toLocaleDateString()}
+                          Joined: {member.createdAt ? new Date(member.createdAt).toLocaleDateString() : 'Unknown'}
                         </p>
                         {member.role !== 'leader' && (
                           <div className="mt-2">

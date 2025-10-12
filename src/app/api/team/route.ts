@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
         role: member.role,
         shiftSchedule: member.shiftSchedule,
         shiftTag: member.shiftTag,
+        createdAt: member.createdAt,
       })),
     };
     
