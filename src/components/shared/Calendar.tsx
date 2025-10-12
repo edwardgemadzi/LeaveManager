@@ -176,24 +176,38 @@ export default function TeamCalendar({ teamId, members }: CalendarProps) {
   }, [teamId, members]);
 
   const eventStyleGetter = useCallback((event: CalendarEvent) => {
-    let backgroundColor = '#3174ad'; // Default blue
+    // Extract reason from title (format: "Name - Reason" or "🚨 Name - Reason")
+    const titleParts = event.title.split(' - ');
+    const reason = titleParts.length > 1 ? titleParts[1].toLowerCase() : '';
     
-    // Emergency requests are always red, regardless of status
-    if (event.resource.isEmergency) {
-      backgroundColor = '#dc3545'; // Red for emergency
-    } else {
+    // Define color scheme for different reasons
+    const getReasonColor = (reason: string, isEmergency: boolean) => {
+      if (isEmergency) {
+        return '#dc3545'; // Red for emergency (overrides everything)
+      }
+      
+      // Regular reason-based colors
+      if (reason.includes('vacation')) return '#17a2b8'; // Teal
+      if (reason.includes('sick')) return '#fd7e14'; // Orange
+      if (reason.includes('medical')) return '#6f42c1'; // Purple
+      if (reason.includes('family')) return '#20c997'; // Green
+      if (reason.includes('personal')) return '#6c757d'; // Gray
+      if (reason.includes('emergency')) return '#dc3545'; // Red
+      
+      // Default color based on status if reason not recognized
       switch (event.resource.status) {
         case 'approved':
-          backgroundColor = '#28a745'; // Green
-          break;
+          return '#28a745'; // Green
         case 'pending':
-          backgroundColor = '#ffc107'; // Yellow
-          break;
+          return '#ffc107'; // Yellow
         case 'rejected':
-          backgroundColor = '#dc3545'; // Red
-          break;
+          return '#dc3545'; // Red
+        default:
+          return '#3174ad'; // Default blue
       }
-    }
+    };
+
+    const backgroundColor = getReasonColor(reason, event.resource.isEmergency || false);
 
     return {
       style: {
@@ -280,18 +294,33 @@ export default function TeamCalendar({ teamId, members }: CalendarProps) {
       />
       
       {/* Legend */}
-      <div className="mt-6 flex flex-wrap gap-6 text-sm font-medium">
-        <div className="flex items-center">
-          <div className="w-4 h-4 bg-green-500 rounded mr-2"></div>
-          <span className="text-gray-700">Approved</span>
-        </div>
-        <div className="flex items-center">
-          <div className="w-4 h-4 bg-yellow-500 rounded mr-2"></div>
-          <span className="text-gray-700">Pending</span>
-        </div>
-        <div className="flex items-center">
-          <div className="w-4 h-4 bg-red-500 rounded mr-2 font-bold"></div>
-          <span className="text-gray-700 font-bold">🚨 Emergency</span>
+      <div className="mt-6 space-y-3">
+        <h4 className="text-sm font-semibold text-gray-800 mb-2">Leave Request Types:</h4>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
+          <div className="flex items-center">
+            <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#17a2b8' }}></div>
+            <span className="text-gray-700">🏖️ Vacation</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#fd7e14' }}></div>
+            <span className="text-gray-700">🤒 Sick Leave</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#6f42c1' }}></div>
+            <span className="text-gray-700">🏥 Medical</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#20c997' }}></div>
+            <span className="text-gray-700">👨‍👩‍👧‍👦 Family</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#6c757d' }}></div>
+            <span className="text-gray-700">👤 Personal</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 rounded mr-2 font-bold" style={{ backgroundColor: '#dc3545' }}></div>
+            <span className="text-gray-700 font-bold">🚨 Emergency</span>
+          </div>
         </div>
       </div>
 
