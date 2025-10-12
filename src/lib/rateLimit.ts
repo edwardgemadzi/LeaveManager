@@ -12,7 +12,7 @@ interface RateLimitOptions {
 export function rateLimit(options: RateLimitOptions) {
   const { windowMs, maxRequests, message = 'Too many requests' } = options;
 
-  return (request: NextRequest) => {
+  return (request: NextRequest): NextResponse | null => {
     const ip = request.headers.get('x-forwarded-for') || 
                request.headers.get('x-real-ip') || 
                'unknown';
@@ -54,13 +54,8 @@ export function rateLimit(options: RateLimitOptions) {
       );
     }
 
-    // Add rate limit headers
-    const response = NextResponse.next();
-    response.headers.set('X-RateLimit-Limit', maxRequests.toString());
-    response.headers.set('X-RateLimit-Remaining', (maxRequests - entry.count).toString());
-    response.headers.set('X-RateLimit-Reset', entry.resetTime.toString());
-
-    return response;
+    // Return null if no rate limit violation
+    return null;
   };
 }
 
