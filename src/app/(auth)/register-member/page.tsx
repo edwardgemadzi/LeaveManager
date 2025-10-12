@@ -94,7 +94,12 @@ export default function RegisterMemberPage() {
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 placeholder="Your full name"
                 value={formData.fullName}
-                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Capitalize first letter of each word
+                  const capitalizedValue = value.replace(/\b\w/g, l => l.toUpperCase());
+                  setFormData({ ...formData, fullName: capitalizedValue });
+                }}
               />
             </div>
 

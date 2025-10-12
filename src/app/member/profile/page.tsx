@@ -208,10 +208,15 @@ export default function MemberProfilePage() {
                       required
                       className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                       value={profileForm.fullName}
-                      onChange={(e) => setProfileForm({
-                        ...profileForm,
-                        fullName: e.target.value
-                      })}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Capitalize first letter of each word
+                        const capitalizedValue = value.replace(/\b\w/g, l => l.toUpperCase());
+                        setProfileForm({
+                          ...profileForm,
+                          fullName: capitalizedValue
+                        });
+                      }}
                     />
                   </div>
                   
