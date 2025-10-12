@@ -46,7 +46,7 @@ export default function Navbar() {
           </div>
 
           <div className="flex items-center space-x-1">
-            <div className="hidden md:block">
+            <div className="hidden lg:block">
               <div className="flex items-center space-x-1">
                         {user.role === 'leader' ? (
                           <>
@@ -102,10 +102,10 @@ export default function Navbar() {
               </button>
             </div>
 
-            <div className="md:hidden ml-2">
+            <div className="lg:hidden ml-2">
               <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="text-white/90 hover:text-white p-2 rounded-xl hover:bg-white/10 transition-all duration-200"
+                className="text-gray-600 hover:text-gray-900 p-2 rounded-xl hover:bg-gray-100 transition-all duration-200"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -116,41 +116,41 @@ export default function Navbar() {
         </div>
 
         {isOpen && (
-          <div className="md:hidden glass-dark border-t border-white/10">
+          <div className="lg:hidden bg-white border-t border-gray-200 shadow-lg">
             <div className="px-2 pt-2 pb-3 space-y-1">
               {user.role === 'leader' ? (
                 <>
-                  <Link href="/leader/dashboard" className="block px-4 py-3 text-white/90 hover:text-white hover:bg-white/10 rounded-xl text-sm font-medium transition-all duration-200">
+                  <Link href="/leader/dashboard" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-xl text-sm font-medium transition-all duration-200">
                     Dashboard
                   </Link>
-                  <Link href="/leader/requests" className="block px-4 py-3 text-white/90 hover:text-white hover:bg-white/10 rounded-xl text-sm font-medium transition-all duration-200">
+                  <Link href="/leader/requests" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-xl text-sm font-medium transition-all duration-200">
                     Requests
                   </Link>
-                  <Link href="/leader/calendar" className="block px-4 py-3 text-white/90 hover:text-white hover:bg-white/10 rounded-xl text-sm font-medium transition-all duration-200">
+                  <Link href="/leader/calendar" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-xl text-sm font-medium transition-all duration-200">
                     Calendar
                   </Link>
-                  <Link href="/leader/members" className="block px-4 py-3 text-white/90 hover:text-white hover:bg-white/10 rounded-xl text-sm font-medium transition-all duration-200">
+                  <Link href="/leader/members" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-xl text-sm font-medium transition-all duration-200">
                     Members
                   </Link>
-                  <Link href="/leader/settings" className="block px-4 py-3 text-white/90 hover:text-white hover:bg-white/10 rounded-xl text-sm font-medium transition-all duration-200">
+                  <Link href="/leader/settings" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-xl text-sm font-medium transition-all duration-200">
                     Settings
                   </Link>
-                  <Link href="/leader/profile" className="block px-4 py-3 text-white/90 hover:text-white hover:bg-white/10 rounded-xl text-sm font-medium transition-all duration-200">
+                  <Link href="/leader/profile" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-xl text-sm font-medium transition-all duration-200">
                     Profile
                   </Link>
                 </>
               ) : (
                 <>
-                  <Link href="/member/dashboard" className="block px-4 py-3 text-white/90 hover:text-white hover:bg-white/10 rounded-xl text-sm font-medium transition-all duration-200">
+                  <Link href="/member/dashboard" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-xl text-sm font-medium transition-all duration-200">
                     Dashboard
                   </Link>
-                  <Link href="/member/requests" className="block px-4 py-3 text-white/90 hover:text-white hover:bg-white/10 rounded-xl text-sm font-medium transition-all duration-200">
+                  <Link href="/member/requests" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-xl text-sm font-medium transition-all duration-200">
                     My Requests
                   </Link>
-                  <Link href="/member/calendar" className="block px-4 py-3 text-white/90 hover:text-white hover:bg-white/10 rounded-xl text-sm font-medium transition-all duration-200">
+                  <Link href="/member/calendar" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-xl text-sm font-medium transition-all duration-200">
                     Calendar
                   </Link>
-                  <Link href="/member/profile" className="block px-4 py-3 text-white/90 hover:text-white hover:bg-white/10 rounded-xl text-sm font-medium transition-all duration-200">
+                  <Link href="/member/profile" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-xl text-sm font-medium transition-all duration-200">
                     Profile
                   </Link>
                 </>
