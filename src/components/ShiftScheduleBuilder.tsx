@@ -27,6 +27,7 @@ export default function ShiftScheduleBuilder({ onScheduleChange, initialSchedule
   // New state for x/x pattern inputs
   const [daysOn, setDaysOn] = useState<number>(2);
   const [daysOff, setDaysOff] = useState<number>(2);
+  const [isInitialized, setIsInitialized] = useState<boolean>(false);
 
   // Function to generate pattern based on x/x inputs
   const generatePattern = (on: number, off: number): boolean[] => {
@@ -46,9 +47,23 @@ export default function ShiftScheduleBuilder({ onScheduleChange, initialSchedule
     return newPattern;
   };
 
-  // Update pattern when x/x inputs change
+  // Initialize x/x values from existing pattern if available (only once)
   useEffect(() => {
-    if (scheduleType === 'rotating') {
+    if (initialSchedule?.type === 'rotating' && initialSchedule.pattern && !isInitialized) {
+      const workingCount = initialSchedule.pattern.filter(day => day).length;
+      const offCount = initialSchedule.pattern.filter(day => !day).length;
+      setDaysOn(workingCount);
+      setDaysOff(offCount);
+      setIsInitialized(true);
+    } else if (!initialSchedule && !isInitialized) {
+      setIsInitialized(true);
+    }
+  }, [initialSchedule, isInitialized]);
+
+  // Update pattern when x/x inputs change (but not during initialization)
+  useEffect(() => {
+    if (scheduleType === 'rotating' && isInitialized) {
+      console.log('Generating pattern for:', daysOn, 'on,', daysOff, 'off');
       const newPattern = generatePattern(daysOn, daysOff);
       setPattern(newPattern);
       onScheduleChange({
@@ -57,17 +72,7 @@ export default function ShiftScheduleBuilder({ onScheduleChange, initialSchedule
         type: 'rotating'
       });
     }
-  }, [daysOn, daysOff, scheduleType, startDate, onScheduleChange]);
-
-  // Initialize x/x values from existing pattern if available
-  useEffect(() => {
-    if (initialSchedule?.type === 'rotating' && initialSchedule.pattern) {
-      const workingCount = initialSchedule.pattern.filter(day => day).length;
-      const offCount = initialSchedule.pattern.filter(day => !day).length;
-      setDaysOn(workingCount);
-      setDaysOff(offCount);
-    }
-  }, [initialSchedule]);
+  }, [daysOn, daysOff, scheduleType, startDate, onScheduleChange, isInitialized]);
 
   const handlePatternChange = (index: number) => {
     const newPattern = [...pattern];
@@ -130,6 +135,7 @@ export default function ShiftScheduleBuilder({ onScheduleChange, initialSchedule
                   startDate: new Date(startDate),
                   type: 'rotating'
                 });
+                setIsInitialized(true);
               }}
               className="mr-2"
             />
