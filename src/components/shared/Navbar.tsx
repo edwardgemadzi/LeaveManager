@@ -94,12 +94,14 @@ export default function Navbar() {
                   {user.username} ({user.role})
                 </span>
               </div>
-              <button
-                onClick={handleLogout}
-                className="bg-red-500/80 hover:bg-red-500 text-white px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 backdrop-blur-sm border border-red-400/50 hover:border-red-300"
-              >
-                Logout
-              </button>
+              <div className="hidden lg:block">
+                <button
+                  onClick={handleLogout}
+                  className="bg-red-500/80 hover:bg-red-500 text-white px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 backdrop-blur-sm border border-red-400/50 hover:border-red-300"
+                >
+                  Logout
+                </button>
+              </div>
             </div>
 
             <div className="lg:hidden ml-2">
@@ -155,6 +157,27 @@ export default function Navbar() {
                   </Link>
                 </>
               )}
+              
+              {/* User info and logout section */}
+              <div className="border-t border-gray-200 mt-2 pt-2">
+                <div className="px-4 py-2">
+                  <p className="text-xs text-gray-500 mb-2">
+                    Logged in as: <span className="font-medium text-gray-700">{user.username}</span>
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Role: <span className="font-medium text-gray-700 capitalize">{user.role}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
+                    handleLogout();
+                  }}
+                  className="w-full mx-2 mb-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200"
+                >
+                  Logout
+                </button>
+              </div>
             </div>
           </div>
         )}
