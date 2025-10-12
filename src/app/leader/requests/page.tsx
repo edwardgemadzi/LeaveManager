@@ -9,6 +9,17 @@ export default function LeaderRequestsPage() {
   const [members, setMembers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  
+  // Emergency request state
+  const [showEmergencyForm, setShowEmergencyForm] = useState(false);
+  const [emergencyForm, setEmergencyForm] = useState({
+    memberId: '',
+    startDate: '',
+    endDate: '',
+    reason: '',
+    password: ''
+  });
+  const [submittingEmergency, setSubmittingEmergency] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -87,6 +98,49 @@ export default function LeaderRequestsPage() {
     }
   };
 
+  const handleEmergencyRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmittingEmergency(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/leave-requests/emergency', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...emergencyForm,
+          isEmergency: true
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Add the new request to the list
+        setRequests([data, ...requests]);
+        setEmergencyForm({
+          memberId: '',
+          startDate: '',
+          endDate: '',
+          reason: '',
+          password: ''
+        });
+        setShowEmergencyForm(false);
+        alert('Emergency leave request created and auto-approved!');
+      } else {
+        alert(data.error || 'Failed to create emergency request');
+      }
+    } catch (error) {
+      console.error('Error creating emergency request:', error);
+      alert('Network error. Please try again.');
+    } finally {
+      setSubmittingEmergency(false);
+    }
+  };
+
   const filteredRequests = requests.filter(request => {
     if (filter === 'all') return true;
     return request.status === filter;
@@ -118,9 +172,132 @@ export default function LeaderRequestsPage() {
       
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <h1 className="text-3xl font-bold text-gray-900">Team Requests</h1>
-          <p className="mt-2 text-gray-600">Manage leave requests from your team members.</p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Team Requests</h1>
+              <p className="mt-2 text-gray-600">Manage leave requests from your team members.</p>
+            </div>
+            <button
+              onClick={() => setShowEmergencyForm(!showEmergencyForm)}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+            >
+              🚨 Emergency Request
+            </button>
+          </div>
         </div>
+
+        {/* Emergency Request Form */}
+        {showEmergencyForm && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-6">
+            <h2 className="text-lg font-medium text-red-900 mb-4">🚨 Create Emergency Leave Request</h2>
+            <p className="text-sm text-red-700 mb-4">
+              This will create an emergency leave request that bypasses normal team settings and is automatically approved.
+            </p>
+            
+            <form onSubmit={handleEmergencyRequest} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="memberId" className="block text-sm font-medium text-gray-700">
+                    Select Member
+                  </label>
+                  <select
+                    id="memberId"
+                    required
+                    value={emergencyForm.memberId}
+                    onChange={(e) => setEmergencyForm({ ...emergencyForm, memberId: e.target.value })}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  >
+                    <option value="">Choose a member...</option>
+                    {members.filter(member => member.role !== 'leader').map((member) => (
+                      <option key={member._id} value={member._id}>
+                        {member.fullName || member.username}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="reason" className="block text-sm font-medium text-gray-700">
+                    Reason
+                  </label>
+                  <select
+                    id="reason"
+                    required
+                    value={emergencyForm.reason}
+                    onChange={(e) => setEmergencyForm({ ...emergencyForm, reason: e.target.value })}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  >
+                    <option value="">Select reason...</option>
+                    <option value="Medical Emergency">Medical Emergency</option>
+                    <option value="Family Emergency">Family Emergency</option>
+                    <option value="Personal Crisis">Personal Crisis</option>
+                    <option value="Other Emergency">Other Emergency</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    id="startDate"
+                    required
+                    value={emergencyForm.startDate}
+                    onChange={(e) => setEmergencyForm({ ...emergencyForm, startDate: e.target.value })}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="endDate" className="block text-sm font-medium text-gray-700">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    id="endDate"
+                    required
+                    value={emergencyForm.endDate}
+                    onChange={(e) => setEmergencyForm({ ...emergencyForm, endDate: e.target.value })}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                  Your Password (for authentication)
+                </label>
+                <input
+                  type="password"
+                  id="password"
+                  required
+                  value={emergencyForm.password}
+                  onChange={(e) => setEmergencyForm({ ...emergencyForm, password: e.target.value })}
+                  placeholder="Enter your password to authenticate this emergency request"
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setShowEmergencyForm(false)}
+                  className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingEmergency}
+                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  {submittingEmergency ? 'Creating...' : 'Create Emergency Request'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
 
         {/* Filter Tabs */}
         <div className="mb-6">
@@ -173,9 +350,16 @@ export default function LeaderRequestsPage() {
                             {new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()}
                           </p>
                           <p className="text-gray-700 mt-2">{request.reason}</p>
-                          <p className="text-xs text-gray-500 mt-2">
-                            Requested on {new Date(request.createdAt).toLocaleDateString()}
-                          </p>
+                          <div className="flex items-center space-x-2 mt-2">
+                            <p className="text-xs text-gray-500">
+                              Requested on {new Date(request.createdAt).toLocaleDateString()}
+                            </p>
+                            {request.requestedBy && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                🚨 Emergency
+                              </span>
+                            )}
+                          </div>
                         </div>
                         {request.status === 'pending' && (
                           <div className="flex space-x-2 ml-4">
