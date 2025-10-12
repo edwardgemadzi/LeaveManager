@@ -19,6 +19,8 @@ interface CalendarEvent {
     userId: string;
     username: string;
     fullName?: string;
+    isEmergency?: boolean;
+    requestedBy?: string;
   };
 }
 
@@ -69,9 +71,16 @@ export default function TeamCalendar({ teamId, members }: CalendarProps) {
         const calendarEvents: CalendarEvent[] = [];
         
         requests.forEach(request => {
+          // Skip rejected requests - they shouldn't show on the calendar
+          if (request.status === 'rejected') {
+            console.log('Calendar - Skipping rejected request:', request._id);
+            return;
+          }
+
           const member = members.find(m => m._id === request.userId);
           const memberName = member?.fullName || member?.username || 'Unknown';
           const shiftSchedule = member?.shiftSchedule;
+          const isEmergency = !!request.requestedBy; // Emergency if requestedBy is set
           
           console.log('Calendar event creation:', {
             requestId: request._id,
@@ -79,14 +88,20 @@ export default function TeamCalendar({ teamId, members }: CalendarProps) {
             member: member ? { id: member._id, username: member.username, fullName: member.fullName } : null,
             memberName,
             membersCount: members.length,
-            membersIds: members.map(m => m._id)
+            membersIds: members.map(m => m._id),
+            isEmergency,
+            requestedBy: request.requestedBy
           });
           
           if (!shiftSchedule) {
             // If no shift schedule, create a single event for the entire period
+            const eventTitle = isEmergency 
+              ? `🚨 ${memberName} - ${request.reason}` 
+              : `${memberName} - ${request.reason}`;
+              
             calendarEvents.push({
               id: request._id!,
-              title: `${memberName} - ${request.reason}`,
+              title: eventTitle,
               start: new Date(request.startDate),
               end: new Date(request.endDate),
               resource: {
@@ -94,6 +109,8 @@ export default function TeamCalendar({ teamId, members }: CalendarProps) {
                 userId: request.userId,
                 username: member?.username || 'Unknown',
                 fullName: member?.fullName,
+                isEmergency,
+                requestedBy: request.requestedBy,
               },
             });
           } else {
@@ -116,9 +133,13 @@ export default function TeamCalendar({ teamId, members }: CalendarProps) {
             });
             
             workingDays.forEach((workingDay, index) => {
+              const eventTitle = isEmergency 
+                ? `🚨 ${memberName} - ${request.reason}` 
+                : `${memberName} - ${request.reason}`;
+                
               const event = {
                 id: `${request._id!}-${index}`,
-                title: `${memberName} - ${request.reason}`,
+                title: eventTitle,
                 start: new Date(workingDay),
                 end: new Date(workingDay),
                 resource: {
@@ -126,6 +147,8 @@ export default function TeamCalendar({ teamId, members }: CalendarProps) {
                   userId: request.userId,
                   username: member?.username || 'Unknown',
                   fullName: member?.fullName,
+                  isEmergency,
+                  requestedBy: request.requestedBy,
                 },
               };
               
@@ -155,16 +178,21 @@ export default function TeamCalendar({ teamId, members }: CalendarProps) {
   const eventStyleGetter = useCallback((event: CalendarEvent) => {
     let backgroundColor = '#3174ad'; // Default blue
     
-    switch (event.resource.status) {
-      case 'approved':
-        backgroundColor = '#28a745'; // Green
-        break;
-      case 'pending':
-        backgroundColor = '#ffc107'; // Yellow
-        break;
-      case 'rejected':
-        backgroundColor = '#dc3545'; // Red
-        break;
+    // Emergency requests are always red, regardless of status
+    if (event.resource.isEmergency) {
+      backgroundColor = '#dc3545'; // Red for emergency
+    } else {
+      switch (event.resource.status) {
+        case 'approved':
+          backgroundColor = '#28a745'; // Green
+          break;
+        case 'pending':
+          backgroundColor = '#ffc107'; // Yellow
+          break;
+        case 'rejected':
+          backgroundColor = '#dc3545'; // Red
+          break;
+      }
     }
 
     return {
@@ -175,6 +203,7 @@ export default function TeamCalendar({ teamId, members }: CalendarProps) {
         color: 'white',
         border: '0px',
         display: 'block',
+        fontWeight: event.resource.isEmergency ? 'bold' : 'normal',
       },
     };
   }, []);
@@ -261,8 +290,8 @@ export default function TeamCalendar({ teamId, members }: CalendarProps) {
           <span className="text-gray-700">Pending</span>
         </div>
         <div className="flex items-center">
-          <div className="w-4 h-4 bg-red-500 rounded mr-2"></div>
-          <span className="text-gray-700">Rejected</span>
+          <div className="w-4 h-4 bg-red-500 rounded mr-2 font-bold"></div>
+          <span className="text-gray-700 font-bold">🚨 Emergency</span>
         </div>
       </div>
 
@@ -302,7 +331,9 @@ export default function TeamCalendar({ teamId, members }: CalendarProps) {
                 'rejected': { color: 'text-red-600', bg: 'bg-red-100', icon: '❌' }
               };
               
-              const status = statusConfig[selectedEvent.resource.status as keyof typeof statusConfig];
+              const status = selectedEvent.resource.isEmergency 
+                ? { color: 'text-red-600', bg: 'bg-red-100', icon: '🚨' }
+                : statusConfig[selectedEvent.resource.status as keyof typeof statusConfig];
               
               return (
                 <div className="space-y-4">
@@ -312,7 +343,7 @@ export default function TeamCalendar({ teamId, members }: CalendarProps) {
                       <p className="font-semibold text-gray-900">{memberName}</p>
                       <p className="text-sm text-gray-600">@{selectedEvent.resource.username}</p>
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status.bg} ${status.color}`}>
-                        {selectedEvent.resource.status.toUpperCase()}
+                        {selectedEvent.resource.isEmergency ? 'EMERGENCY' : selectedEvent.resource.status.toUpperCase()}
                       </span>
                     </div>
                   </div>
