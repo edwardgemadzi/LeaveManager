@@ -199,109 +199,113 @@ export default function LeaderMembersPage() {
             ) : (
               <div className="space-y-4">
                 {members.map((member) => (
-                  <div key={member._id} className="border rounded-lg p-6 hover:bg-gray-50 transition-colors">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3">
-                          <h4 className="text-lg font-medium text-gray-900">
-                            {member.fullName || member.username}
-                          </h4>
-                          {member.role !== 'leader' && (
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getShiftTagColor(member.shiftTag)}`}>
-                              {getShiftTagIcon(member.shiftTag)} {member.shiftTag || 'Unassigned'}
-                            </span>
-                          )}
-                          {member.role === 'leader' && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              👑 Leader
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-600 mt-1">
-                          Username: {member.username}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          Joined: {member.createdAt ? new Date(member.createdAt).toLocaleDateString() : 'Unknown'}
-                        </p>
-                        {member.role !== 'leader' && (
-                          <div className="mt-2">
-                            {editingSchedule === member._id ? (
-                              <div className="space-y-3">
-                                <div className="border rounded-lg p-4 bg-gray-50">
-                                  <h5 className="text-sm font-medium text-gray-700 mb-3">Edit Shift Schedule</h5>
-                                  <ShiftScheduleBuilder 
-                                    onScheduleChange={setTempSchedule}
-                                    initialSchedule={tempSchedule || undefined}
-                                  />
-                                </div>
-                                <div className="flex space-x-2">
-                                  <button
-                                    onClick={() => handleSaveSchedule(member._id!)}
-                                    disabled={updating === member._id}
-                                    className="bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
-                                  >
-                                    {updating === member._id ? 'Saving...' : 'Save Schedule'}
-                                  </button>
-                                  <button
-                                    onClick={handleCancelEdit}
-                                    className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="flex items-center space-x-2">
-                                <p className="text-sm text-gray-600">
-                                  Schedule: {member.shiftSchedule?.type === 'rotating' ? 'Rotating' : 'Fixed'} 
-                                  {member.shiftSchedule?.pattern && (
-                                    <span className="ml-2">
-                                      ({member.shiftSchedule.pattern.map(day => day ? 'W' : 'O').join('')})
-                                    </span>
-                                  )}
-                                </p>
-                                <button
-                                  onClick={() => handleEditSchedule(member)}
-                                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                                >
-                                  Edit
-                                </button>
-                              </div>
+                  <div key={member._id} className="border rounded-lg p-4 sm:p-6 hover:bg-gray-50 transition-colors">
+                    <div className="space-y-4">
+                      {/* Header Section */}
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start space-y-3 sm:space-y-0">
+                        <div className="flex-1">
+                          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                            <h4 className="text-lg font-medium text-gray-900">
+                              {member.fullName || member.username}
+                            </h4>
+                            {member.role !== 'leader' && (
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getShiftTagColor(member.shiftTag)}`}>
+                                {getShiftTagIcon(member.shiftTag)} {member.shiftTag || 'Unassigned'}
+                              </span>
                             )}
+                            {member.role === 'leader' && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                👑 Leader
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">
+                            Username: {member.username}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            Joined: {member.createdAt ? new Date(member.createdAt).toLocaleDateString() : 'Unknown'}
+                          </p>
+                        </div>
+                        
+                        {/* Action Buttons - Only for members */}
+                        {member.role !== 'leader' && (
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+                            {/* Shift Tag Selector */}
+                            <div className="flex items-center space-x-2">
+                              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Shift:</label>
+                              <select
+                                value={member.shiftTag || ''}
+                                onChange={(e) => handleUpdateShiftTag(member._id!, e.target.value as 'day' | 'night' | 'mixed')}
+                                disabled={updating === member._id}
+                                className="text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 min-w-0 flex-1"
+                              >
+                                <option value="">Select shift</option>
+                                <option value="day">☀️ Day Shift</option>
+                                <option value="night">🌙 Night Shift</option>
+                                <option value="mixed">🔄 Mixed Shifts</option>
+                              </select>
+                            </div>
+                            
+                            {/* Delete Button */}
+                            <button
+                              onClick={() => handleDeleteMember(member._id!, member.fullName || member.username)}
+                              disabled={deleting === member._id}
+                              className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                            >
+                              {deleting === member._id ? 'Removing...' : 'Remove'}
+                            </button>
                           </div>
                         )}
                       </div>
                       
-                      <div className="flex items-center space-x-3">
-                        {/* Shift Tag Selector - Only for members */}
-                        {member.role !== 'leader' && (
-                          <div className="flex items-center space-x-2">
-                            <label className="text-sm font-medium text-gray-700">Shift:</label>
-                            <select
-                              value={member.shiftTag || ''}
-                              onChange={(e) => handleUpdateShiftTag(member._id!, e.target.value as 'day' | 'night' | 'mixed')}
-                              disabled={updating === member._id}
-                              className="text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50"
-                            >
-                              <option value="">Select shift</option>
-                              <option value="day">☀️ Day Shift</option>
-                              <option value="night">🌙 Night Shift</option>
-                              <option value="mixed">🔄 Mixed Shifts</option>
-                            </select>
-                          </div>
-                        )}
-                        
-                        {/* Delete Button */}
-                        {member.role !== 'leader' && (
-                          <button
-                            onClick={() => handleDeleteMember(member._id!, member.fullName || member.username)}
-                            disabled={deleting === member._id}
-                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            {deleting === member._id ? 'Removing...' : 'Remove'}
-                          </button>
-                        )}
-                      </div>
+                      {/* Schedule Section - Only for members */}
+                      {member.role !== 'leader' && (
+                        <div className="border-t border-gray-200 pt-4">
+                          {editingSchedule === member._id ? (
+                            <div className="space-y-3">
+                              <div className="border rounded-lg p-4 bg-gray-50">
+                                <h5 className="text-sm font-medium text-gray-700 mb-3">Edit Shift Schedule</h5>
+                                <ShiftScheduleBuilder 
+                                  onScheduleChange={setTempSchedule}
+                                  initialSchedule={tempSchedule || undefined}
+                                />
+                              </div>
+                              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                                <button
+                                  onClick={() => handleSaveSchedule(member._id!)}
+                                  disabled={updating === member._id}
+                                  className="bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+                                >
+                                  {updating === member._id ? 'Saving...' : 'Save Schedule'}
+                                </button>
+                                <button
+                                  onClick={handleCancelEdit}
+                                  className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+                              <p className="text-sm text-gray-600">
+                                Schedule: {member.shiftSchedule?.type === 'rotating' ? 'Rotating' : 'Fixed'} 
+                                {member.shiftSchedule?.pattern && (
+                                  <span className="ml-2">
+                                    ({member.shiftSchedule.pattern.map(day => day ? 'W' : 'O').join('')})
+                                  </span>
+                                )}
+                              </p>
+                              <button
+                                onClick={() => handleEditSchedule(member)}
+                                className="text-blue-600 hover:text-blue-800 text-sm font-medium self-start"
+                              >
+                                Edit
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
