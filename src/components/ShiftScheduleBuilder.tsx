@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ShiftSchedule } from '@/types';
 
 interface ShiftScheduleBuilderProps {
@@ -23,6 +23,51 @@ export default function ShiftScheduleBuilder({ onScheduleChange, initialSchedule
   const [workingDays, setWorkingDays] = useState<boolean[]>(
     initialSchedule?.pattern || [true, true, true, true, true, false, false]
   );
+  
+  // New state for x/x pattern inputs
+  const [daysOn, setDaysOn] = useState<number>(2);
+  const [daysOff, setDaysOff] = useState<number>(2);
+
+  // Function to generate pattern based on x/x inputs
+  const generatePattern = (on: number, off: number): boolean[] => {
+    const totalDays = on + off;
+    const newPattern: boolean[] = [];
+    
+    // Add working days
+    for (let i = 0; i < on; i++) {
+      newPattern.push(true);
+    }
+    
+    // Add off days
+    for (let i = 0; i < off; i++) {
+      newPattern.push(false);
+    }
+    
+    return newPattern;
+  };
+
+  // Update pattern when x/x inputs change
+  useEffect(() => {
+    if (scheduleType === 'rotating') {
+      const newPattern = generatePattern(daysOn, daysOff);
+      setPattern(newPattern);
+      onScheduleChange({
+        pattern: newPattern,
+        startDate: new Date(startDate),
+        type: 'rotating'
+      });
+    }
+  }, [daysOn, daysOff, scheduleType, startDate, onScheduleChange]);
+
+  // Initialize x/x values from existing pattern if available
+  useEffect(() => {
+    if (initialSchedule?.type === 'rotating' && initialSchedule.pattern) {
+      const workingCount = initialSchedule.pattern.filter(day => day).length;
+      const offCount = initialSchedule.pattern.filter(day => !day).length;
+      setDaysOn(workingCount);
+      setDaysOff(offCount);
+    }
+  }, [initialSchedule]);
 
   const handlePatternChange = (index: number) => {
     const newPattern = [...pattern];
@@ -75,7 +120,17 @@ export default function ShiftScheduleBuilder({ onScheduleChange, initialSchedule
               type="radio"
               value="rotating"
               checked={scheduleType === 'rotating'}
-              onChange={(e) => setScheduleType(e.target.value as 'rotating')}
+              onChange={(e) => {
+                setScheduleType(e.target.value as 'rotating');
+                // Generate new pattern when switching to rotating
+                const newPattern = generatePattern(daysOn, daysOff);
+                setPattern(newPattern);
+                onScheduleChange({
+                  pattern: newPattern,
+                  startDate: new Date(startDate),
+                  type: 'rotating'
+                });
+              }}
               className="mr-2"
             />
             Rotating Schedule
@@ -85,7 +140,14 @@ export default function ShiftScheduleBuilder({ onScheduleChange, initialSchedule
               type="radio"
               value="fixed"
               checked={scheduleType === 'fixed'}
-              onChange={(e) => setScheduleType(e.target.value as 'fixed')}
+              onChange={(e) => {
+                setScheduleType(e.target.value as 'fixed');
+                onScheduleChange({
+                  pattern: workingDays,
+                  startDate: new Date(startDate),
+                  type: 'fixed'
+                });
+              }}
               className="mr-2"
             />
             Fixed Weekly Schedule
@@ -107,30 +169,66 @@ export default function ShiftScheduleBuilder({ onScheduleChange, initialSchedule
 
       {scheduleType === 'rotating' ? (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Work Pattern (click to toggle)
-          </label>
-          <div className="flex space-x-2">
-            {pattern.map((isWorking, index) => (
-              <button
-                key={index}
-                type="button"
-                onClick={() => handlePatternChange(index)}
-                className={`px-3 py-2 rounded-md text-sm font-medium ${
-                  isWorking
-                    ? 'bg-green-100 text-green-800 border border-green-300'
-                    : 'bg-red-100 text-red-800 border border-red-300'
-                }`}
-              >
-                Day {index + 1}
-                <br />
-                {isWorking ? 'Work' : 'Off'}
-              </button>
-            ))}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Rotation Pattern
+            </label>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="number"
+                  min="1"
+                  max="14"
+                  value={daysOn}
+                  onChange={(e) => setDaysOn(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-16 px-2 py-1 border border-gray-300 rounded-md text-center"
+                />
+                <span className="text-sm text-gray-600">days on</span>
+              </div>
+              <span className="text-gray-400">/</span>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="number"
+                  min="1"
+                  max="14"
+                  value={daysOff}
+                  onChange={(e) => setDaysOff(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-16 px-2 py-1 border border-gray-300 rounded-md text-center"
+                />
+                <span className="text-sm text-gray-600">days off</span>
+              </div>
+              <span className="text-sm text-gray-500">
+                (Total cycle: {daysOn + daysOff} days)
+              </span>
+            </div>
           </div>
-          <p className="mt-2 text-xs text-gray-500">
-            This pattern will repeat continuously starting from the selected date
-          </p>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Work Pattern (click to toggle individual days)
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {pattern.map((isWorking, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => handlePatternChange(index)}
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isWorking
+                      ? 'bg-green-100 text-green-800 border border-green-300 hover:bg-green-200'
+                      : 'bg-red-100 text-red-800 border border-red-300 hover:bg-red-200'
+                  }`}
+                >
+                  Day {index + 1}
+                  <br />
+                  {isWorking ? 'Work' : 'Off'}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-gray-500">
+              This {daysOn + daysOff}-day pattern will repeat continuously starting from the selected date
+            </p>
+          </div>
         </div>
       ) : (
         <div>
