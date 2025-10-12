@@ -44,7 +44,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Member not found' }, { status: 404 });
     }
 
-    if (member.teamId !== user.teamId) {
+    console.log('Emergency request debug:', {
+      leaderId: user.id,
+      leaderTeamId: user.teamId,
+      memberId: memberId,
+      memberTeamId: member.teamId,
+      memberUsername: member.username
+    });
+
+    // Handle both string and ObjectId teamId comparisons
+    const memberTeamId = member.teamId?.toString();
+    const userTeamId = user.teamId?.toString();
+    
+    if (memberTeamId !== userTeamId) {
+      console.log('Team ID mismatch:', { memberTeamId, userTeamId, memberId, leaderId: user.id });
       return NextResponse.json({ error: 'Member does not belong to your team' }, { status: 403 });
     }
 
