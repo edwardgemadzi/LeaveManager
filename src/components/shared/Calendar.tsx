@@ -309,7 +309,7 @@ export default function TeamCalendar({ teamId, members }: CalendarProps) {
         {/* Status Priority */}
         <div>
           <h4 className="text-sm font-semibold text-gray-800 mb-2">Status Priority:</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
             <div className="flex items-center">
               <div className="w-4 h-4 rounded mr-2 font-bold" style={{ backgroundColor: '#dc3545' }}></div>
               <span className="text-gray-700 font-bold">🚨 Emergency (Always Red)</span>
@@ -317,10 +317,6 @@ export default function TeamCalendar({ teamId, members }: CalendarProps) {
             <div className="flex items-center">
               <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#ffc107' }}></div>
               <span className="text-gray-700">⏳ Pending (Always Yellow)</span>
-            </div>
-            <div className="flex items-center">
-              <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#28a745' }}></div>
-              <span className="text-gray-700">✅ Approved (Reason Colors)</span>
             </div>
           </div>
         </div>
