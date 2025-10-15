@@ -180,38 +180,45 @@ export default function TeamCalendar({ teamId, members }: CalendarProps) {
     const titleParts = event.title.split(' - ');
     const reason = titleParts.length > 1 ? titleParts[1].toLowerCase() : '';
     
-    // Define color scheme for different reasons
-    const getReasonColor = (reason: string, isEmergency: boolean) => {
+    // Define color scheme with status priority
+    const getEventColor = (reason: string, isEmergency: boolean, status: string) => {
+      // Emergency requests are always red, regardless of status
       if (isEmergency) {
         return '#dc3545'; // Red for emergency (overrides everything)
       }
       
-      // Regular reason-based colors
-      if (reason.includes('vacation')) return '#17a2b8'; // Teal
-      if (reason.includes('sick')) return '#fd7e14'; // Orange
-      if (reason.includes('medical')) return '#6f42c1'; // Purple
-      if (reason.includes('family')) return '#20c997'; // Green
-      if (reason.includes('personal')) return '#6c757d'; // Gray
-      if (reason.includes('maternity') || reason.includes('paternity')) return '#e83e8c'; // Pink
-      if (reason.includes('bereavement')) return '#6c757d'; // Dark Gray
-      if (reason.includes('study') || reason.includes('education')) return '#20c997'; // Teal Green
-      if (reason.includes('religious')) return '#ffc107'; // Yellow
-      if (reason.includes('emergency')) return '#dc3545'; // Red
-      
-      // Default color based on status if reason not recognized
-      switch (event.resource.status) {
-        case 'approved':
-          return '#28a745'; // Green
-        case 'pending':
-          return '#ffc107'; // Yellow
-        case 'rejected':
-          return '#dc3545'; // Red
-        default:
-          return '#3174ad'; // Default blue
+      // Pending events should be highlighted with yellow/orange regardless of reason
+      if (status === 'pending') {
+        return '#ffc107'; // Yellow for pending (high priority)
       }
+      
+      // For approved events, use reason-based colors
+      if (status === 'approved') {
+        if (reason.includes('vacation')) return '#17a2b8'; // Teal
+        if (reason.includes('sick')) return '#fd7e14'; // Orange
+        if (reason.includes('medical')) return '#6f42c1'; // Purple
+        if (reason.includes('family')) return '#20c997'; // Green
+        if (reason.includes('personal')) return '#6c757d'; // Gray
+        if (reason.includes('maternity') || reason.includes('paternity')) return '#e83e8c'; // Pink
+        if (reason.includes('bereavement')) return '#6c757d'; // Dark Gray
+        if (reason.includes('study') || reason.includes('education')) return '#20c997'; // Teal Green
+        if (reason.includes('religious')) return '#ffc107'; // Yellow
+        if (reason.includes('emergency')) return '#dc3545'; // Red
+        
+        // Default approved color
+        return '#28a745'; // Green
+      }
+      
+      // For rejected events (though they shouldn't show on calendar)
+      if (status === 'rejected') {
+        return '#dc3545'; // Red
+      }
+      
+      // Fallback
+      return '#3174ad'; // Default blue
     };
 
-    const backgroundColor = getReasonColor(reason, event.resource.isEmergency || false);
+    const backgroundColor = getEventColor(reason, event.resource.isEmergency || false, event.resource.status);
 
     return {
       style: {
@@ -298,48 +305,66 @@ export default function TeamCalendar({ teamId, members }: CalendarProps) {
       />
       
       {/* Legend */}
-      <div className="mt-6 space-y-3">
-        <h4 className="text-sm font-semibold text-gray-800 mb-2">Leave Request Types:</h4>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 text-sm">
-          <div className="flex items-center">
-            <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#17a2b8' }}></div>
-            <span className="text-gray-700">🏖️ Vacation</span>
+      <div className="mt-6 space-y-4">
+        {/* Status Priority */}
+        <div>
+          <h4 className="text-sm font-semibold text-gray-800 mb-2">Status Priority:</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+            <div className="flex items-center">
+              <div className="w-4 h-4 rounded mr-2 font-bold" style={{ backgroundColor: '#dc3545' }}></div>
+              <span className="text-gray-700 font-bold">🚨 Emergency (Always Red)</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#ffc107' }}></div>
+              <span className="text-gray-700">⏳ Pending (Always Yellow)</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#28a745' }}></div>
+              <span className="text-gray-700">✅ Approved (Reason Colors)</span>
+            </div>
           </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#fd7e14' }}></div>
-            <span className="text-gray-700">🤒 Sick Leave</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#6f42c1' }}></div>
-            <span className="text-gray-700">🏥 Medical</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#20c997' }}></div>
-            <span className="text-gray-700">👨‍👩‍👧‍👦 Family</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#6c757d' }}></div>
-            <span className="text-gray-700">👤 Personal</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#e83e8c' }}></div>
-            <span className="text-gray-700">👶 Maternity/Paternity</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#6c757d' }}></div>
-            <span className="text-gray-700">🕊️ Bereavement</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#20c997' }}></div>
-            <span className="text-gray-700">📚 Study/Education</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#ffc107' }}></div>
-            <span className="text-gray-700">⛪ Religious</span>
-          </div>
-          <div className="flex items-center">
-            <div className="w-4 h-4 rounded mr-2 font-bold" style={{ backgroundColor: '#dc3545' }}></div>
-            <span className="text-gray-700 font-bold">🚨 Emergency</span>
+        </div>
+        
+        {/* Approved Leave Types */}
+        <div>
+          <h4 className="text-sm font-semibold text-gray-800 mb-2">Approved Leave Types:</h4>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
+            <div className="flex items-center">
+              <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#17a2b8' }}></div>
+              <span className="text-gray-700">🏖️ Vacation</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#fd7e14' }}></div>
+              <span className="text-gray-700">🤒 Sick Leave</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#6f42c1' }}></div>
+              <span className="text-gray-700">🏥 Medical</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#20c997' }}></div>
+              <span className="text-gray-700">👨‍👩‍👧‍👦 Family</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#6c757d' }}></div>
+              <span className="text-gray-700">👤 Personal</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#e83e8c' }}></div>
+              <span className="text-gray-700">👶 Maternity/Paternity</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#6c757d' }}></div>
+              <span className="text-gray-700">🕊️ Bereavement</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#20c997' }}></div>
+              <span className="text-gray-700">📚 Study/Education</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#ffc107' }}></div>
+              <span className="text-gray-700">⛪ Religious</span>
+            </div>
           </div>
         </div>
       </div>
