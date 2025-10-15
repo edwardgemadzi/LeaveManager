@@ -147,3 +147,8 @@ temp/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Development and debugging scripts (contain sensitive information)
+/scripts/
+scripts/
+*.sh
