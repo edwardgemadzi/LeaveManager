@@ -620,7 +620,7 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
         style={{ height: '600px' }}
         eventPropGetter={eventStyleGetter}
         dayPropGetter={dayPropGetter}
-        views={[Views.MONTH, Views.WEEK, Views.DAY]}
+        views={[Views.MONTH, Views.WEEK]}
         view={currentView}
         onView={handleView}
         date={currentDate}
@@ -640,7 +640,6 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
           today: 'Today',
           month: 'Month',
           week: 'Week',
-          day: 'Day',
           agenda: 'Agenda',
           date: 'Date',
           time: 'Time',
