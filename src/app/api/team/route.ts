@@ -2,42 +2,30 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTokenFromRequest, verifyToken } from '@/lib/auth';
 import { TeamModel } from '@/models/Team';
 import { UserModel } from '@/models/User';
-import { getDatabase } from '@/lib/mongodb';
 
 export async function GET(request: NextRequest) {
   try {
     const token = getTokenFromRequest(request);
-    console.log('Team API - Token:', token ? 'Present' : 'Missing');
     
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const user = verifyToken(token);
-    console.log('Team API - User:', user);
-    
     if (!user) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    console.log('Team API - Looking for teamId:', user.teamId);
-    console.log('Team API - TeamId type:', typeof user.teamId);
-    
-    const team = await TeamModel.findById(user.teamId!);
-    console.log('Team API - Found team:', team);
-    
-    if (!team) {
-      console.log('Team API - Team not found, checking all teams...');
-      const db = await getDatabase();
-      const allTeams = await db.collection('teams').find({}).toArray();
-      console.log('Team API - All teams in database:', allTeams);
+    if (!user.teamId) {
+      return NextResponse.json({ error: 'No team assigned' }, { status: 400 });
     }
     
+    const team = await TeamModel.findById(user.teamId);
     if (!team) {
       return NextResponse.json({ error: 'Team not found' }, { status: 404 });
     }
 
-    const members = await UserModel.findByTeamId(user.teamId!);
+    const members = await UserModel.findByTeamId(user.teamId);
     
     // Get current user data with shift schedule
     const currentUser = await UserModel.findById(user.id);
@@ -53,6 +41,9 @@ export async function GET(request: NextRequest) {
         fullName: currentUser.fullName,
         role: currentUser.role,
         shiftSchedule: currentUser.shiftSchedule,
+        shiftTag: currentUser.shiftTag,
+        workingDaysTag: currentUser.workingDaysTag,
+        subgroupTag: currentUser.subgroupTag,
       } : null,
       members: allMembers.map(member => ({
         _id: member._id,
@@ -61,24 +52,11 @@ export async function GET(request: NextRequest) {
         role: member.role,
         shiftSchedule: member.shiftSchedule,
         shiftTag: member.shiftTag,
+        workingDaysTag: member.workingDaysTag,
+        subgroupTag: member.subgroupTag,
         createdAt: member.createdAt,
       })),
     };
-    
-    console.log('Team API - Returning data:', {
-      teamId: team._id,
-      currentUserId: user.id,
-      membersCount: response.members.length,
-      members: response.members.map(m => ({ _id: m._id, username: m.username, fullName: m.fullName }))
-    });
-    
-    console.log('Team API - Member inclusion check:', {
-      allMembersCount: allMembers.length,
-      originalMembersCount: members.length,
-      currentUserIncluded: !!currentUser,
-      currentUserId: currentUser?._id,
-      currentUserInOriginalMembers: !!members.find(m => m._id === currentUser?._id)
-    });
     
     return NextResponse.json(response);
   } catch (error) {
@@ -114,7 +92,59 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    await TeamModel.updateSettings(user.teamId!, settings);
+    // allowCarryover is optional boolean, ensure it's set if provided
+    if (settings.allowCarryover !== undefined && typeof settings.allowCarryover !== 'boolean') {
+      return NextResponse.json(
+        { error: 'Invalid settings' },
+        { status: 400 }
+      );
+    }
+
+    // enableSubgrouping is optional boolean, ensure it's set if provided
+    if (settings.enableSubgrouping !== undefined && typeof settings.enableSubgrouping !== 'boolean') {
+      return NextResponse.json(
+        { error: 'Invalid settings' },
+        { status: 400 }
+      );
+    }
+
+    // If subgrouping is enabled, validate subgroups
+    if (settings.enableSubgrouping) {
+      // Validate subgroups is an array
+      if (settings.subgroups === undefined) {
+        settings.subgroups = [];
+      }
+      if (!Array.isArray(settings.subgroups)) {
+        return NextResponse.json(
+          { error: 'Subgroups must be an array' },
+          { status: 400 }
+        );
+      }
+      
+      // Filter out empty subgroup names
+      const validSubgroups = settings.subgroups.filter((name: string) => name && name.trim().length > 0);
+      
+      // Require at least 2 subgroups (one subgroup is just the team itself)
+      if (validSubgroups.length < 2) {
+        return NextResponse.json(
+          { error: 'At least 2 subgroups are required when subgrouping is enabled' },
+          { status: 400 }
+        );
+      }
+      
+      // Remove duplicates and trim
+      const uniqueSubgroups = Array.from(new Set(validSubgroups.map((name: string) => name.trim())));
+      settings.subgroups = uniqueSubgroups;
+    } else {
+      // If subgrouping is disabled, clear subgroups
+      settings.subgroups = [];
+    }
+
+    if (!user.teamId) {
+      return NextResponse.json({ error: 'No team assigned' }, { status: 400 });
+    }
+
+    await TeamModel.updateSettings(user.teamId, settings);
     
     return NextResponse.json({ success: true });
   } catch (error) {

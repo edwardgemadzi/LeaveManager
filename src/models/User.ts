@@ -1,6 +1,7 @@
 import { getDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { User, ShiftSchedule } from '@/types';
+import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
 
 export class UserModel {
   static async create(user: Omit<User, '_id' | 'createdAt'>): Promise<User> {
@@ -40,27 +41,82 @@ export class UserModel {
     const users = db.collection<User>('users');
     console.log('UserModel.findByTeamId - searching for teamId:', teamId);
     
-    // Handle both string and ObjectId teamIds
-    const results = await users.find({
-      $or: [
-        { teamId: teamId },
-        // @ts-expect-error - ObjectId type compatibility issue
-        { teamId: new ObjectId(teamId) }
-      ]
+    // Get all members first, then filter by teamId in JavaScript
+    // This approach is more flexible and handles all formats (string, ObjectId, etc.)
+    const allMembers = await users.find({
+      role: 'member'
     }).toArray();
     
-    console.log('UserModel.findByTeamId - found users:', results.map(u => ({ id: u._id, username: u.username, teamId: u.teamId })));
-    return results;
+    // Filter members by teamId
+    const teamIdStr = teamId.toString().trim();
+    const filteredResults = allMembers.filter(u => {
+      if (!u.teamId) return false;
+      // Convert both to strings and compare
+      const memberTeamIdStr = String(u.teamId).trim();
+      return memberTeamIdStr === teamIdStr;
+    });
+    
+    console.log('UserModel.findByTeamId - found users:', filteredResults.length, 'members');
+    return filteredResults;
   }
+
 
   static async updateShiftSchedule(userId: string, shiftSchedule: ShiftSchedule): Promise<void> {
     const db = await getDatabase();
     const users = db.collection<User>('users');
     const objectId = new ObjectId(userId);
+    
+    // Only store tag for fixed schedules (tags are stable)
+    // For rotating schedules, tags change daily and should be regenerated
+    if (shiftSchedule.type === 'fixed') {
+      const workingDaysTag = generateWorkingDaysTag(shiftSchedule);
+      await users.updateOne(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { _id: objectId } as any,
+        { $set: { shiftSchedule, workingDaysTag } }
+      );
+    } else {
+      // For rotating schedules, remove stored tag (will be regenerated on use)
     await users.updateOne(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       { _id: objectId } as any,
-      { $set: { shiftSchedule } }
+        { 
+          $set: { shiftSchedule },
+          $unset: { workingDaysTag: '' }
+        }
+      );
+    }
+  }
+
+  static async updateWorkingDaysTag(userId: string): Promise<void> {
+    const db = await getDatabase();
+    const users = db.collection<User>('users');
+    const objectId = new ObjectId(userId);
+    
+    // Get user's current schedule
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const user = await users.findOne({ _id: objectId } as any);
+    if (!user) {
+      throw new Error('User not found');
+    }
+    
+    // Only update tag for fixed schedules (tags are stable)
+    // For rotating schedules, tags change daily and should be regenerated on use
+    if (user.shiftSchedule && user.shiftSchedule.type === 'fixed') {
+      const workingDaysTag = generateWorkingDaysTag(user.shiftSchedule);
+      
+      await users.updateOne(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { _id: objectId } as any,
+        { $set: { workingDaysTag } }
     );
+    } else if (user.shiftSchedule && user.shiftSchedule.type === 'rotating') {
+      // For rotating schedules, remove stored tag (will be regenerated on use)
+      await users.updateOne(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { _id: objectId } as any,
+        { $unset: { workingDaysTag: '' } }
+      );
+    }
   }
 }

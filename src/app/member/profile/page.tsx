@@ -235,6 +235,29 @@ export default function MemberProfilePage() {
                       </p>
                     </div>
                   )}
+
+                  {user?.shiftTag && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Shift Type</label>
+                      <p className="mt-1 text-sm text-gray-900 bg-gray-50 px-3 py-2 rounded-md">
+                        {user.shiftTag === 'day' && '☀️ Day Shift'}
+                        {user.shiftTag === 'night' && '🌙 Night Shift'}
+                        {user.shiftTag === 'mixed' && '🔄 Mixed Shifts'}
+                      </p>
+                    </div>
+                  )}
+
+                  {user?.workingDaysTag && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Working Days Pattern</label>
+                      <p className="mt-1 text-sm text-gray-900 bg-gray-50 px-3 py-2 rounded-md font-mono">
+                        {user.workingDaysTag}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Members with the same pattern work on exactly the same days
+                      </p>
+                    </div>
+                  )}
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Member Since</label>

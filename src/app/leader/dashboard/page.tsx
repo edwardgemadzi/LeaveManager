@@ -5,6 +5,7 @@ import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { LeaveRequest, Team, User } from '@/types';
 import { calculateLeaveBalance } from '@/lib/leaveCalculations';
+import { GroupedTeamAnalytics } from '@/lib/analyticsCalculations';
 
 export default function LeaderDashboard() {
   const [team, setTeam] = useState<Team | null>(null);
@@ -13,6 +14,7 @@ export default function LeaderDashboard() {
   const [allRequests, setAllRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingRequest, setProcessingRequest] = useState<string | null>(null);
+  const [analytics, setAnalytics] = useState<GroupedTeamAnalytics | null>(null);
 
   const handleApprove = async (requestId: string) => {
     setProcessingRequest(requestId);
@@ -67,6 +69,11 @@ export default function LeaderDashboard() {
       const token = localStorage.getItem('token');
       const user = JSON.parse(localStorage.getItem('user') || '{}');
 
+      if (!user.teamId) {
+        console.error('No team ID found');
+        return;
+      }
+
       // Fetch team data
       const teamResponse = await fetch('/api/team', {
         headers: {
@@ -75,35 +82,41 @@ export default function LeaderDashboard() {
       });
       
       if (!teamResponse.ok) {
-        console.error('Failed to fetch team data:', teamResponse.status, teamResponse.statusText);
-        const errorData = await teamResponse.json();
-        console.error('Error details:', errorData);
+        console.error('Failed to fetch team data:', teamResponse.status);
         return;
       }
       
       const teamData = await teamResponse.json();
-      console.log('Team data received:', teamData);
       setTeam(teamData.team);
       setMembers(teamData.members || []);
 
       // Fetch all requests
-      const requestsResponse = await fetch(`/api/leave-requests?teamId=${user.teamId}`, {
+      const requestsResponse = await fetch('/api/leave-requests', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
       
       if (!requestsResponse.ok) {
-        console.error('Failed to fetch requests:', requestsResponse.status, requestsResponse.statusText);
-        const errorData = await requestsResponse.json();
-        console.error('Error details:', errorData);
+        console.error('Failed to fetch requests:', requestsResponse.status);
         return;
       }
       
       const requests = await requestsResponse.json();
-      console.log('Requests received:', requests);
       setAllRequests(requests);
       setPendingRequests(requests.filter((req: LeaveRequest) => req.status === 'pending'));
+
+      // Fetch analytics
+      const analyticsResponse = await fetch('/api/analytics', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (analyticsResponse.ok) {
+        const analyticsData = await analyticsResponse.json();
+        setAnalytics(analyticsData.analytics); // Grouped analytics
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
     }
@@ -198,7 +211,7 @@ export default function LeaderDashboard() {
                   <div className="ml-5 flex-1">
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">Team Members</dt>
-                      <dd className="text-2xl font-bold text-gray-900">{members?.length || 0}</dd>
+                      <dd className="text-2xl font-bold text-gray-900">{members?.filter(m => m.role === 'member').length || 0}</dd>
                     </dl>
                   </div>
                 </div>
@@ -245,7 +258,156 @@ export default function LeaderDashboard() {
             </div>
           </div>
 
-          {/* Team Leave Balances */}
+          {/* Analytics Section */}
+          {analytics && (
+            <div className="mb-8 space-y-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">Year-End Analytics</h2>
+              
+              {/* Aggregate Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
+                <div className="card card-hover slide-up">
+                  <div className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <h3 className="text-xs font-medium text-gray-500">Realistic Usable Days</h3>
+                        <p className="text-2xl font-bold text-blue-700 mt-1">{analytics.aggregate.totalRealisticUsableDays ?? 0}</p>
+                      </div>
+                      <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                        <span className="text-white text-lg">📊</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500">With concurrent leave constraints</p>
+                  </div>
+                </div>
+
+                <div className="card card-hover slide-up" style={{ animationDelay: '0.1s' }}>
+                  <div className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <h3 className="text-xs font-medium text-gray-500">Theoretical Working Days</h3>
+                        <p className="text-2xl font-bold text-gray-700 mt-1">{analytics.aggregate.totalTheoreticalWorkingDays ?? 0}</p>
+                      </div>
+                      <div className="w-12 h-12 bg-gradient-to-r from-gray-500 to-gray-600 rounded-xl flex items-center justify-center">
+                        <span className="text-white text-lg">📈</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500">Total without constraints</p>
+                  </div>
+                </div>
+
+                <div className="card card-hover slide-up" style={{ animationDelay: '0.2s' }}>
+                  <div className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <h3 className="text-xs font-medium text-gray-500">Total Remaining Leave</h3>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">{analytics.aggregate.totalRemainingLeaveBalance}</p>
+                      </div>
+                      <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+                        <span className="text-white text-lg">📅</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500">Leave days remaining</p>
+                  </div>
+                </div>
+
+                <div className={`card card-hover slide-up ${analytics.aggregate.totalWillCarryover > 0 ? 'border-2 border-green-300 bg-green-50' : ''}`} style={{ animationDelay: '0.3s' }}>
+                  <div className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <h3 className="text-xs font-medium text-gray-500">Will Carry Over</h3>
+                        <p className="text-2xl font-bold text-green-700 mt-1">{analytics.aggregate.totalWillCarryover}</p>
+                      </div>
+                      <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+                        <span className="text-white text-lg">✓</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500">Days to next year</p>
+                  </div>
+                </div>
+
+                <div className={`card card-hover slide-up ${analytics.aggregate.totalWillLose > 0 ? 'border-2 border-red-300 bg-red-50' : ''}`} style={{ animationDelay: '0.4s' }}>
+                  <div className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <h3 className="text-xs font-medium text-gray-500">Will Be Lost</h3>
+                        <p className="text-2xl font-bold text-red-700 mt-1">{analytics.aggregate.totalWillLose}</p>
+                      </div>
+                      <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-red-600 rounded-xl flex items-center justify-center">
+                        <span className="text-white text-lg">⚠</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500">Days lost at year end</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Competition Context Card */}
+              <div className="card border-2 border-blue-300 bg-blue-50 mb-6">
+                <div className="p-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                      <span className="text-white text-lg">👥</span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-blue-900 mb-1">Team Competition Context</p>
+                      <p className="text-sm text-blue-700 mb-2">
+                        <strong>{analytics.aggregate.membersCount}</strong> team member{analytics.aggregate.membersCount !== 1 ? 's' : ''} 
+                        {' '}need to coordinate use of <strong>{analytics.aggregate.totalRealisticUsableDays}</strong> realistic usable days.
+                      </p>
+                      <p className="text-sm text-blue-700">
+                        Average of <strong>{analytics.aggregate.averageDaysPerMemberAcrossTeam}</strong> days per member available across the team.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Availability Constraint Info */}
+              {analytics.aggregate.totalRealisticUsableDays < analytics.aggregate.totalTheoreticalWorkingDays && (
+                <div className="card border-2 border-orange-300 bg-orange-50 mb-6">
+                  <div className="p-4">
+                    <div className="flex items-start space-x-3">
+                      <div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center flex-shrink-0">
+                        <span className="text-white text-lg">⚠</span>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-orange-900 mb-1">Concurrent Leave Constraints Active</p>
+                        <p className="text-sm text-orange-700">
+                          Team members can realistically use <strong>{analytics.aggregate.totalRealisticUsableDays}</strong> of <strong>{analytics.aggregate.totalTheoreticalWorkingDays}</strong> theoretical working days remaining.
+                          Some periods are fully booked due to concurrent leave limits.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Policy Info */}
+              {team && (
+                <div className={`card ${team.settings.allowCarryover ? 'border-2 border-green-300 bg-green-50' : 'border-2 border-orange-300 bg-orange-50'}`}>
+                  <div className="p-4">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${team.settings.allowCarryover ? 'bg-green-500' : 'bg-orange-500'}`}>
+                        <span className="text-white text-lg">{team.settings.allowCarryover ? '✓' : '⚠'}</span>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-900">
+                          {team.settings.allowCarryover ? 'Carryover Enabled' : 'Carryover Disabled'}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {team.settings.allowCarryover
+                            ? 'Unused leave days will carry over to next year'
+                            : 'Unused leave days will be lost at year end'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Team Leave Balances - Grouped by Tags */}
           <div className="card card-hover slide-up mb-8" style={{ animationDelay: '0.3s' }}>
             <div className="p-6">
               <h3 className="text-xl font-bold text-gray-900 mb-6">
@@ -256,63 +418,70 @@ export default function LeaderDashboard() {
                   <div className="text-4xl mb-4">👥</div>
                   <p className="text-gray-500">No team members yet</p>
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {members
-                    .filter(member => member.role === 'member')
-                    .map(member => {
-                      const memberRequests = allRequests.filter(req => 
-                        req.userId === member._id && req.status === 'approved'
-                      );
+              ) : analytics?.groups && analytics.groups.length > 0 ? (() => {
+                // Group by subgroup if subgrouping is enabled
+                const groupBySubgroup = (groups: typeof analytics.groups) => {
+                  const subgroupMap = new Map<string, typeof groups>();
+                  for (const group of groups) {
+                    const subgroupKey = group.subgroupTag || 'Ungrouped';
+                    if (!subgroupMap.has(subgroupKey)) {
+                      subgroupMap.set(subgroupKey, []);
+                    }
+                    subgroupMap.get(subgroupKey)!.push(group);
+                  }
+                  return subgroupMap;
+                };
 
-                      const approvedRequests = memberRequests.map(req => ({
-                        startDate: new Date(req.startDate),
-                        endDate: new Date(req.endDate)
-                      }));
+                const subgroupMap = team?.settings.enableSubgrouping 
+                  ? groupBySubgroup(analytics.groups) 
+                  : new Map([['All', analytics.groups]]);
 
-                      const remainingBalance = member.shiftSchedule ? calculateLeaveBalance(
-                        team?.settings.maxLeavePerYear || 20,
-                        approvedRequests,
-                        member.shiftSchedule
-                      ) : 0;
-
-                      const isLowBalance = remainingBalance < (team?.settings.maxLeavePerYear || 20) * 0.25;
-
-                      return (
-                        <div key={member._id} className={`border rounded-lg p-4 ${isLowBalance ? 'border-orange-200 bg-orange-50' : 'border-gray-200 bg-gray-50'}`}>
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h4 className="font-semibold text-gray-900">
-                                {member.fullName || member.username}
-                              </h4>
-                              <p className="text-sm text-gray-600">
-                                {member.shiftTag && (
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mr-2">
-                                    {member.shiftTag === 'day' && '☀️ Day'}
-                                    {member.shiftTag === 'night' && '🌙 Night'}
-                                    {member.shiftTag === 'mixed' && '🔄 Mixed'}
-                                  </span>
-                                )}
-                                {member.shiftSchedule?.type === 'rotating' ? 'Rotating' : 'Fixed'}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <div className={`text-2xl font-bold ${isLowBalance ? 'text-orange-600' : 'text-green-600'}`}>
-                                {remainingBalance}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                of {team?.settings.maxLeavePerYear || 20} days
-                              </div>
-                            </div>
-                          </div>
-                          {isLowBalance && (
-                            <div className="mt-2 text-xs text-orange-600 font-medium">
-                              ⚠️ Low balance
-                            </div>
+                return (
+                  <div className="space-y-8">
+                    {Array.from(subgroupMap.entries()).map(([subgroupName, subgroupGroups]) => (
+                      <div key={subgroupName} className="border-t border-gray-200 pt-6 first:border-t-0 first:pt-0">
+                        <h4 className="text-lg font-semibold text-gray-800 mb-4">
+                          {team?.settings.enableSubgrouping ? (
+                            <>
+                              Subgroup: <span className="text-indigo-600">{subgroupName}</span>
+                            </>
+                          ) : (
+                            'All Members'
                           )}
+                        </h4>
+                        <div className="space-y-6">
+                          {subgroupGroups.map((group, index) => (
+                            <div key={group.groupKey || index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                              <h5 className="text-md font-medium text-gray-800 mb-2">
+                                {group.shiftTag ? `${group.shiftTag} Shift` : 'No Shift Tag'} - Pattern: {group.workingDaysTag}
+                              </h5>
+                              <p className="text-sm text-gray-600 mb-2">
+                                Members in this group: {group.aggregate.groupTotalMembers}
+                              </p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-3">
+                                <div className="bg-white p-3 rounded-md">
+                                  <p className="text-xs font-medium text-gray-500">Avg. Usable Days</p>
+                                  <p className="text-lg font-semibold text-gray-900">{group.aggregate.groupAverageUsableDays.toFixed(1)}</p>
+                                </div>
+                                <div className="bg-white p-3 rounded-md">
+                                  <p className="text-xs font-medium text-gray-500">Avg. Realistic Usable Days</p>
+                                  <p className="text-lg font-semibold text-gray-900">{group.aggregate.groupAverageRealisticUsableDays.toFixed(1)}</p>
+                                </div>
+                                <div className="bg-white p-3 rounded-md">
+                                  <p className="text-xs font-medium text-gray-500">Avg. Remaining Balance</p>
+                                  <p className="text-lg font-semibold text-gray-900">{group.aggregate.groupAverageLeaveBalance.toFixed(1)}</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      );
-                    })}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })() : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No analytics data available</p>
                 </div>
               )}
             </div>

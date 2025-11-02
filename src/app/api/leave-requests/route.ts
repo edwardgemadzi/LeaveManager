@@ -17,14 +17,39 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const { searchParams } = new URL(request.url);
-    const teamId = searchParams.get('teamId');
-
-    if (!teamId || teamId !== user.teamId) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!user.teamId) {
+      return NextResponse.json({ error: 'No team assigned' }, { status: 400 });
     }
 
-    const requests = await LeaveRequestModel.findByTeamId(teamId);
+    // Get team settings to check if subgrouping is enabled
+    const team = await TeamModel.findById(user.teamId);
+    if (!team) {
+      return NextResponse.json({ error: 'Team not found' }, { status: 404 });
+    }
+
+    // Fetch all leave requests for the team
+    let requests = await LeaveRequestModel.findByTeamId(user.teamId);
+
+    // If user is a member and subgrouping is enabled, filter by subgroup
+    if (user.role === 'member' && team.settings.enableSubgrouping) {
+      const currentUser = await UserModel.findById(user.id);
+      const userSubgroup = currentUser?.subgroupTag || 'Ungrouped';
+      
+      // Filter requests to only include those from members in the same subgroup
+      const filteredRequests = [];
+      for (const req of requests) {
+        const reqUser = await UserModel.findById(req.userId);
+        if (!reqUser) continue;
+        
+        const reqUserSubgroup = reqUser.subgroupTag || 'Ungrouped';
+        if (reqUserSubgroup === userSubgroup) {
+          filteredRequests.push(req);
+        }
+      }
+      requests = filteredRequests;
+    }
+    // Leaders see all requests (no filtering needed)
+
     return NextResponse.json(requests);
   } catch (error) {
     console.error('Get leave requests error:', error);
@@ -70,8 +95,12 @@ export async function POST(request: NextRequest) {
     // Determine the user ID for the request
     const requestUserId = requestedFor || user.id;
 
+    if (!user.teamId) {
+      return NextResponse.json({ error: 'No team assigned' }, { status: 400 });
+    }
+
     // Get team settings for validation
-    const team = await TeamModel.findById(user.teamId!);
+    const team = await TeamModel.findById(user.teamId);
     if (!team) {
       return NextResponse.json({ error: 'Team not found' }, { status: 404 });
     }
@@ -93,39 +122,74 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check concurrent leave limit (considering shift tags)
+    // Check concurrent leave limit (considering subgroups and shift tags)
     const overlappingRequests = await LeaveRequestModel.findOverlappingRequests(
       user.teamId!,
       start,
       end
     );
 
-    // Get the requesting user's shift tag
+    // Get the requesting user's shift tag and subgroup tag
     const requestingUser = await UserModel.findById(requestUserId);
     const requestingUserShiftTag = requestingUser?.shiftTag;
+    const requestingUserSubgroupTag = requestingUser?.subgroupTag;
 
-    // Count overlapping requests from users with the same shift tag
-    let sameShiftOverlappingCount = 0;
-    for (const req of overlappingRequests) {
-      const reqUser = await UserModel.findById(req.userId);
-      if (reqUser?.shiftTag === requestingUserShiftTag) {
-        sameShiftOverlappingCount++;
+    // If subgrouping is enabled, filter by subgroup first
+    // Each subgroup gets its own concurrent leave limit
+    let relevantOverlappingCount = 0;
+    
+    if (team.settings.enableSubgrouping) {
+      // Filter overlapping requests to only count those from the same subgroup
+      for (const req of overlappingRequests) {
+        const reqUser = await UserModel.findById(req.userId);
+        if (!reqUser) continue;
+        
+        // Get requesting user's subgroup (or "Ungrouped")
+        const requestingSubgroup = requestingUserSubgroupTag || 'Ungrouped';
+        // Get request user's subgroup (or "Ungrouped")
+        const reqUserSubgroup = reqUser.subgroupTag || 'Ungrouped';
+        
+        // Only count if they're in the same subgroup
+        if (requestingSubgroup !== reqUserSubgroup) continue;
+        
+        // Also check shift tag if applicable (existing logic)
+        if (requestingUserShiftTag !== undefined) {
+          if (reqUser.shiftTag !== requestingUserShiftTag) continue;
+        } else {
+          // Requesting user has no shift tag - only count members with no shift tag
+          if (reqUser.shiftTag !== undefined) continue;
+        }
+        
+        relevantOverlappingCount++;
+      }
+    } else {
+      // Subgrouping disabled - use existing shift tag logic
+      if (requestingUserShiftTag !== undefined) {
+        // Count overlapping requests from users with the same shift tag
+        for (const req of overlappingRequests) {
+          const reqUser = await UserModel.findById(req.userId);
+          if (reqUser?.shiftTag === requestingUserShiftTag) {
+            relevantOverlappingCount++;
+          }
+        }
+      } else {
+        // User has no shift tag - count all overlapping requests
+        relevantOverlappingCount = overlappingRequests.length;
       }
     }
 
-    // If user has a shift tag, only count overlapping requests from same shift
-    // If no shift tag, count all overlapping requests
-    const relevantOverlappingCount = requestingUserShiftTag 
-      ? sameShiftOverlappingCount
-      : overlappingRequests.length;
-
     if (relevantOverlappingCount >= team.settings.concurrentLeave) {
-      const shiftContext = requestingUserShiftTag 
-        ? ` (${requestingUserShiftTag} shift)`
-        : '';
+      let context = '';
+      if (team.settings.enableSubgrouping && requestingUserSubgroupTag) {
+        context = ` (${requestingUserSubgroupTag} subgroup)`;
+      } else if (team.settings.enableSubgrouping && !requestingUserSubgroupTag) {
+        context = ' (Ungrouped)';
+      } else if (requestingUserShiftTag) {
+        context = ` (${requestingUserShiftTag} shift)`;
+      }
       return NextResponse.json(
         { 
-          error: `Concurrent leave limit exceeded${shiftContext}. Maximum ${team.settings.concurrentLeave} team member(s) can be on leave simultaneously.` 
+          error: `Concurrent leave limit exceeded${context}. Maximum ${team.settings.concurrentLeave} team member(s) can be on leave simultaneously.` 
         },
         { status: 400 }
       );

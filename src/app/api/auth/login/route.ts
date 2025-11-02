@@ -28,7 +28,6 @@ export async function POST(request: NextRequest) {
     const { username, password } = validation.data;
 
     const user = await UserModel.findByUsername(username);
-    console.log('Login API - Found user:', user ? 'Yes' : 'No');
     
     if (!user) {
       return NextResponse.json(
@@ -38,8 +37,6 @@ export async function POST(request: NextRequest) {
     }
 
     const isValidPassword = await bcrypt.compare(password, user.password);
-    console.log('Login API - Password valid:', isValidPassword);
-    console.log('Login API - User teamId:', user.teamId);
     
     if (!isValidPassword) {
       return NextResponse.json(
@@ -48,12 +45,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const token = generateToken({
+    // Build token data
+    const tokenData: {
+      id: string;
+      username: string;
+      role: 'leader' | 'member';
+      teamId?: string;
+    } = {
       id: user._id!,
       username: user.username,
       role: user.role,
-      teamId: user.teamId,
-    });
+    };
+    
+    if (user.teamId) {
+      tokenData.teamId = user.teamId;
+    }
+
+    const token = generateToken(tokenData);
 
     return NextResponse.json({
       token,

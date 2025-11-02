@@ -5,7 +5,7 @@ import { Calendar, momentLocalizer, View, Views } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { LeaveRequest, User } from '@/types';
-import { getWorkingDays } from '@/lib/leaveCalculations';
+import { getWorkingDays, isWorkingDay } from '@/lib/leaveCalculations';
 
 const localizer = momentLocalizer(moment);
 
@@ -31,9 +31,10 @@ interface CalendarEvent {
 interface CalendarProps {
   teamId: string;
   members: User[];
+  currentUser?: User; // Current logged-in user (for highlighting working days)
 }
 
-export default function TeamCalendar({ teamId, members }: CalendarProps) {
+export default function TeamCalendar({ teamId, members, currentUser }: CalendarProps) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState<View>(Views.MONTH);
@@ -252,6 +253,24 @@ export default function TeamCalendar({ teamId, members }: CalendarProps) {
     console.log('Selected slot:', slotInfo);
   }, []);
 
+  // Style getter for highlighting working days (only for members)
+  const dayPropGetter = useCallback((date: Date) => {
+    // Only highlight working days if currentUser is provided and has a role of 'member'
+    if (currentUser && currentUser.role === 'member' && currentUser.shiftSchedule) {
+      const isWorking = isWorkingDay(date, currentUser.shiftSchedule);
+      if (isWorking) {
+        return {
+          style: {
+            backgroundColor: '#f0f9ff', // Light blue background
+            borderLeft: '3px solid #3b82f6', // Blue left border
+          },
+          className: 'rbc-working-day'
+        };
+      }
+    }
+    return {};
+  }, [currentUser]);
+
   const closeModal = useCallback(() => {
     setShowModal(false);
     setSelectedEvent(null);
@@ -274,6 +293,7 @@ export default function TeamCalendar({ teamId, members }: CalendarProps) {
         endAccessor="end"
         style={{ height: '600px' }}
         eventPropGetter={eventStyleGetter}
+        dayPropGetter={dayPropGetter}
         views={[Views.MONTH, Views.WEEK, Views.DAY]}
         view={currentView}
         onView={handleView}
@@ -306,6 +326,17 @@ export default function TeamCalendar({ teamId, members }: CalendarProps) {
       
       {/* Legend */}
       <div className="mt-6 space-y-4">
+        {/* Working Days Highlight (only for members) */}
+        {currentUser && currentUser.role === 'member' && currentUser.shiftSchedule && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="flex items-center">
+              <div className="w-6 h-6 rounded mr-2" style={{ backgroundColor: '#f0f9ff', borderLeft: '3px solid #3b82f6' }}></div>
+              <p className="text-sm text-blue-800">
+                <span className="font-semibold">Highlighted dates</span> indicate your scheduled working days
+              </p>
+            </div>
+          </div>
+        )}
         {/* Status Priority */}
         <div>
           <h4 className="text-sm font-semibold text-gray-800 mb-2">Status Priority:</h4>

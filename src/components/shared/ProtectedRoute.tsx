@@ -15,33 +15,55 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
 
   useEffect(() => {
     const checkAuth = () => {
-      const token = localStorage.getItem('token');
-      const user = localStorage.getItem('user');
-
-      if (!token || !user) {
-        router.push('/login');
-        return;
-      }
-
       try {
-        const userData = JSON.parse(user);
-        
-        // Check role if required
-        if (requiredRole && userData.role !== requiredRole) {
-          // Redirect to appropriate dashboard
-          if (userData.role === 'leader') {
-            router.push('/leader/dashboard');
-          } else {
-            router.push('/member/dashboard');
-          }
+        const token = localStorage.getItem('token');
+        const user = localStorage.getItem('user');
+
+        if (!token || !user) {
+          router.push('/login');
+          setIsLoading(false);
           return;
         }
 
-        setIsAuthenticated(true);
+        try {
+          const userData = JSON.parse(user);
+          
+          // Validate user data structure
+          if (!userData || !userData.role || !userData.id) {
+            // Invalid user data structure, clear it
+            console.error('Invalid user data structure:', userData);
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            router.push('/login');
+            setIsLoading(false);
+            return;
+          }
+          
+          // Check role if required
+          if (requiredRole && userData.role !== requiredRole) {
+            // Redirect to appropriate dashboard
+            if (userData.role === 'leader') {
+              router.push('/leader/dashboard');
+            } else if (userData.role === 'member') {
+              router.push('/member/dashboard');
+            } else {
+              // Unknown role, redirect to login
+              router.push('/login');
+            }
+            setIsLoading(false);
+            return;
+          }
+
+          setIsAuthenticated(true);
+        } catch (parseError) {
+          console.error('Error parsing user data:', parseError);
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          router.push('/login');
+        }
       } catch (error) {
-        console.error('Error parsing user data:', error);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        // localStorage might not be available
+        console.error('Error accessing localStorage:', error);
         router.push('/login');
       } finally {
         setIsLoading(false);

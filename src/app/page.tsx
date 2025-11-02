@@ -1,26 +1,61 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 export default function HomePage() {
   const router = useRouter();
+  const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
     // Check if user is already logged in
-    const token = localStorage.getItem('token');
-    const user = localStorage.getItem('user');
-    
-    if (token && user) {
-      const userData = JSON.parse(user);
-      if (userData.role === 'leader') {
-        router.push('/leader/dashboard');
-      } else {
-        router.push('/member/dashboard');
+    try {
+      const token = localStorage.getItem('token');
+      const user = localStorage.getItem('user');
+      
+      if (token && user) {
+        try {
+          const userData = JSON.parse(user);
+          // Validate user data structure
+          if (userData && userData.role) {
+            if (userData.role === 'leader') {
+              router.push('/leader/dashboard');
+              return;
+            } else if (userData.role === 'member') {
+              router.push('/member/dashboard');
+              return;
+            }
+          } else {
+            // Invalid user data, clear it
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+          }
+        } catch (parseError) {
+          // Invalid JSON in localStorage, clear it
+          console.error('Error parsing user data:', parseError);
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        }
       }
+    } catch (error) {
+      // localStorage might not be available (SSR)
+      console.error('Error accessing localStorage:', error);
+    } finally {
+      setIsChecking(false);
     }
   }, [router]);
+
+  if (isChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white">

@@ -9,15 +9,12 @@ export async function PATCH(
 ) {
   try {
     const token = getTokenFromRequest(request);
-    console.log('Schedule API - Token received:', !!token);
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const user = verifyToken(token);
-    console.log('Schedule API - User verified:', user ? { id: user.id, role: user.role, teamId: user.teamId } : 'null');
     if (!user || user.role !== 'leader') {
-      console.log('Schedule API - Forbidden: user role is', user?.role);
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -40,30 +37,26 @@ export async function PATCH(
       );
     }
 
-    // Check if the target user exists and belongs to the same team
+    // Check if the target user exists
     const targetUser = await UserModel.findById(id);
-    console.log('Schedule API - Target user:', targetUser ? { id: targetUser._id, teamId: targetUser.teamId } : 'null');
     if (!targetUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Handle both string and ObjectId teamId comparisons
-    const userTeamId = user.teamId;
-    const targetTeamId = targetUser.teamId;
-    const teamIdsMatch = userTeamId === targetTeamId || 
-                        userTeamId === targetTeamId?.toString() || 
-                        targetTeamId === userTeamId?.toString();
+    // Verify leader has access to the target user's team
+    if (!targetUser.teamId) {
+      return NextResponse.json({ error: 'User has no team' }, { status: 400 });
+    }
+
+    // Compare teamIds as strings to handle ObjectId/string mismatches
+    const userTeamIdStr = user.teamId?.toString().trim() || '';
+    const targetTeamIdStr = targetUser.teamId.toString().trim();
     
-    console.log('Schedule API - Team ID comparison:', { 
-      userTeamId, 
-      targetTeamId,
-      userTeamIdType: typeof userTeamId,
-      targetTeamIdType: typeof targetTeamId,
-      match: teamIdsMatch 
-    });
-    
-    if (!teamIdsMatch) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (userTeamIdStr !== targetTeamIdStr) {
+      return NextResponse.json(
+        { error: 'Access denied - users must be in the same team' },
+        { status: 403 }
+      );
     }
 
     // Update the shift schedule

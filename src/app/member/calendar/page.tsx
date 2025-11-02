@@ -8,12 +8,15 @@ import { Team, User } from '@/types';
 export default function MemberCalendarPage() {
   const [team, setTeam] = useState<Team | null>(null);
   const [members, setMembers] = useState<User[]>([]);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const token = localStorage.getItem('token');
+        const userData = JSON.parse(localStorage.getItem('user') || '{}');
+        
         const response = await fetch('/api/team', {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -21,7 +24,29 @@ export default function MemberCalendarPage() {
         });
         const data = await response.json();
         setTeam(data.team);
-        setMembers(data.members);
+        
+        // Update user with fresh data from server
+        if (data.currentUser) {
+          setUser(data.currentUser);
+        } else {
+          setUser(userData);
+        }
+        
+        // If subgrouping is enabled, filter members by subgroup
+        if (data.team?.settings?.enableSubgrouping && data.currentUser) {
+          const userSubgroup = data.currentUser.subgroupTag || 'Ungrouped';
+          const filteredMembers = data.members.filter((member: User) => {
+            // Always include the current user
+            if (member._id === data.currentUser._id) return true;
+            // Include members from the same subgroup
+            const memberSubgroup = member.subgroupTag || 'Ungrouped';
+            return memberSubgroup === userSubgroup;
+          });
+          setMembers(filteredMembers);
+        } else {
+          // No subgrouping or leader - show all members
+          setMembers(data.members);
+        }
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
@@ -49,14 +74,22 @@ export default function MemberCalendarPage() {
       
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Team Calendar</h1>
-          <p className="text-lg text-gray-600">View all leave requests for your team.</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            {team?.settings?.enableSubgrouping && user?.subgroupTag 
+              ? `${user.subgroupTag} Calendar`
+              : 'Team Calendar'}
+          </h1>
+          <p className="text-lg text-gray-600">
+            {team?.settings?.enableSubgrouping && user?.subgroupTag
+              ? `View all leave requests for your subgroup.`
+              : 'View all leave requests for your team.'}
+          </p>
         </div>
 
         <div className="bg-white shadow-xl rounded-xl border border-gray-200">
           <div className="px-6 py-8">
             {team?._id ? (
-              <TeamCalendar teamId={team._id} members={members} />
+              <TeamCalendar teamId={team._id} members={members} currentUser={user || undefined} />
             ) : (
               <div className="flex items-center justify-center h-64">
                 <div className="text-center">

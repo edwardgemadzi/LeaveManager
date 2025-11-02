@@ -52,6 +52,13 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    if (!team._id) {
+      return NextResponse.json(
+        { error: 'Failed to create team' },
+        { status: 500 }
+      );
+    }
+
     // Create user
     const user = await UserModel.create({
       username,
@@ -68,15 +75,21 @@ export async function POST(request: NextRequest) {
       { _id: new ObjectId(team._id) },
       { $set: { leaderId: user._id } }
     );
-    
-    console.log('✅ Team updated with leader ID:', user._id);
 
-    const token = generateToken({
+    // Build token data
+    const tokenData: {
+      id: string;
+      username: string;
+      role: 'leader';
+      teamId: string;
+    } = {
       id: user._id!,
       username: user.username,
-      role: user.role,
-      teamId: user.teamId,
-    });
+      role: 'leader',
+      teamId: team._id!,
+    };
+
+    const token = generateToken(tokenData);
 
     return NextResponse.json({
       token,
@@ -84,7 +97,7 @@ export async function POST(request: NextRequest) {
         id: user._id,
         username: user.username,
         role: user.role,
-        teamId: user.teamId,
+        teamId: team._id,
       },
       team: {
         id: team._id,

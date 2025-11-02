@@ -33,7 +33,7 @@ export default function Navbar() {
 
   return (
     <nav className="bg-white border-b border-gray-200 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <Link href={user.role === 'leader' ? '/leader/dashboard' : '/member/dashboard'} 
@@ -52,6 +52,12 @@ export default function Navbar() {
                           <>
                             <Link href="/leader/dashboard" className="nav-tab">
                               Dashboard
+                            </Link>
+                            <Link href="/leader/leave-balance" className="nav-tab">
+                              Leave Balance
+                            </Link>
+                            <Link href="/leader/analytics" className="nav-tab">
+                              Analytics
                             </Link>
                             <Link href="/leader/requests" className="nav-tab">
                               Requests
@@ -124,6 +130,12 @@ export default function Navbar() {
                 <>
                   <Link href="/leader/dashboard" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-xl text-sm font-medium transition-all duration-200">
                     Dashboard
+                  </Link>
+                  <Link href="/leader/leave-balance" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-xl text-sm font-medium transition-all duration-200">
+                    Leave Balance
+                  </Link>
+                  <Link href="/leader/analytics" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-xl text-sm font-medium transition-all duration-200">
+                    Analytics
                   </Link>
                   <Link href="/leader/requests" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-xl text-sm font-medium transition-all duration-200">
                     Requests

@@ -7,6 +7,8 @@ export interface User {
   teamId?: string;
   shiftSchedule?: ShiftSchedule;
   shiftTag?: 'day' | 'night' | 'mixed'; // New field for shift categorization
+  workingDaysTag?: string; // Automatic tag grouping members who work on exactly the same days
+  subgroupTag?: string; // Custom subgroup name assigned by leader (only when enableSubgrouping is true)
   createdAt: Date;
 }
 
@@ -23,6 +25,9 @@ export interface TeamSettings {
   concurrentLeave: number;
   maxLeavePerYear: number;
   minimumNoticePeriod: number; // Minimum days in advance for leave requests
+  allowCarryover?: boolean; // Whether unused leave days can carry over to next year
+  enableSubgrouping?: boolean; // Whether to enable subgroup organization within the team
+  subgroups?: string[]; // List of predefined subgroup names (minimum 2 required if enableSubgrouping is true)
 }
 
 export interface LeaveRequest {

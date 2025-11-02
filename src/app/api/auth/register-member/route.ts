@@ -3,7 +3,8 @@ import bcrypt from 'bcryptjs';
 import { UserModel } from '@/models/User';
 import { TeamModel } from '@/models/Team';
 import { generateToken } from '@/lib/auth';
-import { RegisterMemberRequest } from '@/types';
+import { RegisterMemberRequest, ShiftSchedule } from '@/types';
+import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,22 +39,87 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create user
-    const user = await UserModel.create({
+    // Only store tag for fixed schedules (tags are stable)
+    // For rotating schedules, tags change daily and should be regenerated
+    if (!team._id) {
+      return NextResponse.json(
+        { error: 'Team ID not found' },
+        { status: 500 }
+      );
+    }
+
+    // Ensure shiftSchedule.startDate is a Date object (might come as string from JSON)
+    // Create a copy of shiftSchedule to avoid mutating the original
+    let startDate: Date;
+    if (shiftSchedule.startDate) {
+      if (typeof shiftSchedule.startDate === 'string') {
+        startDate = new Date(shiftSchedule.startDate);
+      } else if (shiftSchedule.startDate instanceof Date) {
+        startDate = new Date(shiftSchedule.startDate);
+      } else {
+        startDate = new Date();
+      }
+      
+      // Validate that startDate is a valid date
+      if (isNaN(startDate.getTime())) {
+        return NextResponse.json(
+          { error: 'Invalid start date in shift schedule' },
+          { status: 400 }
+        );
+      }
+    } else {
+      startDate = new Date();
+    }
+
+    const shiftScheduleCopy: ShiftSchedule = {
+      ...shiftSchedule,
+      startDate,
+    };
+
+    const userData: {
+      username: string;
+      fullName: string;
+      password: string;
+      role: 'member';
+      teamId: string;
+      shiftSchedule: ShiftSchedule;
+      workingDaysTag?: string;
+    } = {
       username,
       fullName,
       password: hashedPassword,
       role: 'member',
       teamId: team._id,
-      shiftSchedule,
-    });
+      shiftSchedule: shiftScheduleCopy,
+    };
 
-    const token = generateToken({
+    // Only store tag for fixed schedules
+    if (shiftSchedule.type === 'fixed') {
+      try {
+        userData.workingDaysTag = generateWorkingDaysTag(shiftScheduleCopy);
+      } catch (error) {
+        console.error('Error generating working days tag:', error);
+        // Continue without tag rather than failing registration
+      }
+    }
+
+    // Create user
+    const user = await UserModel.create(userData);
+
+    // Build token data
+    const tokenData: {
+      id: string;
+      username: string;
+      role: 'member';
+      teamId: string;
+    } = {
       id: user._id!,
       username: user.username,
-      role: user.role,
-      teamId: user.teamId,
-    });
+      role: 'member',
+      teamId: team._id,
+    };
+
+    const token = generateToken(tokenData);
 
     return NextResponse.json({
       token,
@@ -61,7 +127,7 @@ export async function POST(request: NextRequest) {
         id: user._id,
         username: user.username,
         role: user.role,
-        teamId: user.teamId,
+        teamId: team._id,
       },
       team: {
         id: team._id,
@@ -71,8 +137,14 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Member registration error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error',
+        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined,
+        stack: process.env.NODE_ENV === 'development' ? errorStack : undefined
+      },
       { status: 500 }
     );
   }

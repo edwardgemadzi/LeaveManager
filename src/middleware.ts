@@ -22,27 +22,33 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const user = verifyToken(token);
-  if (!user) {
-    return NextResponse.next();
-  }
+  try {
+    const user = verifyToken(token);
+    if (!user) {
+      return NextResponse.next();
+    }
 
-  // Role-based access control
-  if (pathname.startsWith('/leader') && user.role !== 'leader') {
-    return NextResponse.redirect(new URL('/member/dashboard', request.url));
-  }
-
-  if (pathname.startsWith('/member') && user.role !== 'member') {
-    return NextResponse.redirect(new URL('/leader/dashboard', request.url));
-  }
-
-  // Redirect dashboard to role-specific dashboard
-  if (pathname === '/dashboard') {
-    if (user.role === 'leader') {
-      return NextResponse.redirect(new URL('/leader/dashboard', request.url));
-    } else {
+    // Role-based access control
+    if (pathname.startsWith('/leader') && user.role !== 'leader') {
       return NextResponse.redirect(new URL('/member/dashboard', request.url));
     }
+
+    if (pathname.startsWith('/member') && user.role !== 'member') {
+      return NextResponse.redirect(new URL('/leader/dashboard', request.url));
+    }
+
+    // Redirect dashboard to role-specific dashboard
+    if (pathname === '/dashboard') {
+      if (user.role === 'leader') {
+        return NextResponse.redirect(new URL('/leader/dashboard', request.url));
+      } else {
+        return NextResponse.redirect(new URL('/member/dashboard', request.url));
+      }
+    }
+  } catch (error) {
+    // Token verification failed, let client handle it
+    console.error('Middleware token verification error:', error);
+    return NextResponse.next();
   }
 
   return NextResponse.next();

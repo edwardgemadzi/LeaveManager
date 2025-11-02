@@ -63,8 +63,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    console.log('Password changed successfully for user:', user.id);
-
     return NextResponse.json({
       message: 'Password has been changed successfully'
     });

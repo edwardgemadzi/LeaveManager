@@ -8,10 +8,14 @@ export default function TeamSettingsPage() {
   const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const [settings, setSettings] = useState({
     concurrentLeave: 2,
     maxLeavePerYear: 20,
     minimumNoticePeriod: 1,
+    allowCarryover: false,
+    enableSubgrouping: false,
+    subgroups: [] as string[],
   });
 
   useEffect(() => {
@@ -34,7 +38,7 @@ export default function TeamSettingsPage() {
         const data = await response.json();
         console.log('Settings - Team data received:', data);
         setTeam(data.team);
-        setSettings(data.team?.settings || { concurrentLeave: 2, maxLeavePerYear: 20, minimumNoticePeriod: 1 });
+        setSettings(data.team?.settings || { concurrentLeave: 2, maxLeavePerYear: 20, minimumNoticePeriod: 1, allowCarryover: false, enableSubgrouping: false, subgroups: [] });
       } catch (error) {
         console.error('Error fetching team:', error);
       } finally {
@@ -48,6 +52,17 @@ export default function TeamSettingsPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setError('');
+
+    // Client-side validation
+    if (settings.enableSubgrouping) {
+      const validSubgroups = (settings.subgroups || []).filter(name => name && name.trim().length > 0);
+      if (validSubgroups.length < 2) {
+        setError('At least 2 subgroups are required when subgrouping is enabled');
+        setSaving(false);
+        return;
+      }
+    }
 
     try {
       const token = localStorage.getItem('token');
@@ -62,12 +77,24 @@ export default function TeamSettingsPage() {
 
       if (response.ok) {
         alert('Settings saved successfully!');
+        // Refresh team data to get updated settings
+        const teamResponse = await fetch('/api/team', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        if (teamResponse.ok) {
+          const teamData = await teamResponse.json();
+          setTeam(teamData.team);
+          setSettings(teamData.team?.settings || { concurrentLeave: 2, maxLeavePerYear: 20, minimumNoticePeriod: 1, allowCarryover: false, enableSubgrouping: false, subgroups: [] });
+        }
       } else {
-        alert('Failed to save settings');
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to save settings');
       }
     } catch (error) {
       console.error('Error saving settings:', error);
-      alert('Error saving settings');
+      setError('Error saving settings. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -169,6 +196,119 @@ export default function TeamSettingsPage() {
                       Minimum number of days in advance that leave requests must be submitted. Set to 0 to allow same-day requests.
                     </p>
                   </div>
+
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="allowCarryover"
+                      checked={settings.allowCarryover || false}
+                      onChange={(e) => setSettings({
+                        ...settings,
+                        allowCarryover: e.target.checked
+                      })}
+                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="allowCarryover" className="ml-2 block text-sm font-medium text-gray-700">
+                      Allow Leave Carryover
+                    </label>
+                  </div>
+                  <p className="mt-1 ml-6 text-sm text-gray-500">
+                    If enabled, unused leave days will carry over to the next year. If disabled, unused days will be lost at year end.
+                  </p>
+                  
+                  <div className="flex items-center mt-4">
+                    <input
+                      type="checkbox"
+                      id="enableSubgrouping"
+                      checked={settings.enableSubgrouping || false}
+                      onChange={(e) => {
+                        const isEnabled = e.target.checked;
+                        setSettings({
+                          ...settings,
+                          enableSubgrouping: isEnabled,
+                          // Initialize with 2 empty subgroups if enabling, or clear if disabling
+                          subgroups: isEnabled && (!settings.subgroups || settings.subgroups.length === 0) 
+                            ? ['', ''] 
+                            : (isEnabled ? settings.subgroups : [])
+                        });
+                      }}
+                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="enableSubgrouping" className="ml-2 block text-sm font-medium text-gray-700">
+                      Enable Subgrouping
+                    </label>
+                  </div>
+                  <p className="mt-1 ml-6 text-sm text-gray-500">
+                    If enabled, leaders can organize members into custom subgroups. Each subgroup operates independently with separate concurrent leave limits and analytics. Minimum 2 subgroups required.
+                  </p>
+                  
+                  {/* Subgroup Naming Section */}
+                  {settings.enableSubgrouping && (
+                    <div className="mt-4 ml-6 space-y-3">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Subgroup Names (Minimum 2 required)
+                      </label>
+                      <div className="space-y-2">
+                        {(settings.subgroups && settings.subgroups.length >= 2 ? settings.subgroups : ['', '']).map((subgroup, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            <input
+                              type="text"
+                              value={subgroup || ''}
+                              onChange={(e) => {
+                                const newSubgroups = [...(settings.subgroups || ['', ''])];
+                                newSubgroups[index] = e.target.value; // Don't trim on every keystroke
+                                // Ensure we always have at least 2 subgroups
+                                while (newSubgroups.length < 2) {
+                                  newSubgroups.push('');
+                                }
+                                setSettings({
+                                  ...settings,
+                                  subgroups: newSubgroups
+                                });
+                              }}
+                              placeholder={`Subgroup ${index + 1} name`}
+                              className="flex-1 text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                            />
+                            {index >= 2 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newSubgroups = [...(settings.subgroups || [])];
+                                  newSubgroups.splice(index, 1);
+                                  // Ensure we always have at least 2 subgroups
+                                  while (newSubgroups.length < 2) {
+                                    newSubgroups.push('');
+                                  }
+                                  setSettings({
+                                    ...settings,
+                                    subgroups: newSubgroups
+                                  });
+                                }}
+                                className="text-red-600 hover:text-red-800 text-sm font-medium"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSettings({
+                              ...settings,
+                              subgroups: [...(settings.subgroups || ['', '']), '']
+                            });
+                          }}
+                          className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                        >
+                          + Add Another Subgroup
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        Members without a subgroup assignment will be treated as &quot;Ungrouped&quot;
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -189,6 +329,12 @@ export default function TeamSettingsPage() {
                 </div>
               </div>
             </div>
+
+            {error && (
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                <p className="text-sm text-red-800">{error}</p>
+              </div>
+            )}
 
             <div className="mt-6 flex justify-end">
               <button

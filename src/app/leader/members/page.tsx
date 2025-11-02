@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ShiftScheduleBuilder from '@/components/ShiftScheduleBuilder';
-import { User, ShiftSchedule } from '@/types';
+import { User, ShiftSchedule, Team } from '@/types';
 
 export default function LeaderMembersPage() {
   const [members, setMembers] = useState<User[]>([]);
+  const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
@@ -30,6 +31,7 @@ export default function LeaderMembersPage() {
         
         const data = await response.json();
         setMembers(data.members || []);
+        setTeam(data.team || null);
       } catch (error) {
         console.error('Error fetching members:', error);
       } finally {
@@ -95,6 +97,38 @@ export default function LeaderMembersPage() {
       }
     } catch (error) {
       console.error('Error updating shift tag:', error);
+      alert('Network error. Please try again.');
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const handleUpdateSubgroup = async (memberId: string, newSubgroupTag: string) => {
+    setUpdating(memberId);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/users/${memberId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ subgroupTag: newSubgroupTag.trim() || undefined }),
+      });
+
+      if (response.ok) {
+        setMembers(members.map(member => 
+          member._id === memberId 
+            ? { ...member, subgroupTag: newSubgroupTag.trim() || undefined }
+            : member
+        ));
+      } else {
+        const errorData = await response.json();
+        console.error('Error updating subgroup:', errorData);
+        alert(errorData.error || 'Failed to update subgroup');
+      }
+    } catch (error) {
+      console.error('Error updating subgroup:', error);
       alert('Network error. Please try again.');
     } finally {
       setUpdating(null);
@@ -222,6 +256,30 @@ export default function LeaderMembersPage() {
                           <p className="text-sm text-gray-600 mt-1">
                             Username: {member.username}
                           </p>
+                          {member.workingDaysTag && (
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-xs text-gray-500">Working Days:</span>
+                              <span className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded">
+                                {member.workingDaysTag}
+                              </span>
+                            </div>
+                          )}
+                          {team?.settings.enableSubgrouping && member.subgroupTag && (
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-xs text-gray-500">Subgroup:</span>
+                              <span className="text-xs font-medium bg-purple-50 text-purple-700 px-2 py-0.5 rounded">
+                                {member.subgroupTag}
+                              </span>
+                            </div>
+                          )}
+                          {team?.settings.enableSubgrouping && !member.subgroupTag && (
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-xs text-gray-500">Subgroup:</span>
+                              <span className="text-xs font-medium bg-gray-50 text-gray-600 px-2 py-0.5 rounded">
+                                Ungrouped
+                              </span>
+                            </div>
+                          )}
                           <p className="text-sm text-gray-600">
                             Joined: {member.createdAt ? new Date(member.createdAt).toLocaleDateString() : 'Unknown'}
                           </p>
@@ -258,6 +316,41 @@ export default function LeaderMembersPage() {
                         )}
                       </div>
                       
+                      {/* Subgroup Section - Only for members when subgrouping is enabled */}
+                      {member.role !== 'leader' && team?.settings.enableSubgrouping && team?.settings.subgroups && team.settings.subgroups.length >= 2 && (
+                        <div className="border-t border-gray-200 pt-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+                            <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Subgroup:</label>
+                            <select
+                              value={member.subgroupTag || ''}
+                              onChange={(e) => {
+                                const newValue = e.target.value;
+                                // Update local state immediately for better UX
+                                setMembers(members.map(m => 
+                                  m._id === member._id 
+                                    ? { ...member, subgroupTag: newValue || undefined }
+                                    : m
+                                ));
+                                // Save immediately on change
+                                handleUpdateSubgroup(member._id!, newValue);
+                              }}
+                              disabled={updating === member._id}
+                              className="text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 flex-1 max-w-xs"
+                            >
+                              <option value="">Ungrouped</option>
+                              {team.settings.subgroups.map((subgroupName) => (
+                                <option key={subgroupName} value={subgroupName}>
+                                  {subgroupName}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Members in the same subgroup share concurrent leave limits and analytics.
+                          </p>
+                        </div>
+                      )}
+
                       {/* Schedule Section - Only for members */}
                       {member.role !== 'leader' && (
                         <div className="border-t border-gray-200 pt-4">
