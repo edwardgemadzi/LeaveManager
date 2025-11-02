@@ -258,11 +258,20 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
     return d1.getTime() === d2.getTime();
   }, [normalizeDate]);
 
-  // Handle slot selection - toggle individual dates
+  // Handle slot selection - toggle individual dates (only working days)
   const onSelectSlot = useCallback((slotInfo: { start: Date; end: Date; slots: Date[] }) => {
     if (!isMember) return;
 
     const clickedDate = normalizeDate(slotInfo.start);
+
+    // Only allow selection of working days
+    if (currentUser && currentUser.shiftSchedule) {
+      const isWorking = isWorkingDay(clickedDate, currentUser.shiftSchedule);
+      if (!isWorking) {
+        alert('You can only request leave for your scheduled working days.');
+        return;
+      }
+    }
 
     // If not in selection mode, enter selection mode
     if (!selectionMode) {
@@ -282,12 +291,19 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
           }
           return updated;
         } else {
-          // Add date
+          // Add date (only if it's a working day)
+          if (currentUser && currentUser.shiftSchedule) {
+            const isWorking = isWorkingDay(clickedDate, currentUser.shiftSchedule);
+            if (!isWorking) {
+              alert('You can only request leave for your scheduled working days.');
+              return prev;
+            }
+          }
           return [...prev, clickedDate].sort((a, b) => a.getTime() - b.getTime());
         }
       });
     }
-  }, [isMember, selectionMode, normalizeDate, isSameDay]);
+  }, [isMember, selectionMode, currentUser, normalizeDate, isSameDay]);
 
   // Style getter for highlighting working days and selected dates (only for members)
   const dayPropGetter = useCallback((date: Date) => {
@@ -446,6 +462,15 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
     const sortedDates = [...selectedDates].sort((a, b) => a.getTime() - b.getTime());
     const reason = getFinalReason();
 
+    // Validate that all selected dates are working days
+    if (currentUser && currentUser.shiftSchedule) {
+      const nonWorkingDays = sortedDates.filter(date => !isWorkingDay(date, currentUser.shiftSchedule!));
+      if (nonWorkingDays.length > 0) {
+        alert('You can only request leave for your scheduled working days. Please remove non-working days from your selection.');
+        return;
+      }
+    }
+
     // Check minimum notice period for earliest date
     if (teamSettings?.minimumNoticePeriod && teamSettings.minimumNoticePeriod > 0) {
       const today = new Date();
@@ -541,7 +566,7 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
     } finally {
       setSubmitting(false);
     }
-  }, [selectedDates, selectedReasonType, customReason, teamSettings, getFinalReason, requestAsRange, teamId, members, clearSelectionMode, refreshCalendar]);
+  }, [selectedDates, selectedReasonType, customReason, teamSettings, getFinalReason, requestAsRange, teamId, members, clearSelectionMode, refreshCalendar, currentUser]);
 
   const closeRequestModal = useCallback(() => {
     setShowRequestModal(false);
@@ -557,9 +582,12 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
         <div className="mb-4 bg-indigo-50 border border-indigo-200 rounded-lg p-3">
           <div className="flex items-center justify-between">
             <p className="text-sm text-indigo-800">
-              <span className="font-semibold">Selection Mode Active</span> - Click dates to toggle individual dates
+              <span className="font-semibold">Selection Mode Active</span> - Click working days to toggle individual dates
               {selectedDates.length > 0 && (
                 <span className="ml-2">({selectedDates.length} date{selectedDates.length !== 1 ? 's' : ''} selected)</span>
+              )}
+              {currentUser && currentUser.shiftSchedule && (
+                <span className="block mt-1 text-xs text-indigo-600">Only your scheduled working days can be selected</span>
               )}
             </p>
             <button
