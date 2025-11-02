@@ -47,19 +47,11 @@ export default function LeaderAnalyticsPage() {
 
         if (analyticsResponse.ok) {
           const analyticsData = await analyticsResponse.json();
-          console.log('Analytics page - Full API response:', analyticsData);
-          console.log('Analytics page - analytics field:', analyticsData.analytics);
-          console.log('Analytics page - analytics type:', typeof analyticsData.analytics);
-          console.log('Analytics page - analytics keys:', analyticsData.analytics ? Object.keys(analyticsData.analytics) : 'null');
           
-          // The API returns { analytics: groupedAnalytics, regularAnalytics }
+          // The API returns { analytics: groupedAnalytics }
           const groupedData = analyticsData.analytics || analyticsData.grouped || null;
           
           if (groupedData) {
-            console.log('Analytics page - Setting analytics:', groupedData);
-            console.log('Analytics page - Has groups?', groupedData.groups);
-            console.log('Analytics page - Groups length:', groupedData.groups?.length);
-            console.log('Analytics page - Has aggregate?', groupedData.aggregate);
             setAnalytics(groupedData);
           } else {
             console.error('Analytics page - No analytics data found in response');

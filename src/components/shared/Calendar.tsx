@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Calendar, momentLocalizer, View, Views } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
@@ -24,10 +24,6 @@ interface CalendarEvent {
   };
 }
 
-// Note: isWorkingDay is now imported from @/lib/leaveCalculations
-
-// Note: getWorkingDays is now imported from @/lib/leaveCalculations
-
 interface CalendarProps {
   teamId: string;
   members: User[];
@@ -36,11 +32,63 @@ interface CalendarProps {
 
 export default function TeamCalendar({ teamId, members, currentUser }: CalendarProps) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState<View>(Views.MONTH);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [showModal, setShowModal] = useState(false);
+  
+  // Date selection state (only for members)
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [teamSettings, setTeamSettings] = useState<{ minimumNoticePeriod: number } | null>(null);
+  
+  // Leave request form state
+  const [selectedReasonType, setSelectedReasonType] = useState('');
+  const [customReason, setCustomReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [requestAsRange, setRequestAsRange] = useState(false); // Checkbox: request as range (default: individual dates)
+  
+  const isMember = currentUser?.role === 'member';
+  
+  const leaveReasons = useMemo(() => [
+    { value: 'vacation', label: '🏖️ Vacation' },
+    { value: 'sick', label: '🤒 Sick Leave' },
+    { value: 'personal', label: '👤 Personal' },
+    { value: 'family', label: '👨‍👩‍👧‍👦 Family Emergency' },
+    { value: 'medical', label: '🏥 Medical Appointment' },
+    { value: 'bereavement', label: '🕊️ Bereavement' },
+    { value: 'maternity', label: '👶 Maternity/Paternity' },
+    { value: 'study', label: '📚 Study/Education' },
+    { value: 'religious', label: '⛪ Religious Holiday' },
+    { value: 'other', label: '📝 Other (specify below)' },
+  ], []);
+
+  // Fetch team settings for validation
+  useEffect(() => {
+    if (!isMember) return;
+    
+    const fetchTeamSettings = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/team', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        const data = await response.json();
+        if (data.team?.settings) {
+          setTeamSettings({
+            minimumNoticePeriod: data.team.settings.minimumNoticePeriod || 1,
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching team settings:', error);
+      }
+    };
+
+    fetchTeamSettings();
+  }, [isMember, teamId]);
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -52,29 +100,11 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
           },
         });
         const requests: LeaveRequest[] = await response.json();
-        
-        console.log('Calendar - Received requests:', requests.map(r => ({ id: r._id, userId: r.userId, reason: r.reason })));
-        console.log('Calendar - Received members:', members.map(m => ({ id: m._id, username: m.username, fullName: m.fullName })));
-        console.log('Calendar - Members count:', members.length);
-        console.log('Calendar - Requests count:', requests.length);
-        
-        // Debug member matching
-        requests.forEach(request => {
-          const member = members.find(m => m._id === request.userId);
-          console.log(`Calendar - Member lookup for request ${request._id}:`, {
-            requestUserId: request.userId,
-            memberFound: !!member,
-            member: member ? { id: member._id, username: member.username, fullName: member.fullName } : null,
-            allMemberIds: members.map(m => m._id)
-          });
-        });
-        
         const calendarEvents: CalendarEvent[] = [];
         
         requests.forEach(request => {
           // Skip rejected requests - they shouldn't show on the calendar
           if (request.status === 'rejected') {
-            console.log('Calendar - Skipping rejected request:', request._id);
             return;
           }
 
@@ -82,17 +112,6 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
           const memberName = member?.fullName || member?.username || 'Unknown';
           const shiftSchedule = member?.shiftSchedule;
           const isEmergency = !!request.requestedBy; // Emergency if requestedBy is set
-          
-          console.log('Calendar event creation:', {
-            requestId: request._id,
-            userId: request.userId,
-            member: member ? { id: member._id, username: member.username, fullName: member.fullName } : null,
-            memberName,
-            membersCount: members.length,
-            membersIds: members.map(m => m._id),
-            isEmergency,
-            requestedBy: request.requestedBy
-          });
           
           if (!shiftSchedule) {
             // If no shift schedule, create a single event for the entire period
@@ -122,23 +141,12 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
               shiftSchedule
             );
             
-            console.log('Calendar - Working days calculation:', {
-              requestId: request._id,
-              startDate: request.startDate,
-              endDate: request.endDate,
-              startDateParsed: new Date(request.startDate).toDateString(),
-              endDateParsed: new Date(request.endDate).toDateString(),
-              shiftSchedule: shiftSchedule,
-              workingDaysCount: workingDays.length,
-              workingDays: workingDays.map(d => d.toDateString())
-            });
-            
             workingDays.forEach((workingDay, index) => {
               const eventTitle = isEmergency 
                 ? `🚨 ${memberName} - ${request.reason}` 
                 : `${memberName} - ${request.reason}`;
                 
-              const event = {
+              calendarEvents.push({
                 id: `${request._id!}-${index}`,
                 title: eventTitle,
                 start: new Date(workingDay),
@@ -151,16 +159,7 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
                   isEmergency,
                   requestedBy: request.requestedBy,
                 },
-              };
-              
-              console.log(`Calendar - Creating event ${index + 1}:`, {
-                id: event.id,
-                title: event.title,
-                start: event.start.toDateString(),
-                end: event.end.toDateString()
               });
-              
-              calendarEvents.push(event);
             });
           }
         });
@@ -168,8 +167,6 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
         setEvents(calendarEvents);
       } catch (error) {
         console.error('Error fetching calendar events:', error);
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -247,45 +244,346 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
     setShowModal(true);
   }, []);
 
-  const onSelectSlot = useCallback((slotInfo: { start: Date; end: Date; slots: Date[] }) => {
-    // For now, we'll keep the slot selection simple
-    // In a full implementation, this could open a form to create a new leave request
-    console.log('Selected slot:', slotInfo);
+  // Helper function to normalize dates (remove time component)
+  const normalizeDate = useCallback((date: Date): Date => {
+    const normalized = new Date(date);
+    normalized.setHours(0, 0, 0, 0);
+    return normalized;
   }, []);
 
-  // Style getter for highlighting working days (only for members)
-  const dayPropGetter = useCallback((date: Date) => {
-    // Only highlight working days if currentUser is provided and has a role of 'member'
-    if (currentUser && currentUser.role === 'member' && currentUser.shiftSchedule) {
-      const isWorking = isWorkingDay(date, currentUser.shiftSchedule);
-      if (isWorking) {
-        return {
-          style: {
-            backgroundColor: '#f0f9ff', // Light blue background
-            borderLeft: '3px solid #3b82f6', // Blue left border
-          },
-          className: 'rbc-working-day'
-        };
-      }
+  // Helper function to check if two dates are the same day
+  const isSameDay = useCallback((date1: Date, date2: Date): boolean => {
+    const d1 = normalizeDate(date1);
+    const d2 = normalizeDate(date2);
+    return d1.getTime() === d2.getTime();
+  }, [normalizeDate]);
+
+  // Handle slot selection - toggle individual dates
+  const onSelectSlot = useCallback((slotInfo: { start: Date; end: Date; slots: Date[] }) => {
+    if (!isMember) return;
+
+    const clickedDate = normalizeDate(slotInfo.start);
+
+    // If not in selection mode, enter selection mode
+    if (!selectionMode) {
+      setSelectionMode(true);
+      setSelectedDates([clickedDate]);
+    } else {
+      // Toggle the date
+      setSelectedDates(prev => {
+        const existingIndex = prev.findIndex(d => isSameDay(d, clickedDate));
+        
+        if (existingIndex >= 0) {
+          // Remove date
+          const updated = prev.filter((_, index) => index !== existingIndex);
+          // If no dates left, exit selection mode
+          if (updated.length === 0) {
+            setSelectionMode(false);
+          }
+          return updated;
+        } else {
+          // Add date
+          return [...prev, clickedDate].sort((a, b) => a.getTime() - b.getTime());
+        }
+      });
     }
-    return {};
-  }, [currentUser]);
+  }, [isMember, selectionMode, normalizeDate, isSameDay]);
+
+  // Style getter for highlighting working days and selected dates (only for members)
+  const dayPropGetter = useCallback((date: Date) => {
+    const normalizedDate = normalizeDate(date);
+    const style: React.CSSProperties = {};
+    const classNames: string[] = [];
+
+    // Check if date is selected (in selection mode)
+    const isSelected = isMember && selectionMode && selectedDates.some(d => isSameDay(d, normalizedDate));
+    
+    // Only highlight working days if currentUser is provided and has a role of 'member'
+    const isWorking = currentUser && currentUser.role === 'member' && currentUser.shiftSchedule && isWorkingDay(date, currentUser.shiftSchedule);
+
+    if (isSelected) {
+      style.backgroundColor = '#dbeafe'; // Light blue for selected
+      style.borderTop = '2px solid #3b82f6';
+      style.borderRight = '2px solid #3b82f6';
+      style.borderBottom = '2px solid #3b82f6';
+      // If also a working day, use thicker left border; otherwise use same thickness as other borders
+      style.borderLeft = isWorking ? '3px solid #3b82f6' : '2px solid #3b82f6';
+      style.borderRadius = '4px';
+      classNames.push('rbc-selected-date');
+      if (isWorking) {
+        classNames.push('rbc-working-day');
+      }
+    } else if (isWorking) {
+      style.backgroundColor = '#f0f9ff'; // Light blue background
+      style.borderLeft = '3px solid #3b82f6'; // Blue left border
+      classNames.push('rbc-working-day');
+    }
+
+    return {
+      style,
+      className: classNames.join(' ')
+    };
+  }, [currentUser, isMember, selectionMode, selectedDates, normalizeDate, isSameDay]);
+
+  // Clear selection mode
+  const clearSelectionMode = useCallback(() => {
+    setSelectionMode(false);
+    setSelectedDates([]);
+  }, []);
 
   const closeModal = useCallback(() => {
     setShowModal(false);
     setSelectedEvent(null);
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
-      </div>
-    );
-  }
+  const getFinalReason = useCallback(() => {
+    if (selectedReasonType === 'other') {
+      return customReason || '';
+    }
+    const selectedReason = leaveReasons.find(r => r.value === selectedReasonType);
+    return selectedReason?.label || '';
+  }, [selectedReasonType, customReason, leaveReasons]);
+
+  // Helper function to refresh calendar events
+  const refreshCalendar = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/leave-requests?teamId=${teamId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch leave requests');
+      }
+      const requests: LeaveRequest[] = await response.json();
+      
+      const calendarEvents: CalendarEvent[] = [];
+      requests.forEach(request => {
+        if (request.status === 'rejected') return;
+        const member = members.find(m => m._id === request.userId);
+        const memberName = member?.fullName || member?.username || 'Unknown';
+        const shiftSchedule = member?.shiftSchedule;
+        const isEmergency = !!request.requestedBy;
+        
+        if (!shiftSchedule) {
+          const eventTitle = isEmergency 
+            ? `🚨 ${memberName} - ${request.reason}` 
+            : `${memberName} - ${request.reason}`;
+            
+          calendarEvents.push({
+            id: request._id!,
+            title: eventTitle,
+            start: new Date(request.startDate),
+            end: new Date(request.endDate),
+            resource: {
+              status: request.status,
+              userId: request.userId,
+              username: member?.username || 'Unknown',
+              fullName: member?.fullName,
+              isEmergency,
+              requestedBy: request.requestedBy,
+            },
+          });
+        } else {
+          const workingDays = getWorkingDays(
+            new Date(request.startDate),
+            new Date(request.endDate),
+            shiftSchedule
+          );
+          
+          workingDays.forEach((workingDay, index) => {
+            const eventTitle = isEmergency 
+              ? `🚨 ${memberName} - ${request.reason}` 
+              : `${memberName} - ${request.reason}`;
+              
+            calendarEvents.push({
+              id: `${request._id!}-${index}`,
+              title: eventTitle,
+              start: new Date(workingDay),
+              end: new Date(workingDay),
+              resource: {
+                status: request.status,
+                userId: request.userId,
+                username: member?.username || 'Unknown',
+                fullName: member?.fullName,
+                isEmergency,
+                requestedBy: request.requestedBy,
+              },
+            });
+          });
+        }
+      });
+
+      setEvents(calendarEvents);
+    } catch (error) {
+      console.error('Error refreshing calendar events:', error);
+    }
+  }, [teamId, members]);
+
+  const handleRequestLeave = useCallback(() => {
+    if (selectedDates.length === 0) return;
+    setShowRequestModal(true);
+  }, [selectedDates]);
+
+  const handleSubmitLeaveRequest = useCallback(async () => {
+    if (!selectedReasonType) {
+      alert('Please select a reason for your leave request.');
+      return;
+    }
+
+    if (selectedReasonType === 'other' && !customReason.trim()) {
+      alert('Please provide details for your leave request.');
+      return;
+    }
+
+    if (selectedDates.length === 0) {
+      alert('Please select at least one date.');
+      return;
+    }
+
+    // Sort dates
+    const sortedDates = [...selectedDates].sort((a, b) => a.getTime() - b.getTime());
+    const reason = getFinalReason();
+
+    // Check minimum notice period for earliest date
+    if (teamSettings?.minimumNoticePeriod && teamSettings.minimumNoticePeriod > 0) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const earliestDate = sortedDates[0];
+      const daysDifference = Math.ceil((earliestDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (daysDifference < teamSettings.minimumNoticePeriod) {
+        alert(`Leave requests must be submitted at least ${teamSettings.minimumNoticePeriod} day(s) in advance. Please select dates ${teamSettings.minimumNoticePeriod} or more days from today.`);
+        return;
+      }
+    }
+
+    setSubmitting(true);
+
+    try {
+      const token = localStorage.getItem('token');
+
+      if (requestAsRange) {
+        // Request as a single range (when checkbox is checked)
+        const startDate = sortedDates[0];
+        const endDate = sortedDates[sortedDates.length - 1];
+
+        const response = await fetch('/api/leave-requests', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            startDate: startDate.toISOString().split('T')[0],
+            endDate: endDate.toISOString().split('T')[0],
+            reason: reason,
+          }),
+        });
+
+        if (response.ok) {
+          // Refresh calendar and show success
+          await refreshCalendar();
+          alert('Leave request submitted successfully!');
+          clearSelectionMode();
+          setShowRequestModal(false);
+          setSelectedReasonType('');
+          setCustomReason('');
+          setRequestAsRange(false);
+        } else {
+          const error = await response.json();
+          alert(error.error || 'Failed to submit request');
+        }
+      } else {
+        // Request each date separately (default)
+        let successCount = 0;
+        let failureCount = 0;
+
+        for (const date of sortedDates) {
+          const response = await fetch('/api/leave-requests', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              startDate: date.toISOString().split('T')[0],
+              endDate: date.toISOString().split('T')[0],
+              reason: reason,
+            }),
+          });
+
+          if (response.ok) {
+            successCount++;
+          } else {
+            failureCount++;
+          }
+        }
+
+        // Refresh calendar
+        await refreshCalendar();
+
+        if (failureCount === 0) {
+          alert(`Leave request submitted successfully! (${successCount} date${successCount !== 1 ? 's' : ''})`);
+          clearSelectionMode();
+          setShowRequestModal(false);
+          setSelectedReasonType('');
+          setCustomReason('');
+          setRequestAsRange(false);
+        } else {
+          alert(`Submitted ${successCount} request(s) successfully. ${failureCount} request(s) failed.`);
+        }
+      }
+    } catch (error) {
+      console.error('Error submitting request:', error);
+      alert('Error submitting request');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [selectedDates, selectedReasonType, customReason, teamSettings, getFinalReason, requestAsRange, teamId, members, clearSelectionMode, refreshCalendar]);
+
+  const closeRequestModal = useCallback(() => {
+    setShowRequestModal(false);
+    setSelectedReasonType('');
+    setCustomReason('');
+    setRequestAsRange(false);
+  }, []);
 
   return (
-    <div className="min-h-[600px]">
+    <div className="min-h-[600px] relative">
+      {/* Selection mode indicator */}
+      {isMember && selectionMode && (
+        <div className="mb-4 bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-indigo-800">
+              <span className="font-semibold">Selection Mode Active</span> - Click dates to toggle individual dates
+              {selectedDates.length > 0 && (
+                <span className="ml-2">({selectedDates.length} date{selectedDates.length !== 1 ? 's' : ''} selected)</span>
+              )}
+            </p>
+            <button
+              onClick={clearSelectionMode}
+              className="text-xs text-indigo-600 hover:text-indigo-800 underline"
+            >
+              Cancel Selection
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Request Leave button */}
+      {isMember && selectionMode && selectedDates.length > 0 && (
+        <div className="mb-4 flex justify-center">
+          <button
+            onClick={handleRequestLeave}
+            className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-lg"
+          >
+            Request Leave ({selectedDates.length} date{selectedDates.length !== 1 ? 's' : ''})
+          </button>
+        </div>
+      )}
+
       <Calendar
         localizer={localizer}
         events={events}
@@ -301,7 +599,7 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
         onNavigate={handleNavigate}
         onSelectEvent={onSelectEvent}
         onSelectSlot={onSelectSlot}
-        selectable
+        selectable={isMember}
         popup
         showMultiDayTimes
         step={60}
@@ -476,6 +774,165 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
                 </div>
               );
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* Leave Request Modal */}
+      {showRequestModal && isMember && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-gray-900">Request Leave</h3>
+              <button
+                onClick={closeRequestModal}
+                className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Selected Dates Display */}
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-2">Selected Dates:</p>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  {selectedDates.length === 0 ? (
+                    <p className="text-sm text-gray-500">No dates selected</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {requestAsRange && selectedDates.length > 1 ? (
+                        <>
+                          <p className="text-sm text-gray-900">
+                            <strong>Start:</strong> {selectedDates[0].toLocaleDateString('en-US', {
+                              weekday: 'long',
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })}
+                          </p>
+                          <p className="text-sm text-gray-900">
+                            <strong>End:</strong> {selectedDates[selectedDates.length - 1].toLocaleDateString('en-US', {
+                              weekday: 'long',
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            (Range from {selectedDates[0].toLocaleDateString()} to {selectedDates[selectedDates.length - 1].toLocaleDateString()})
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm font-medium text-gray-900 mb-1">Individual Dates ({selectedDates.length}):</p>
+                          <div className="space-y-1 max-h-32 overflow-y-auto">
+                            {selectedDates.map((date, index) => (
+                              <p key={index} className="text-sm text-gray-900">
+                                {date.toLocaleDateString('en-US', {
+                                  weekday: 'short',
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric'
+                                })}
+                              </p>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Reason Selection */}
+              <div>
+                <label htmlFor="reason" className="block text-sm font-medium text-gray-700 mb-2">
+                  Reason for Leave
+                </label>
+                <select
+                  id="reason"
+                  value={selectedReasonType}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSelectedReasonType(value);
+                    if (value !== 'other') {
+                      setCustomReason('');
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="">Select a reason...</option>
+                  {leaveReasons.map((reason) => (
+                    <option key={reason.value} value={reason.value}>
+                      {reason.label}
+                    </option>
+                  ))}
+                </select>
+
+                {selectedReasonType === 'other' && (
+                  <div className="mt-3">
+                    <label htmlFor="customReason" className="block text-sm font-medium text-gray-700 mb-2">
+                      Please specify
+                    </label>
+                    <textarea
+                      id="customReason"
+                      rows={3}
+                      value={customReason}
+                      onChange={(e) => setCustomReason(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      placeholder="Please provide details for your leave request..."
+                    />
+                  </div>
+                )}
+
+                {teamSettings?.minimumNoticePeriod && teamSettings.minimumNoticePeriod > 0 && (
+                  <p className="mt-2 text-xs text-gray-500">
+                    ⚠️ Leave requests must be submitted at least {teamSettings.minimumNoticePeriod} day(s) in advance
+                  </p>
+                )}
+              </div>
+
+              {/* Request Option Checkbox - only show if multiple dates selected */}
+              {selectedDates.length > 1 && (
+                <div className="border-t pt-4">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={requestAsRange}
+                      onChange={(e) => setRequestAsRange(e.target.checked)}
+                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                    />
+                    <span className="text-sm text-gray-700">
+                      Request as a single range
+                    </span>
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1 ml-6">
+                    {requestAsRange 
+                      ? `Creates one request covering all ${selectedDates.length} days (from ${selectedDates[0].toLocaleDateString()} to ${selectedDates[selectedDates.length - 1].toLocaleDateString()}).`
+                      : `Creates ${selectedDates.length} separate requests, one for each selected day.`
+                    }
+                  </p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  onClick={closeRequestModal}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitLeaveRequest}
+                  disabled={submitting || !selectedReasonType || (selectedReasonType === 'other' && !customReason.trim())}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submitting ? 'Submitting...' : 'Submit Request'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
