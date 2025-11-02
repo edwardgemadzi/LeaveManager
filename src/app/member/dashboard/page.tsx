@@ -164,7 +164,7 @@ export default function MemberDashboard() {
     return (
       <div className="min-h-screen">
         <Navbar />
-        <div className="flex items-center justify-center h-64">
+        <div className="flex items-center justify-center h-64 pt-24">
           <div className="text-center">
             <div className="spinner w-16 h-16 mx-auto mb-4"></div>
             <p className="text-gray-600 text-lg">Loading your dashboard...</p>
@@ -181,7 +181,7 @@ export default function MemberDashboard() {
       <div className="min-h-screen">
         <Navbar />
         
-        <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 pt-24">
           <div className="mb-8 fade-in">
             <h1 className="text-4xl font-bold text-gray-900 mb-2">My Dashboard</h1>
             <p className="text-gray-600 text-lg">Welcome back! Here&apos;s your leave information</p>

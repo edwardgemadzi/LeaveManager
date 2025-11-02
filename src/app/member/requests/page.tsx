@@ -161,7 +161,7 @@ export default function MemberRequestsPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />
-        <div className="flex items-center justify-center h-64">
+        <div className="flex items-center justify-center h-64 pt-24">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
         </div>
       </div>
@@ -172,7 +172,7 @@ export default function MemberRequestsPage() {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       
-      <div className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8 pt-24">
         <div className="px-4 py-6 sm:px-0">
           <div className="flex justify-between items-center">
             <div>
