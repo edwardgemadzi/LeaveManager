@@ -391,10 +391,10 @@ export default function LeaderDashboard() {
                       <p className="font-semibold text-blue-900 mb-1">Team Competition Context</p>
                       <p className="text-sm text-blue-700 mb-2">
                         <strong>{analytics.aggregate.membersCount}</strong> team member{analytics.aggregate.membersCount !== 1 ? 's' : ''} 
-                        {' '}need to coordinate use of <strong>{analytics.aggregate.totalRealisticUsableDays}</strong> realistic usable days.
+                        {' '}need to coordinate use of <strong>{analytics.aggregate.totalRealisticUsableDays.toFixed(1)}</strong> realistic usable days.
                       </p>
                       <p className="text-sm text-blue-700">
-                        Average of <strong>{analytics.aggregate.averageDaysPerMemberAcrossTeam}</strong> days per member available across the team.
+                        Average of <strong>{analytics.aggregate.averageDaysPerMemberAcrossTeam.toFixed(1)}</strong> days per member available across the team.
                       </p>
                     </div>
                   </div>
@@ -412,7 +412,7 @@ export default function LeaderDashboard() {
                       <div>
                         <p className="font-semibold text-orange-900 mb-1">Concurrent Leave Constraints Active</p>
                         <p className="text-sm text-orange-700">
-                          Team members can realistically use <strong>{analytics.aggregate.totalRealisticUsableDays}</strong> of <strong>{analytics.aggregate.totalTheoreticalWorkingDays}</strong> theoretical working days remaining.
+                          Team members can realistically use <strong>{analytics.aggregate.totalRealisticUsableDays.toFixed(1)}</strong> of <strong>{analytics.aggregate.totalTheoreticalWorkingDays.toFixed(1)}</strong> theoretical working days remaining.
                           Some periods are fully booked due to concurrent leave limits.
                         </p>
                       </div>
