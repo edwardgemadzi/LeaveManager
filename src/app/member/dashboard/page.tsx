@@ -530,8 +530,8 @@ export default function MemberDashboard() {
                   </a>
                 </div>
               ) : (
-                <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-                  {myRequests.map((request, index) => (
+                <div className="space-y-4">
+                  {myRequests.slice(0, 5).map((request, index) => (
                     <div key={request._id} className="bg-gray-50 rounded-xl p-4 border border-gray-200 hover:border-gray-300 transition-all duration-200" style={{ animationDelay: `${index * 0.1}s` }}>
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
