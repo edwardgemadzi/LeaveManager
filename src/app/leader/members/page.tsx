@@ -13,6 +13,14 @@ export default function LeaderMembersPage() {
   const [updating, setUpdating] = useState<string | null>(null);
   const [editingSchedule, setEditingSchedule] = useState<string | null>(null);
   const [tempSchedule, setTempSchedule] = useState<ShiftSchedule | null>(null);
+  
+  // Filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterShiftTag, setFilterShiftTag] = useState<string>('');
+  const [filterWorkingDaysTag, setFilterWorkingDaysTag] = useState<string>('');
+  const [filterSubgroup, setFilterSubgroup] = useState<string>('');
+  const [filterRole, setFilterRole] = useState<string>('');
+  const [sortBy, setSortBy] = useState<'name' | 'joinDate'>('name');
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -209,6 +217,83 @@ export default function LeaderMembersPage() {
     }
   };
 
+  // Get unique values for filter dropdowns
+  const uniqueWorkingDaysTags = Array.from(new Set(
+    members
+      .filter(m => m.workingDaysTag)
+      .map(m => m.workingDaysTag!)
+      .sort()
+  ));
+
+  const uniqueSubgroups = team?.settings.enableSubgrouping && team?.settings.subgroups
+    ? Array.from(new Set([...team.settings.subgroups, 'Ungrouped']))
+    : [];
+
+  // Filter and sort members
+  const filteredAndSortedMembers = members
+    .filter((member) => {
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesName = (member.fullName || '').toLowerCase().includes(query);
+        const matchesUsername = member.username.toLowerCase().includes(query);
+        if (!matchesName && !matchesUsername) return false;
+      }
+
+      // Role filter
+      if (filterRole) {
+        if (filterRole === 'leader' && member.role !== 'leader') return false;
+        if (filterRole === 'member' && member.role !== 'member') return false;
+      }
+
+      // Shift tag filter
+      if (filterShiftTag) {
+        // Special handling for "unassigned" - check for empty string or undefined
+        if (filterShiftTag === '__UNASSIGNED__') {
+          if (member.shiftTag) return false;
+        } else {
+          if (member.shiftTag !== filterShiftTag) return false;
+        }
+      }
+
+      // Working days tag filter
+      if (filterWorkingDaysTag) {
+        if (member.workingDaysTag !== filterWorkingDaysTag) return false;
+      }
+
+      // Subgroup filter
+      if (filterSubgroup) {
+        if (filterSubgroup === 'Ungrouped') {
+          if (member.subgroupTag) return false;
+        } else {
+          if (member.subgroupTag !== filterSubgroup) return false;
+        }
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'name') {
+        const nameA = (a.fullName || a.username).toLowerCase();
+        const nameB = (b.fullName || b.username).toLowerCase();
+        return nameA.localeCompare(nameB);
+      } else {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA; // Newest first
+      }
+    });
+
+  const hasActiveFilters = searchQuery || filterShiftTag || filterWorkingDaysTag || filterSubgroup || filterRole;
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setFilterShiftTag('');
+    setFilterWorkingDaysTag('');
+    setFilterSubgroup('');
+    setFilterRole('');
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -235,11 +320,164 @@ export default function LeaderMembersPage() {
 
         <div className="bg-white shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6">
+            {/* Filter Section */}
+            {members.length > 0 && (
+              <div className="mb-6 space-y-4 border-b border-gray-200 pb-4">
+                {/* Search and Quick Filters Row */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Search Input */}
+                  <div className="md:col-span-1">
+                    <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
+                      Search
+                    </label>
+                    <input
+                      type="text"
+                      id="search"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search by name or username..."
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+
+                  {/* Role Filter */}
+                  <div>
+                    <label htmlFor="role-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                      Role
+                    </label>
+                    <select
+                      id="role-filter"
+                      value={filterRole}
+                      onChange={(e) => setFilterRole(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    >
+                      <option value="">All Roles</option>
+                      <option value="leader">👑 Leaders</option>
+                      <option value="member">👤 Members</option>
+                    </select>
+                  </div>
+
+                  {/* Shift Tag Filter */}
+                  <div>
+                    <label htmlFor="shift-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                      Shift Tag
+                    </label>
+                      <select
+                        id="shift-filter"
+                        value={filterShiftTag}
+                        onChange={(e) => setFilterShiftTag(e.target.value)}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      >
+                        <option value="">All Shifts</option>
+                        <option value="day">☀️ Day Shift</option>
+                        <option value="night">🌙 Night Shift</option>
+                        <option value="mixed">🔄 Mixed Shifts</option>
+                        <option value="__UNASSIGNED__">❓ Unassigned</option>
+                      </select>
+                  </div>
+                </div>
+
+                {/* Secondary Filters Row */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Working Days Tag Filter */}
+                  {uniqueWorkingDaysTags.length > 0 && (
+                    <div>
+                      <label htmlFor="working-days-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                        Working Days Pattern
+                      </label>
+                      <select
+                        id="working-days-filter"
+                        value={filterWorkingDaysTag}
+                        onChange={(e) => setFilterWorkingDaysTag(e.target.value)}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      >
+                        <option value="">All Patterns</option>
+                        {uniqueWorkingDaysTags.map((tag) => (
+                          <option key={tag} value={tag}>
+                            {tag}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Subgroup Filter */}
+                  {uniqueSubgroups.length > 0 && (
+                    <div>
+                      <label htmlFor="subgroup-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                        Subgroup
+                      </label>
+                      <select
+                        id="subgroup-filter"
+                        value={filterSubgroup}
+                        onChange={(e) => setFilterSubgroup(e.target.value)}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      >
+                        <option value="">All Subgroups</option>
+                        {uniqueSubgroups.map((subgroup) => (
+                          <option key={subgroup} value={subgroup}>
+                            {subgroup}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Sort By */}
+                  <div>
+                    <label htmlFor="sort-by" className="block text-sm font-medium text-gray-700 mb-1">
+                      Sort By
+                    </label>
+                    <select
+                      id="sort-by"
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value as 'name' | 'joinDate')}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    >
+                      <option value="name">Name (A-Z)</option>
+                      <option value="joinDate">Join Date (Newest First)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Filter Summary and Clear Button */}
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    Showing <span className="font-medium">{filteredAndSortedMembers.length}</span> of{' '}
+                    <span className="font-medium">{members.length}</span> member{members.length !== 1 ? 's' : ''}
+                    {hasActiveFilters && (
+                      <span className="ml-2 text-gray-500">(filtered)</span>
+                    )}
+                  </div>
+                  {hasActiveFilters && (
+                    <button
+                      onClick={clearFilters}
+                      className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                    >
+                      Clear All Filters
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             {members.length === 0 ? (
               <p className="text-gray-500 text-center py-8">No team members found.</p>
+            ) : filteredAndSortedMembers.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No members match your filters.</p>
+                {hasActiveFilters && (
+                  <button
+                    onClick={clearFilters}
+                    className="mt-2 text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                  >
+                    Clear filters to see all members
+                  </button>
+                )}
+              </div>
             ) : (
               <div className="space-y-4">
-                {members.map((member) => (
+                {filteredAndSortedMembers.map((member) => (
                   <div key={member._id} className="border rounded-lg p-4 sm:p-6 hover:bg-gray-50 transition-colors">
                     <div className="space-y-4">
                       {/* Header Section */}
