@@ -116,6 +116,16 @@ export async function PATCH(
             { status: 400 }
           );
         }
+        
+        // Validate maximum limit to prevent abuse (1000 days = ~2.7 years, more than enough)
+        const MAX_MANUAL_BALANCE = 1000;
+        if (manualLeaveBalance > MAX_MANUAL_BALANCE) {
+          return NextResponse.json(
+            { error: `manualLeaveBalance cannot exceed ${MAX_MANUAL_BALANCE} days` },
+            { status: 400 }
+          );
+        }
+        
         updateData.manualLeaveBalance = manualLeaveBalance;
       }
     }

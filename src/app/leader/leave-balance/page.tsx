@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { Team, User, LeaveRequest } from '@/types';
-import { calculateLeaveBalance, countWorkingDays } from '@/lib/leaveCalculations';
+import { calculateLeaveBalance, countWorkingDays, calculateSurplusBalance } from '@/lib/leaveCalculations';
 
 export default function LeaderLeaveBalancePage() {
   const [team, setTeam] = useState<Team | null>(null);
@@ -17,52 +17,73 @@ export default function LeaderLeaveBalancePage() {
   const [tempBalance, setTempBalance] = useState<string>('');
   const [updating, setUpdating] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+  // Extract fetchData function to be reusable
+  const fetchData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-        if (!user.teamId) {
-          console.error('No team ID found');
-          return;
-        }
-
-        // Fetch team data
-        const teamResponse = await fetch('/api/team', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        
-        if (!teamResponse.ok) {
-          console.error('Failed to fetch team data:', teamResponse.status);
-          return;
-        }
-        
-        const teamData = await teamResponse.json();
-        setTeam(teamData.team);
-        setMembers(teamData.members || []);
-
-        // Fetch all requests
-        const requestsResponse = await fetch('/api/leave-requests', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        
-        if (requestsResponse.ok) {
-          const requests = await requestsResponse.json();
-          setAllRequests(requests || []);
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      } finally {
-        setLoading(false);
+      if (!user.teamId) {
+        console.error('No team ID found');
+        return;
       }
+
+      // Fetch team data
+      const teamResponse = await fetch('/api/team', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (!teamResponse.ok) {
+        console.error('Failed to fetch team data:', teamResponse.status);
+        return;
+      }
+      
+      const teamData = await teamResponse.json();
+      setTeam(teamData.team);
+      setMembers(teamData.members || []);
+
+      // Fetch all requests
+      const requestsResponse = await fetch('/api/leave-requests', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (requestsResponse.ok) {
+        const requests = await requestsResponse.json();
+        setAllRequests(requests || []);
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  // Auto-refresh on window focus to get updated data after deletions
+  useEffect(() => {
+    const handleFocus = () => {
+      // Refetch data when window regains focus
+      fetchData();
     };
 
-    fetchData();
+    const handleRequestDeleted = () => {
+      // Refetch data immediately when a request is deleted
+      fetchData();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('leaveRequestDeleted', handleRequestDeleted);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('leaveRequestDeleted', handleRequestDeleted);
+    };
   }, []);
 
   const getMemberLeaveData = (member: User) => {
@@ -127,12 +148,16 @@ export default function LeaderLeaveBalancePage() {
     const maxLeave = team?.settings.maxLeavePerYear || 20;
     const percentageUsed = maxLeave > 0 ? (totalUsed / maxLeave) * 100 : 0;
 
+    // Calculate surplus balance
+    const surplusBalance = calculateSurplusBalance(member.manualLeaveBalance, maxLeave);
+
     return {
       remainingBalance,
       totalUsed,
       yearToDateUsed: yearToDateWorkingDays,
       totalWorkingDaysInYear,
       percentageUsed,
+      surplusBalance,
       approvedCount: approvedRequests.length,
       pendingCount: memberRequests.filter(req => req.status === 'pending').length,
       rejectedCount: memberRequests.filter(req => req.status === 'rejected').length,
@@ -536,10 +561,22 @@ export default function LeaderLeaveBalancePage() {
                                     title="Click to edit balance"
                                   >
                                     {leaveData.remainingBalance.toFixed(1)} / {maxLeave}
+                                    {leaveData.surplusBalance > 0 && (
+                                      <span className="ml-2 text-xs text-green-600" title="Surplus balance">
+                                        (+{leaveData.surplusBalance.toFixed(1)} surplus)
+                                      </span>
+                                    )}
                                     {member.manualLeaveBalance !== undefined && (
                                       <span className="ml-2 text-xs text-blue-600" title="Manual balance override">✏️</span>
                                     )}
                                   </div>
+                                  {leaveData.surplusBalance > 0 && (
+                                    <div className="mt-1">
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        +{leaveData.surplusBalance.toFixed(1)} surplus days
+                                      </span>
+                                    </div>
+                                  )}
                                   {member.manualLeaveBalance !== undefined && (
                                     <button
                                       onClick={(e) => {

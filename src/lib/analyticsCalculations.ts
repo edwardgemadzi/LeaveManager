@@ -1,5 +1,5 @@
 import { ShiftSchedule, User, Team, LeaveRequest } from '@/types';
-import { countWorkingDays, calculateLeaveBalance, isWorkingDay, getWorkingDays } from './leaveCalculations';
+import { countWorkingDays, calculateLeaveBalance, isWorkingDay, getWorkingDays, calculateSurplusBalance } from './leaveCalculations';
 
 // Generate a unique tag for working days pattern
 // Members with the same tag work on exactly the same days (100% overlap)
@@ -374,6 +374,7 @@ export interface MemberAnalytics {
   allowCarryover: boolean;
   membersSharingSameShift: number; // Total members competing for same days
   averageDaysPerMember: number; // Average realistic days per member in same shift
+  surplusBalance: number; // Surplus balance when manual balance exceeds team max
 }
 
 // Analytics data structure for team
@@ -502,6 +503,9 @@ export const getMemberAnalytics = (
     user.manualLeaveBalance
   );
   
+  // Calculate surplus balance
+  const surplusBalance = calculateSurplusBalance(user.manualLeaveBalance, team.settings.maxLeavePerYear);
+  
   // Calculate competition metrics (using filtered members if subgrouping is enabled)
   const membersSharingSameShift = calculateMembersSharingSameShift(user, filteredMembers);
   
@@ -536,7 +540,8 @@ export const getMemberAnalytics = (
     willLose,
     allowCarryover,
     membersSharingSameShift,
-    averageDaysPerMember
+    averageDaysPerMember,
+    surplusBalance
   };
 };
 

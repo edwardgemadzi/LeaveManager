@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { LeaveRequest, Team, User } from '@/types';
-import { calculateLeaveBalance } from '@/lib/leaveCalculations';
+import { calculateLeaveBalance, calculateSurplusBalance } from '@/lib/leaveCalculations';
 import { GroupedTeamAnalytics } from '@/lib/analyticsCalculations';
 
 export default function LeaderDashboard() {
@@ -135,10 +135,12 @@ export default function LeaderDashboard() {
   }, []);
 
   const getLeaveBalanceSummary = () => {
-    if (!team || !members.length) return { totalRemaining: 0, averageRemaining: 0, membersWithLowBalance: 0 };
+    if (!team || !members.length) return { totalRemaining: 0, averageRemaining: 0, membersWithLowBalance: 0, totalSurplus: 0, membersWithSurplus: 0 };
 
     let totalRemaining = 0;
     let membersWithLowBalance = 0;
+    let totalSurplus = 0;
+    let membersWithSurplus = 0;
     const maxLeavePerYear = team.settings.maxLeavePerYear;
 
     members.forEach(member => {
@@ -159,7 +161,14 @@ export default function LeaderDashboard() {
           member.manualLeaveBalance
         );
 
+        const surplus = calculateSurplusBalance(member.manualLeaveBalance, maxLeavePerYear);
+
         totalRemaining += remainingBalance;
+        totalSurplus += surplus;
+        
+        if (surplus > 0) {
+          membersWithSurplus++;
+        }
         
         // Consider low balance if less than 25% of max leave remaining
         if (remainingBalance < maxLeavePerYear * 0.25) {
@@ -171,7 +180,7 @@ export default function LeaderDashboard() {
     const memberCount = members.filter(m => m.role === 'member').length;
     const averageRemaining = memberCount > 0 ? Math.round(totalRemaining / memberCount) : 0;
 
-    return { totalRemaining, averageRemaining, membersWithLowBalance };
+    return { totalRemaining, averageRemaining, membersWithLowBalance, totalSurplus, membersWithSurplus };
   };
 
   if (loading) {
@@ -252,6 +261,11 @@ export default function LeaderDashboard() {
                       <dd className="text-xs text-gray-400 mt-1">
                         {getLeaveBalanceSummary().membersWithLowBalance} member(s) with low balance
                       </dd>
+                      {getLeaveBalanceSummary().totalSurplus > 0 && (
+                        <dd className="text-xs text-green-600 mt-1">
+                          +{getLeaveBalanceSummary().totalSurplus.toFixed(1)} total surplus ({getLeaveBalanceSummary().membersWithSurplus} member(s))
+                        </dd>
+                      )}
                     </dl>
                   </div>
                 </div>
@@ -301,7 +315,31 @@ export default function LeaderDashboard() {
                     <div className="flex items-center justify-between mb-2">
                       <div>
                         <h3 className="text-xs font-medium text-gray-500">Total Remaining Leave</h3>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{analytics.aggregate.totalRemainingLeaveBalance}</p>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">
+                          {analytics.aggregate.totalRemainingLeaveBalance.toFixed(1)}
+                          {(() => {
+                            // Get all members from groups to check for surplus
+                            const allMembers = analytics.groups.flatMap(group => group.members);
+                            const totalSurplus = allMembers.reduce((sum, m) => sum + m.analytics.surplusBalance, 0);
+                            const membersWithSurplus = allMembers.filter(m => m.analytics.surplusBalance > 0);
+                            
+                            if (totalSurplus > 0) {
+                              return (
+                                <>
+                                  <span className="ml-2 text-lg text-green-600">
+                                    (+{totalSurplus.toFixed(1)} surplus)
+                                  </span>
+                                  <p className="mt-2">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                      {membersWithSurplus.length} member(s) with surplus
+                                    </span>
+                                  </p>
+                                </>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </p>
                       </div>
                       <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center">
                         <span className="text-white text-lg">📅</span>

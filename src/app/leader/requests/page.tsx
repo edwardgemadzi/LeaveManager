@@ -116,6 +116,8 @@ export default function LeaderRequestsPage() {
 
       if (response.ok) {
         setRequests(requests.filter(req => req._id !== requestId));
+        // Dispatch custom event to trigger refresh on other pages
+        window.dispatchEvent(new CustomEvent('leaveRequestDeleted'));
         alert('Request deleted successfully');
       } else {
         const error = await response.json();

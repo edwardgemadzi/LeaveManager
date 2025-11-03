@@ -33,6 +33,9 @@ export async function GET(request: NextRequest) {
     // Use members as-is, no need to add current user separately
     const allMembers = members;
 
+    // Build response - include manualLeaveBalance only for leaders
+    const isLeader = user.role === 'leader';
+    
     const response = {
       team,
       currentUser: currentUser ? {
@@ -44,18 +47,32 @@ export async function GET(request: NextRequest) {
         shiftTag: currentUser.shiftTag,
         workingDaysTag: currentUser.workingDaysTag,
         subgroupTag: currentUser.subgroupTag,
+        // Include manualLeaveBalance for current user (they can see their own)
+        manualLeaveBalance: currentUser.manualLeaveBalance,
       } : null,
-      members: allMembers.map(member => ({
-        _id: member._id,
-        username: member.username,
-        fullName: member.fullName,
-        role: member.role,
-        shiftSchedule: member.shiftSchedule,
-        shiftTag: member.shiftTag,
-        workingDaysTag: member.workingDaysTag,
-        subgroupTag: member.subgroupTag,
-        createdAt: member.createdAt,
-      })),
+      members: allMembers.map(member => {
+        const baseMember = {
+          _id: member._id,
+          username: member.username,
+          fullName: member.fullName,
+          role: member.role,
+          shiftSchedule: member.shiftSchedule,
+          shiftTag: member.shiftTag,
+          workingDaysTag: member.workingDaysTag,
+          subgroupTag: member.subgroupTag,
+          createdAt: member.createdAt,
+        };
+        
+        // Include manualLeaveBalance for leaders (to edit balances) or if it's the current user's own data
+        if (isLeader || member._id === user.id) {
+          return {
+            ...baseMember,
+            manualLeaveBalance: member.manualLeaveBalance,
+          };
+        }
+        
+        return baseMember;
+      }),
     };
     
     return NextResponse.json(response);

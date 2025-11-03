@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { LeaveRequest, Team, User } from '@/types';
-import { calculateLeaveBalance, countWorkingDays } from '@/lib/leaveCalculations';
+import { calculateLeaveBalance, countWorkingDays, calculateSurplusBalance } from '@/lib/leaveCalculations';
 import { MemberAnalytics } from '@/lib/analyticsCalculations';
 
 export default function MemberDashboard() {
@@ -107,7 +107,7 @@ export default function MemberDashboard() {
   const getLeaveBalance = () => {
     if (!team || !user) {
       console.log('Leave balance calculation: Missing team or user data', { team: !!team, user: !!user });
-      return 0;
+      return { balance: 0, surplus: 0 };
     }
     
     const approvedRequests = myRequests
@@ -131,8 +131,10 @@ export default function MemberDashboard() {
       user.manualLeaveBalance
     );
     
-    console.log('Calculated leave balance:', balance);
-    return balance;
+    const surplus = calculateSurplusBalance(user.manualLeaveBalance, team.settings.maxLeavePerYear);
+    
+    console.log('Calculated leave balance:', balance, 'Surplus:', surplus);
+    return { balance, surplus };
   };
 
   const getTotalWorkingDaysTaken = () => {
@@ -201,7 +203,19 @@ export default function MemberDashboard() {
                   <div className="ml-5 flex-1">
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">Leave Balance</dt>
-                      <dd className="text-2xl font-bold text-gray-900">{leaveBalance} days</dd>
+                      <dd className="text-2xl font-bold text-gray-900">
+                        {leaveBalance.balance.toFixed(1)} / {team?.settings.maxLeavePerYear || 20}
+                        {leaveBalance.surplus > 0 && (
+                          <span className="ml-2 text-sm text-green-600">(+{leaveBalance.surplus.toFixed(1)} surplus)</span>
+                        )}
+                      </dd>
+                      {leaveBalance.surplus > 0 && (
+                        <dd className="mt-1">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            +{leaveBalance.surplus.toFixed(1)} surplus days
+                          </span>
+                        </dd>
+                      )}
                     </dl>
                   </div>
                 </div>
@@ -312,7 +326,19 @@ export default function MemberDashboard() {
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <h3 className="text-sm font-medium text-gray-500">Remaining Leave Balance</h3>
-                        <p className="text-3xl font-bold text-gray-900 mt-2">{analytics.remainingLeaveBalance}</p>
+                        <p className="text-3xl font-bold text-gray-900 mt-2">
+                          {analytics.remainingLeaveBalance.toFixed(1)} / {team?.settings.maxLeavePerYear || 20}
+                          {analytics.surplusBalance > 0 && (
+                            <span className="ml-2 text-lg text-green-600">(+{analytics.surplusBalance.toFixed(1)} surplus)</span>
+                          )}
+                        </p>
+                        {analytics.surplusBalance > 0 && (
+                          <p className="mt-2">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              +{analytics.surplusBalance.toFixed(1)} surplus days
+                            </span>
+                          </p>
+                        )}
                       </div>
                       <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg">
                         <span className="text-white text-2xl">📅</span>

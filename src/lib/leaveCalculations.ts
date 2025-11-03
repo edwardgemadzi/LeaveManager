@@ -72,3 +72,16 @@ export const calculateLeaveBalance = (
   const baseBalance = manualLeaveBalance !== undefined ? manualLeaveBalance : maxLeavePerYear;
   return baseBalance - approvedWorkingDays;
 };
+
+// Function to calculate surplus balance (when manual balance exceeds team max)
+export const calculateSurplusBalance = (
+  manualLeaveBalance: number | undefined,
+  maxLeavePerYear: number
+): number => {
+  if (manualLeaveBalance === undefined) {
+    return 0;
+  }
+  
+  // Surplus is the amount by which manual balance exceeds team max
+  return manualLeaveBalance > maxLeavePerYear ? manualLeaveBalance - maxLeavePerYear : 0;
+};
