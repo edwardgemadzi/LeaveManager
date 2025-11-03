@@ -196,6 +196,26 @@ export default function MemberDashboard() {
               <div className="p-6">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
+                    <div className="w-12 h-12 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center shadow-lg">
+                      <span className="text-white text-xl">⏳</span>
+                    </div>
+                  </div>
+                  <div className="ml-5 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">Pending Requests</dt>
+                      <dd className="text-2xl font-bold text-gray-900">
+                        {myRequests.filter(req => req.status === 'pending').length}
+                      </dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="card card-hover slide-up" style={{ animationDelay: '0.1s' }}>
+              <div className="p-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
                     <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg">
                       <span className="text-white text-xl">📅</span>
                     </div>
@@ -216,26 +236,6 @@ export default function MemberDashboard() {
                           </span>
                         </dd>
                       )}
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="card card-hover slide-up" style={{ animationDelay: '0.1s' }}>
-              <div className="p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="w-12 h-12 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center shadow-lg">
-                      <span className="text-white text-xl">⏳</span>
-                    </div>
-                  </div>
-                  <div className="ml-5 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Pending Requests</dt>
-                      <dd className="text-2xl font-bold text-gray-900">
-                        {myRequests.filter(req => req.status === 'pending').length}
-                      </dd>
                     </dl>
                   </div>
                 </div>
@@ -530,8 +530,8 @@ export default function MemberDashboard() {
                   </a>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {myRequests.slice(0, 5).map((request, index) => (
+                <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                  {myRequests.map((request, index) => (
                     <div key={request._id} className="bg-gray-50 rounded-xl p-4 border border-gray-200 hover:border-gray-300 transition-all duration-200" style={{ animationDelay: `${index * 0.1}s` }}>
                       <div className="flex justify-between items-start">
                         <div className="flex-1">

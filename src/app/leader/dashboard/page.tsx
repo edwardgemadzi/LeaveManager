@@ -214,24 +214,6 @@ export default function LeaderDashboard() {
               <div className="p-6">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
-                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
-                      <span className="text-white text-xl">👥</span>
-                    </div>
-                  </div>
-                  <div className="ml-5 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Team Members</dt>
-                      <dd className="text-2xl font-bold text-gray-900">{members?.filter(m => m.role === 'member').length || 0}</dd>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="card card-hover slide-up" style={{ animationDelay: '0.1s' }}>
-              <div className="p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
                     <div className="w-12 h-12 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center shadow-lg">
                       <span className="text-white text-xl">⏳</span>
                     </div>
@@ -246,7 +228,7 @@ export default function LeaderDashboard() {
               </div>
             </div>
 
-            <div className="card card-hover slide-up" style={{ animationDelay: '0.2s' }}>
+            <div className="card card-hover slide-up" style={{ animationDelay: '0.1s' }}>
               <div className="p-6">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
@@ -266,6 +248,24 @@ export default function LeaderDashboard() {
                           +{Math.round(getLeaveBalanceSummary().totalSurplus)} total surplus ({getLeaveBalanceSummary().membersWithSurplus} member(s))
                         </dd>
                       )}
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="card card-hover slide-up" style={{ animationDelay: '0.2s' }}>
+              <div className="p-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+                      <span className="text-white text-xl">👥</span>
+                    </div>
+                  </div>
+                  <div className="ml-5 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">Team Members</dt>
+                      <dd className="text-2xl font-bold text-gray-900">{members?.filter(m => m.role === 'member').length || 0}</dd>
                     </dl>
                   </div>
                 </div>
@@ -550,8 +550,8 @@ export default function LeaderDashboard() {
                   <p className="text-gray-400 text-sm mt-2">All caught up! 🎉</p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {pendingRequests.slice(0, 5).map((request, index) => {
+                <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                  {pendingRequests.map((request, index) => {
                     const member = members?.find(m => m._id === request.userId);
                     return (
                       <div key={request._id} className="bg-gray-50 rounded-xl p-4 border border-gray-200 hover:border-gray-300 transition-all duration-200" style={{ animationDelay: `${index * 0.1}s` }}>
