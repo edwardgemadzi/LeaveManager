@@ -160,11 +160,18 @@ export default function LeaderMembersPage() {
       });
 
       if (response.ok) {
-        setMembers(members.map(member => 
-          member._id === memberId 
-            ? { ...member, shiftSchedule: tempSchedule }
-            : member
-        ));
+        // Refetch team data to get updated workingDaysTag
+        const teamResponse = await fetch('/api/team', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        
+        if (teamResponse.ok) {
+          const data = await teamResponse.json();
+          setMembers(data.members || []);
+        }
+        
         setEditingSchedule(null);
         setTempSchedule(null);
       } else {

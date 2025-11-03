@@ -204,15 +204,15 @@ export default function MemberDashboard() {
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">Leave Balance</dt>
                       <dd className="text-2xl font-bold text-gray-900">
-                        {leaveBalance.balance.toFixed(1)} / {team?.settings.maxLeavePerYear || 20}
+                        {Math.round(leaveBalance.balance)} / {team?.settings.maxLeavePerYear || 20}
                         {leaveBalance.surplus > 0 && (
-                          <span className="ml-2 text-sm text-green-600">(+{leaveBalance.surplus.toFixed(1)} surplus)</span>
+                          <span className="ml-2 text-sm text-green-600">(+{Math.round(leaveBalance.surplus)} surplus)</span>
                         )}
                       </dd>
                       {leaveBalance.surplus > 0 && (
                         <dd className="mt-1">
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            +{leaveBalance.surplus.toFixed(1)} surplus days
+                            +{Math.round(leaveBalance.surplus)} surplus days
                           </span>
                         </dd>
                       )}
@@ -275,7 +275,7 @@ export default function MemberDashboard() {
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <h3 className="text-sm font-medium text-gray-500">Realistic Usable Days</h3>
-                        <p className="text-3xl font-bold text-gray-900 mt-2">{analytics.realisticUsableDays ?? 0}</p>
+                        <p className="text-3xl font-bold text-gray-900 mt-2">{Math.round(analytics.realisticUsableDays ?? 0)}</p>
                       </div>
                       <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
                         <span className="text-white text-2xl">📊</span>
@@ -292,7 +292,7 @@ export default function MemberDashboard() {
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <h3 className="text-sm font-medium text-gray-500">Usable Days</h3>
-                        <p className="text-3xl font-bold text-gray-900 mt-2">{analytics.usableDays ?? 0}</p>
+                        <p className="text-3xl font-bold text-gray-900 mt-2">{Math.round(analytics.usableDays ?? 0)}</p>
                       </div>
                       <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
                         <span className="text-white text-2xl">✓</span>
@@ -309,7 +309,7 @@ export default function MemberDashboard() {
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <h3 className="text-sm font-medium text-gray-500">Theoretical Working Days</h3>
-                        <p className="text-3xl font-bold text-gray-900 mt-2">{analytics.theoreticalWorkingDays ?? 0}</p>
+                        <p className="text-3xl font-bold text-gray-900 mt-2">{Math.round(analytics.theoreticalWorkingDays ?? 0)}</p>
                       </div>
                       <div className="w-16 h-16 bg-gradient-to-r from-gray-500 to-gray-600 rounded-xl flex items-center justify-center shadow-lg">
                         <span className="text-white text-2xl">📈</span>
@@ -327,15 +327,15 @@ export default function MemberDashboard() {
                       <div>
                         <h3 className="text-sm font-medium text-gray-500">Remaining Leave Balance</h3>
                         <p className="text-3xl font-bold text-gray-900 mt-2">
-                          {analytics.remainingLeaveBalance.toFixed(1)} / {team?.settings.maxLeavePerYear || 20}
+                          {Math.round(analytics.remainingLeaveBalance)} / {team?.settings.maxLeavePerYear || 20}
                           {analytics.surplusBalance > 0 && (
-                            <span className="ml-2 text-lg text-green-600">(+{analytics.surplusBalance.toFixed(1)} surplus)</span>
+                            <span className="ml-2 text-lg text-green-600">(+{Math.round(analytics.surplusBalance)} surplus)</span>
                           )}
                         </p>
                         {analytics.surplusBalance > 0 && (
                           <p className="mt-2">
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              +{analytics.surplusBalance.toFixed(1)} surplus days
+                              +{Math.round(analytics.surplusBalance)} surplus days
                             </span>
                           </p>
                         )}
@@ -363,14 +363,14 @@ export default function MemberDashboard() {
                       <p className="text-sm text-blue-700 mb-2">
                         <strong>{analytics.membersSharingSameShift}</strong> team member{analytics.membersSharingSameShift !== 1 ? 's' : ''} 
                         {' '}with the <strong>same working days pattern</strong> and <strong>shift type</strong> need to coordinate use of 
-                        {' '}<strong>{analytics.usableDays ?? 0}</strong> available days.
+                        {' '}<strong>{Math.round(analytics.usableDays ?? 0)}</strong> available days.
                       </p>
                       <p className="text-sm text-blue-700 mb-1">
-                        With {analytics.membersSharingSameShift} members competing for {analytics.usableDays ?? 0} days:
+                        With {analytics.membersSharingSameShift} members competing for {Math.round(analytics.usableDays ?? 0)} days:
                       </p>
                       <p className="text-sm text-blue-700 font-medium">
-                        Realistic usable days per member: <strong>{analytics.realisticUsableDays ?? 0}</strong> days 
-                        ({analytics.averageDaysPerMember} average)
+                        Realistic usable days per member: <strong>{Math.round(analytics.realisticUsableDays ?? 0)}</strong> days 
+                        ({analytics.averageDaysPerMember.toFixed(1)} average)
                       </p>
                     </div>
                   </div>
@@ -388,7 +388,7 @@ export default function MemberDashboard() {
                       <div>
                         <p className="font-semibold text-red-900 mb-1">High Demand Alert</p>
                         <p className="text-sm text-red-700">
-                          You have <strong>{analytics.remainingLeaveBalance}</strong> leave days remaining, but on average only <strong>{analytics.averageDaysPerMember}</strong> days per member are available.
+                          You have <strong>{Math.round(analytics.remainingLeaveBalance)}</strong> leave days remaining, but on average only <strong>{analytics.averageDaysPerMember.toFixed(1)}</strong> days per member are available.
                           Consider coordinating with your team members to avoid conflicts.
                         </p>
                       </div>
@@ -408,7 +408,7 @@ export default function MemberDashboard() {
                       <div>
                         <p className="font-semibold text-orange-900 mb-1">Concurrent Leave Constraint</p>
                         <p className="text-sm text-orange-700">
-                          Due to concurrent leave limits, you have <strong>{analytics.usableDays ?? 0}</strong> usable days of <strong>{analytics.theoreticalWorkingDays}</strong> remaining working days.
+                          Due to concurrent leave limits, you have <strong>{Math.round(analytics.usableDays ?? 0)}</strong> usable days of <strong>{Math.round(analytics.theoreticalWorkingDays)}</strong> remaining working days.
                           {analytics.usableDays < analytics.theoreticalWorkingDays && (
                             <> Some days are already booked by other team members.</>
                           )}

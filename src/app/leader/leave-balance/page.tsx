@@ -387,7 +387,7 @@ export default function LeaderLeaveBalancePage() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-500">Total Remaining</p>
-                  <p className="text-2xl font-bold text-gray-900">{totalRemainingBalance.toFixed(1)}</p>
+                  <p className="text-2xl font-bold text-gray-900">{Math.round(totalRemainingBalance)}</p>
                 </div>
               </div>
             </div>
@@ -401,7 +401,7 @@ export default function LeaderLeaveBalancePage() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-500">Total Used</p>
-                  <p className="text-2xl font-bold text-gray-900">{totalUsed.toFixed(1)}</p>
+                  <p className="text-2xl font-bold text-gray-900">{Math.round(totalUsed)}</p>
                 </div>
               </div>
             </div>
@@ -548,7 +548,7 @@ export default function LeaderLeaveBalancePage() {
                                 </div>
                                 {member.manualLeaveBalance !== undefined && (
                                   <p className="text-xs text-blue-600">
-                                    Base balance: {member.manualLeaveBalance.toFixed(1)} days
+                                    Base balance: {Math.round(member.manualLeaveBalance)} days
                                   </p>
                                 )}
                               </div>
@@ -560,10 +560,10 @@ export default function LeaderLeaveBalancePage() {
                                     onClick={() => handleEditBalance(member)}
                                     title="Click to edit balance"
                                   >
-                                    {leaveData.remainingBalance.toFixed(1)} / {maxLeave}
+                                    {Math.round(leaveData.remainingBalance)} / {maxLeave}
                                     {leaveData.surplusBalance > 0 && (
                                       <span className="ml-2 text-xs text-green-600" title="Surplus balance">
-                                        (+{leaveData.surplusBalance.toFixed(1)} surplus)
+                                        (+{Math.round(leaveData.surplusBalance)} surplus)
                                       </span>
                                     )}
                                     {member.manualLeaveBalance !== undefined && (
@@ -573,7 +573,7 @@ export default function LeaderLeaveBalancePage() {
                                   {leaveData.surplusBalance > 0 && (
                                     <div className="mt-1">
                                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                        +{leaveData.surplusBalance.toFixed(1)} surplus days
+                                        +{Math.round(leaveData.surplusBalance)} surplus days
                                       </span>
                                     </div>
                                   )}
@@ -609,10 +609,10 @@ export default function LeaderLeaveBalancePage() {
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {leaveData.totalUsed.toFixed(1)}
+                            {Math.round(leaveData.totalUsed)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {leaveData.yearToDateUsed.toFixed(1)}
+                            {Math.round(leaveData.yearToDateUsed)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`text-sm font-medium ${percentageColor}`}>

@@ -263,7 +263,7 @@ export default function LeaderDashboard() {
                       </dd>
                       {getLeaveBalanceSummary().totalSurplus > 0 && (
                         <dd className="text-xs text-green-600 mt-1">
-                          +{getLeaveBalanceSummary().totalSurplus.toFixed(1)} total surplus ({getLeaveBalanceSummary().membersWithSurplus} member(s))
+                          +{Math.round(getLeaveBalanceSummary().totalSurplus)} total surplus ({getLeaveBalanceSummary().membersWithSurplus} member(s))
                         </dd>
                       )}
                     </dl>
@@ -285,7 +285,7 @@ export default function LeaderDashboard() {
                     <div className="flex items-center justify-between mb-2">
                       <div>
                         <h3 className="text-xs font-medium text-gray-500">Realistic Usable Days</h3>
-                        <p className="text-2xl font-bold text-blue-700 mt-1">{analytics.aggregate.totalRealisticUsableDays ?? 0}</p>
+                        <p className="text-2xl font-bold text-blue-700 mt-1">{Math.round(analytics.aggregate.totalRealisticUsableDays ?? 0)}</p>
                       </div>
                       <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
                         <span className="text-white text-lg">📊</span>
@@ -300,7 +300,7 @@ export default function LeaderDashboard() {
                     <div className="flex items-center justify-between mb-2">
                       <div>
                         <h3 className="text-xs font-medium text-gray-500">Theoretical Working Days</h3>
-                        <p className="text-2xl font-bold text-gray-700 mt-1">{analytics.aggregate.totalTheoreticalWorkingDays ?? 0}</p>
+                        <p className="text-2xl font-bold text-gray-700 mt-1">{Math.round(analytics.aggregate.totalTheoreticalWorkingDays ?? 0)}</p>
                       </div>
                       <div className="w-12 h-12 bg-gradient-to-r from-gray-500 to-gray-600 rounded-xl flex items-center justify-center">
                         <span className="text-white text-lg">📈</span>
@@ -316,7 +316,7 @@ export default function LeaderDashboard() {
                       <div>
                         <h3 className="text-xs font-medium text-gray-500">Total Remaining Leave</h3>
                         <p className="text-2xl font-bold text-gray-900 mt-1">
-                          {analytics.aggregate.totalRemainingLeaveBalance.toFixed(1)}
+                          {Math.round(analytics.aggregate.totalRemainingLeaveBalance)}
                           {(() => {
                             // Get all members from groups to check for surplus
                             const allMembers = analytics.groups.flatMap(group => group.members);
@@ -327,7 +327,7 @@ export default function LeaderDashboard() {
                               return (
                                 <>
                                   <span className="ml-2 text-lg text-green-600">
-                                    (+{totalSurplus.toFixed(1)} surplus)
+                                    (+{Math.round(totalSurplus)} surplus)
                                   </span>
                                   <p className="mt-2">
                                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -354,7 +354,7 @@ export default function LeaderDashboard() {
                     <div className="flex items-center justify-between mb-2">
                       <div>
                         <h3 className="text-xs font-medium text-gray-500">Will Carry Over</h3>
-                        <p className="text-2xl font-bold text-green-700 mt-1">{analytics.aggregate.totalWillCarryover}</p>
+                        <p className="text-2xl font-bold text-green-700 mt-1">{Math.round(analytics.aggregate.totalWillCarryover)}</p>
                       </div>
                       <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center">
                         <span className="text-white text-lg">✓</span>
