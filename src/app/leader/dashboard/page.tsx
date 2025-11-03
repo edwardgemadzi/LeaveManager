@@ -214,6 +214,24 @@ export default function LeaderDashboard() {
               <div className="p-6">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
+                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+                      <span className="text-white text-xl">👥</span>
+                    </div>
+                  </div>
+                  <div className="ml-5 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 truncate">Team Members</dt>
+                      <dd className="text-2xl font-bold text-gray-900">{members?.filter(m => m.role === 'member').length || 0}</dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="card card-hover slide-up" style={{ animationDelay: '0.1s' }}>
+              <div className="p-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
                     <div className="w-12 h-12 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-xl flex items-center justify-center shadow-lg">
                       <span className="text-white text-xl">⏳</span>
                     </div>
@@ -228,7 +246,7 @@ export default function LeaderDashboard() {
               </div>
             </div>
 
-            <div className="card card-hover slide-up" style={{ animationDelay: '0.1s' }}>
+            <div className="card card-hover slide-up" style={{ animationDelay: '0.2s' }}>
               <div className="p-6">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
@@ -253,23 +271,60 @@ export default function LeaderDashboard() {
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="card card-hover slide-up" style={{ animationDelay: '0.2s' }}>
-              <div className="p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
-                      <span className="text-white text-xl">👥</span>
-                    </div>
-                  </div>
-                  <div className="ml-5 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 truncate">Team Members</dt>
-                      <dd className="text-2xl font-bold text-gray-900">{members?.filter(m => m.role === 'member').length || 0}</dd>
-                    </dl>
-                  </div>
+          {/* Recent Pending Requests */}
+          <div className="card card-hover bounce-in mb-8">
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-6">
+                Recent Pending Requests
+              </h3>
+              {!pendingRequests || pendingRequests.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-6xl mb-4">📋</div>
+                  <p className="text-gray-500 text-lg">No pending requests at the moment</p>
+                  <p className="text-gray-400 text-sm mt-2">All caught up! 🎉</p>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                  {pendingRequests.map((request, index) => {
+                    const member = members?.find(m => m._id === request.userId);
+                    return (
+                      <div key={request._id} className="bg-gray-50 rounded-xl p-4 border border-gray-200 hover:border-gray-300 transition-all duration-200" style={{ animationDelay: `${index * 0.1}s` }}>
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-gray-900 mb-1">
+                              👤 {member?.username || 'Unknown User'}
+                            </h4>
+                            <p className="text-sm text-gray-600 mb-1">
+                              📅 {new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()}
+                            </p>
+                            <p className="text-sm text-gray-700 font-medium">{request.reason}</p>
+                          </div>
+                          <div className="flex space-x-2 ml-4">
+                            <button 
+                              onClick={() => handleApprove(request._id!)}
+                              disabled={processingRequest === request._id}
+                              className="btn-success text-xs py-2 px-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {processingRequest === request._id ? '⏳' : '✅'} 
+                              {processingRequest === request._id ? 'Processing...' : 'Approve'}
+                            </button>
+                            <button 
+                              onClick={() => handleReject(request._id!)}
+                              disabled={processingRequest === request._id}
+                              className="btn-danger text-xs py-2 px-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {processingRequest === request._id ? '⏳' : '❌'} 
+                              {processingRequest === request._id ? 'Processing...' : 'Reject'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -532,61 +587,6 @@ export default function LeaderDashboard() {
               })() : (
                 <div className="text-center py-8">
                   <p className="text-gray-500">No analytics data available</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Recent Pending Requests */}
-          <div className="card card-hover bounce-in">
-            <div className="p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-6">
-                Recent Pending Requests
-              </h3>
-              {!pendingRequests || pendingRequests.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="text-6xl mb-4">📋</div>
-                  <p className="text-gray-500 text-lg">No pending requests at the moment</p>
-                  <p className="text-gray-400 text-sm mt-2">All caught up! 🎉</p>
-                </div>
-              ) : (
-                <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-                  {pendingRequests.map((request, index) => {
-                    const member = members?.find(m => m._id === request.userId);
-                    return (
-                      <div key={request._id} className="bg-gray-50 rounded-xl p-4 border border-gray-200 hover:border-gray-300 transition-all duration-200" style={{ animationDelay: `${index * 0.1}s` }}>
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-gray-900 mb-1">
-                              👤 {member?.username || 'Unknown User'}
-                            </h4>
-                            <p className="text-sm text-gray-600 mb-1">
-                              📅 {new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()}
-                            </p>
-                            <p className="text-sm text-gray-700 font-medium">{request.reason}</p>
-                          </div>
-                          <div className="flex space-x-2 ml-4">
-                            <button 
-                              onClick={() => handleApprove(request._id!)}
-                              disabled={processingRequest === request._id}
-                              className="btn-success text-xs py-2 px-3 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {processingRequest === request._id ? '⏳' : '✅'} 
-                              {processingRequest === request._id ? 'Processing...' : 'Approve'}
-                            </button>
-                            <button 
-                              onClick={() => handleReject(request._id!)}
-                              disabled={processingRequest === request._id}
-                              className="btn-danger text-xs py-2 px-3 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {processingRequest === request._id ? '⏳' : '❌'} 
-                              {processingRequest === request._id ? 'Processing...' : 'Reject'}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
                 </div>
               )}
             </div>
