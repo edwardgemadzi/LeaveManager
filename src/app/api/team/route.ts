@@ -97,7 +97,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const { settings } = await request.json();
+    let { settings } = await request.json();
     
     if (!settings || 
         typeof settings.concurrentLeave !== 'number' || 
@@ -123,6 +123,32 @@ export async function PATCH(request: NextRequest) {
         { error: 'Invalid settings' },
         { status: 400 }
       );
+    }
+
+    // Validate workingDaysGroupNames if provided
+    if (settings.workingDaysGroupNames !== undefined) {
+      if (typeof settings.workingDaysGroupNames !== 'object' || Array.isArray(settings.workingDaysGroupNames) || settings.workingDaysGroupNames === null) {
+        return NextResponse.json(
+          { error: 'workingDaysGroupNames must be an object' },
+          { status: 400 }
+        );
+      }
+      
+      // Validate all values are strings
+      for (const [key, value] of Object.entries(settings.workingDaysGroupNames)) {
+        if (typeof key !== 'string' || typeof value !== 'string') {
+          return NextResponse.json(
+            { error: 'workingDaysGroupNames must have string keys and string values' },
+            { status: 400 }
+          );
+        }
+        // Trim empty values and remove them
+        if (!value.trim()) {
+          delete settings.workingDaysGroupNames[key];
+        } else {
+          settings.workingDaysGroupNames[key] = value.trim();
+        }
+      }
     }
 
     // If subgrouping is enabled, validate subgroups
@@ -159,6 +185,23 @@ export async function PATCH(request: NextRequest) {
 
     if (!user.teamId) {
       return NextResponse.json({ error: 'No team assigned' }, { status: 400 });
+    }
+
+    // Get existing team settings to merge workingDaysGroupNames if it's a partial update
+    const existingTeam = await TeamModel.findById(user.teamId);
+    if (existingTeam) {
+      // If workingDaysGroupNames is provided but not a complete replacement, merge with existing
+      if (settings.workingDaysGroupNames !== undefined && existingTeam.settings.workingDaysGroupNames) {
+        settings.workingDaysGroupNames = {
+          ...existingTeam.settings.workingDaysGroupNames,
+          ...settings.workingDaysGroupNames,
+        };
+      }
+      // Ensure all other existing settings are preserved
+      settings = {
+        ...existingTeam.settings,
+        ...settings,
+      };
     }
 
     await TeamModel.updateSettings(user.teamId, settings);

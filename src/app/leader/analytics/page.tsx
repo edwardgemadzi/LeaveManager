@@ -5,6 +5,7 @@ import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { Team } from '@/types';
 import { GroupedTeamAnalytics } from '@/lib/analyticsCalculations';
+import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
 
 export default function LeaderAnalyticsPage() {
   const [team, setTeam] = useState<Team | null>(null);
@@ -357,9 +358,15 @@ export default function LeaderAnalyticsPage() {
                           </>
                         ) : (
                           <>
-                            {group.shiftTag ? `${group.shiftTag} Shift` : 'All Members'}
-                            {' • '}
-                            <span className="text-gray-600">Pattern: {group.workingDaysTag}</span>
+                            <span>{group.shiftTag ? `${group.shiftTag} Shift` : 'All Members'}</span>
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 ml-2">
+                              {getWorkingDaysGroupDisplayName(group.workingDaysTag, team?.settings)}
+                              {team?.settings?.workingDaysGroupNames?.[group.workingDaysTag] && (
+                                <span className="ml-1 text-gray-500 font-mono text-[10px]">
+                                  ({group.workingDaysTag})
+                                </span>
+                              )}
+                            </span>
                           </>
                         )}
                       </h3>

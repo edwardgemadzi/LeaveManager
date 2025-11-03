@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { User, Team } from '@/types';
+import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
 
 export default function MemberProfilePage() {
   const [user, setUser] = useState<User | null>(null);
@@ -249,11 +250,18 @@ export default function MemberProfilePage() {
 
                   {user?.workingDaysTag && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Working Days Pattern</label>
-                      <p className="mt-1 text-sm text-gray-900 bg-gray-50 px-3 py-2 rounded-md font-mono">
-                        {user.workingDaysTag}
-                      </p>
-                      <p className="mt-1 text-xs text-gray-500">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Working Days Pattern</label>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                          {getWorkingDaysGroupDisplayName(user.workingDaysTag, team?.settings)}
+                          {team?.settings?.workingDaysGroupNames?.[user.workingDaysTag] && (
+                            <span className="ml-2 text-xs text-gray-500 font-mono">
+                              ({user.workingDaysTag})
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xs text-gray-500">
                         Members with the same pattern work on exactly the same days
                       </p>
                     </div>

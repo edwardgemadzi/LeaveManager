@@ -6,6 +6,7 @@ import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { LeaveRequest, Team, User } from '@/types';
 import { calculateLeaveBalance, calculateSurplusBalance } from '@/lib/leaveCalculations';
 import { GroupedTeamAnalytics } from '@/lib/analyticsCalculations';
+import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
 
 export default function LeaderDashboard() {
   const [team, setTeam] = useState<Team | null>(null);
@@ -558,7 +559,17 @@ export default function LeaderDashboard() {
                           {subgroupGroups.map((group, index) => (
                             <div key={group.groupKey || index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                               <h5 className="text-md font-medium text-gray-800 mb-2">
-                                {group.shiftTag ? `${group.shiftTag} Shift` : 'No Shift Tag'} - Pattern: {group.workingDaysTag}
+                                <span className="flex items-center gap-2 flex-wrap">
+                                  <span>{group.shiftTag ? `${group.shiftTag} Shift` : 'No Shift Tag'}</span>
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    {getWorkingDaysGroupDisplayName(group.workingDaysTag, team?.settings)}
+                                    {team?.settings?.workingDaysGroupNames?.[group.workingDaysTag] && (
+                                      <span className="ml-1 text-gray-500 font-mono text-[10px]">
+                                        ({group.workingDaysTag})
+                                      </span>
+                                    )}
+                                  </span>
+                                </span>
                               </h5>
                               <p className="text-sm text-gray-600 mb-2">
                                 Members in this group: {group.aggregate.groupTotalMembers}

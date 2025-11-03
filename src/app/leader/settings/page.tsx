@@ -16,6 +16,7 @@ export default function TeamSettingsPage() {
     allowCarryover: false,
     enableSubgrouping: false,
     subgroups: [] as string[],
+    workingDaysGroupNames: {} as Record<string, string>,
   });
 
   useEffect(() => {
@@ -38,7 +39,7 @@ export default function TeamSettingsPage() {
         const data = await response.json();
         console.log('Settings - Team data received:', data);
         setTeam(data.team);
-        setSettings(data.team?.settings || { concurrentLeave: 2, maxLeavePerYear: 20, minimumNoticePeriod: 1, allowCarryover: false, enableSubgrouping: false, subgroups: [] });
+        setSettings(data.team?.settings || { concurrentLeave: 2, maxLeavePerYear: 20, minimumNoticePeriod: 1, allowCarryover: false, enableSubgrouping: false, subgroups: [], workingDaysGroupNames: {} });
       } catch (error) {
         console.error('Error fetching team:', error);
       } finally {

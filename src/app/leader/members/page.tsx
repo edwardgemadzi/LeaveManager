@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ShiftScheduleBuilder from '@/components/ShiftScheduleBuilder';
 import { User, ShiftSchedule, Team } from '@/types';
+import { getWorkingDaysGroupDisplayName, getWorkingDaysGroupDisplayNameWithTag } from '@/lib/helpers';
+import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
 
 export default function LeaderMembersPage() {
   const [members, setMembers] = useState<User[]>([]);
@@ -14,12 +16,15 @@ export default function LeaderMembersPage() {
   const [editingSchedule, setEditingSchedule] = useState<string | null>(null);
   const [tempSchedule, setTempSchedule] = useState<ShiftSchedule | null>(null);
   
+  // Group name management
+  const [editingGroupNames, setEditingGroupNames] = useState<Record<string, string>>({});
+  const [savingGroupNames, setSavingGroupNames] = useState(false);
+  
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [filterShiftTag, setFilterShiftTag] = useState<string>('');
   const [filterWorkingDaysTag, setFilterWorkingDaysTag] = useState<string>('');
   const [filterSubgroup, setFilterSubgroup] = useState<string>('');
-  const [filterRole, setFilterRole] = useState<string>('');
   const [sortBy, setSortBy] = useState<'name' | 'joinDate'>('name');
 
   useEffect(() => {
@@ -217,13 +222,25 @@ export default function LeaderMembersPage() {
     }
   };
 
-  // Get unique values for filter dropdowns
-  const uniqueWorkingDaysTags = Array.from(new Set(
-    members
-      .filter(m => m.workingDaysTag)
-      .map(m => m.workingDaysTag!)
-      .sort()
-  ));
+  // Get unique values for filter dropdowns with member counts
+  // Include both stored tags (fixed schedules) and generated tags (rotating schedules)
+  // This ensures all patterns that appear in analytics are included for renaming
+  const workingDaysTagsWithCounts = members
+    .filter(m => m.shiftSchedule) // Only include members with schedules
+    .reduce((acc, m) => {
+      // For fixed schedules, use stored tag or generate if missing
+      // For rotating schedules, always generate (matches analytics behavior)
+      const tag = m.shiftSchedule?.type === 'rotating'
+        ? generateWorkingDaysTag(m.shiftSchedule)
+        : (m.workingDaysTag || generateWorkingDaysTag(m.shiftSchedule));
+      
+      if (tag && tag !== 'no-schedule') {
+        acc[tag] = (acc[tag] || 0) + 1;
+      }
+      return acc;
+    }, {} as Record<string, number>);
+  
+  const uniqueWorkingDaysTags = Object.keys(workingDaysTagsWithCounts).sort();
 
   const uniqueSubgroups = team?.settings.enableSubgrouping && team?.settings.subgroups
     ? Array.from(new Set([...team.settings.subgroups, 'Ungrouped']))
@@ -240,12 +257,6 @@ export default function LeaderMembersPage() {
         if (!matchesName && !matchesUsername) return false;
       }
 
-      // Role filter
-      if (filterRole) {
-        if (filterRole === 'leader' && member.role !== 'leader') return false;
-        if (filterRole === 'member' && member.role !== 'member') return false;
-      }
-
       // Shift tag filter
       if (filterShiftTag) {
         // Special handling for "unassigned" - check for empty string or undefined
@@ -256,9 +267,14 @@ export default function LeaderMembersPage() {
         }
       }
 
-      // Working days tag filter
+      // Working days tag filter (for both fixed and rotating schedules)
       if (filterWorkingDaysTag) {
-        if (member.workingDaysTag !== filterWorkingDaysTag) return false;
+        // Generate tag for rotating schedules, use stored tag for fixed
+        const memberTag = member.shiftSchedule?.type === 'rotating'
+          ? generateWorkingDaysTag(member.shiftSchedule)
+          : (member.workingDaysTag || (member.shiftSchedule ? generateWorkingDaysTag(member.shiftSchedule) : undefined));
+        
+        if (memberTag !== filterWorkingDaysTag) return false;
       }
 
       // Subgroup filter
@@ -284,14 +300,107 @@ export default function LeaderMembersPage() {
       }
     });
 
-  const hasActiveFilters = searchQuery || filterShiftTag || filterWorkingDaysTag || filterSubgroup || filterRole;
+  const hasActiveFilters = searchQuery || filterShiftTag || filterWorkingDaysTag || filterSubgroup;
 
   const clearFilters = () => {
     setSearchQuery('');
     setFilterShiftTag('');
     setFilterWorkingDaysTag('');
     setFilterSubgroup('');
-    setFilterRole('');
+  };
+
+  // Handle group name editing
+  const handleGroupNameChange = (tag: string, value: string) => {
+    setEditingGroupNames(prev => ({
+      ...prev,
+      [tag]: value,
+    }));
+  };
+
+  const handleSaveGroupNames = async () => {
+    setSavingGroupNames(true);
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Build the update object with only changed names
+      const groupNamesUpdate: Record<string, string> = {};
+      
+      // Start with existing group names from team settings
+      const existingNames = team?.settings.workingDaysGroupNames || {};
+      const updatedNames = { ...existingNames };
+      
+      // Apply all edits (including empty strings to remove names)
+      for (const [tag, name] of Object.entries(editingGroupNames)) {
+        const trimmedName = name.trim();
+        if (trimmedName) {
+          updatedNames[tag] = trimmedName;
+        } else {
+          // Remove the name if it's empty
+          delete updatedNames[tag];
+        }
+      }
+      
+      // Only update if there are changes
+      const hasChanges = JSON.stringify(existingNames) !== JSON.stringify(updatedNames);
+      
+      if (!hasChanges) {
+        setSavingGroupNames(false);
+        return;
+      }
+      
+      // Fetch current team settings first to merge properly
+      const currentResponse = await fetch('/api/team', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (!currentResponse.ok) {
+        throw new Error('Failed to fetch current settings');
+      }
+      
+      const currentData = await currentResponse.json();
+      const currentSettings = currentData.team?.settings || {};
+      
+      // Update settings with new group names
+      const response = await fetch('/api/team', {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          settings: {
+            ...currentSettings,
+            workingDaysGroupNames: updatedNames,
+          },
+        }),
+      });
+      
+      if (response.ok) {
+        // Refresh team data
+        const teamResponse = await fetch('/api/team', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        
+        if (teamResponse.ok) {
+          const data = await teamResponse.json();
+          setTeam(data.team);
+          setEditingGroupNames({});
+          alert('Group names saved successfully!');
+        }
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to save group names');
+      }
+    } catch (error) {
+      console.error('Error saving group names:', error);
+      alert('Network error. Please try again.');
+    } finally {
+      setSavingGroupNames(false);
+    }
   };
 
   if (loading) {
@@ -324,9 +433,9 @@ export default function LeaderMembersPage() {
             {members.length > 0 && (
               <div className="mb-6 space-y-4 border-b border-gray-200 pb-4">
                 {/* Search and Quick Filters Row */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Search Input */}
-                  <div className="md:col-span-1">
+                  <div>
                     <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
                       Search
                     </label>
@@ -340,40 +449,23 @@ export default function LeaderMembersPage() {
                     />
                   </div>
 
-                  {/* Role Filter */}
-                  <div>
-                    <label htmlFor="role-filter" className="block text-sm font-medium text-gray-700 mb-1">
-                      Role
-                    </label>
-                    <select
-                      id="role-filter"
-                      value={filterRole}
-                      onChange={(e) => setFilterRole(e.target.value)}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                      <option value="">All Roles</option>
-                      <option value="leader">👑 Leaders</option>
-                      <option value="member">👤 Members</option>
-                    </select>
-                  </div>
-
                   {/* Shift Tag Filter */}
                   <div>
                     <label htmlFor="shift-filter" className="block text-sm font-medium text-gray-700 mb-1">
                       Shift Tag
                     </label>
-                      <select
-                        id="shift-filter"
-                        value={filterShiftTag}
-                        onChange={(e) => setFilterShiftTag(e.target.value)}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                      >
-                        <option value="">All Shifts</option>
-                        <option value="day">☀️ Day Shift</option>
-                        <option value="night">🌙 Night Shift</option>
-                        <option value="mixed">🔄 Mixed Shifts</option>
-                        <option value="__UNASSIGNED__">❓ Unassigned</option>
-                      </select>
+                    <select
+                      id="shift-filter"
+                      value={filterShiftTag}
+                      onChange={(e) => setFilterShiftTag(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    >
+                      <option value="">All Shifts</option>
+                      <option value="day">☀️ Day Shift</option>
+                      <option value="night">🌙 Night Shift</option>
+                      <option value="mixed">🔄 Mixed Shifts</option>
+                      <option value="__UNASSIGNED__">❓ Unassigned</option>
+                    </select>
                   </div>
                 </div>
 
@@ -392,11 +484,24 @@ export default function LeaderMembersPage() {
                         className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                       >
                         <option value="">All Patterns</option>
-                        {uniqueWorkingDaysTags.map((tag) => (
-                          <option key={tag} value={tag}>
-                            {tag}
-                          </option>
-                        ))}
+                        {uniqueWorkingDaysTags
+                          .map(tag => ({
+                            tag,
+                            displayName: getWorkingDaysGroupDisplayNameWithTag(tag, team?.settings),
+                            customName: team?.settings?.workingDaysGroupNames?.[tag],
+                            count: workingDaysTagsWithCounts[tag] || 0,
+                          }))
+                          .sort((a, b) => {
+                            // Sort by custom name first, then by tag
+                            const nameA = a.customName || a.tag;
+                            const nameB = b.customName || b.tag;
+                            return nameA.localeCompare(nameB);
+                          })
+                          .map(({ tag, displayName, count }) => (
+                            <option key={tag} value={tag}>
+                              {displayName} ({count} {count === 1 ? 'member' : 'members'})
+                            </option>
+                          ))}
                       </select>
                     </div>
                   )}
@@ -461,6 +566,73 @@ export default function LeaderMembersPage() {
               </div>
             )}
 
+            {/* Working Days Group Names Management Section */}
+            {members.length > 0 && uniqueWorkingDaysTags.length > 0 && (
+              <div className="mb-6 border-t border-gray-200 pt-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-medium text-gray-900">Working Days Group Names</h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Assign custom names to groups of members who work on the same days pattern.
+                    </p>
+                  </div>
+                  {Object.keys(editingGroupNames).length > 0 && (
+                    <button
+                      onClick={handleSaveGroupNames}
+                      disabled={savingGroupNames}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {savingGroupNames ? 'Saving...' : 'Save Names'}
+                    </button>
+                  )}
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {uniqueWorkingDaysTags.map((tag) => {
+                    const memberCount = workingDaysTagsWithCounts[tag] || 0;
+                    const currentName = team?.settings?.workingDaysGroupNames?.[tag] || '';
+                    const editingName = editingGroupNames[tag] !== undefined 
+                      ? editingGroupNames[tag] 
+                      : currentName;
+                    const hasChanges = editingName !== currentName;
+                    
+                    return (
+                      <div key={tag} className="border rounded-lg p-3 bg-gray-50">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-mono text-gray-600">{tag}</span>
+                              <span className="text-xs text-gray-500">
+                                ({memberCount} {memberCount === 1 ? 'member' : 'members'})
+                              </span>
+                            </div>
+                            <input
+                              type="text"
+                              value={editingName}
+                              onChange={(e) => handleGroupNameChange(tag, e.target.value)}
+                              placeholder="Enter group name..."
+                              className={`w-full text-sm border rounded-md px-2 py-1.5 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 ${
+                                hasChanges ? 'border-indigo-400 bg-white' : 'border-gray-300 bg-white'
+                              }`}
+                            />
+                            {currentName && !hasChanges && (
+                              <p className="text-xs text-green-600 mt-1">✓ {currentName}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                {Object.keys(editingGroupNames).length === 0 && (
+                  <p className="text-xs text-gray-500 mt-2">
+                    Click on any input above to start editing group names. Changes will be saved for all members with that pattern.
+                  </p>
+                )}
+              </div>
+            )}
+
             {members.length === 0 ? (
               <p className="text-gray-500 text-center py-8">No team members found.</p>
             ) : filteredAndSortedMembers.length === 0 ? (
@@ -501,14 +673,29 @@ export default function LeaderMembersPage() {
                           <p className="text-sm text-gray-600 mt-1">
                             Username: {member.username}
                           </p>
-                          {member.workingDaysTag && (
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-xs text-gray-500">Working Days:</span>
-                              <span className="text-xs font-mono bg-blue-50 text-blue-700 px-2 py-0.5 rounded">
-                                {member.workingDaysTag}
-                              </span>
-                            </div>
-                          )}
+                          {member.shiftSchedule && (() => {
+                            // Generate tag for both fixed (stored) and rotating (dynamic) schedules
+                            const workingDaysTag = member.shiftSchedule.type === 'rotating'
+                              ? generateWorkingDaysTag(member.shiftSchedule)
+                              : (member.workingDaysTag || generateWorkingDaysTag(member.shiftSchedule));
+                            
+                            if (workingDaysTag && workingDaysTag !== 'no-schedule') {
+                              return (
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-xs text-gray-500">Working Days:</span>
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    {getWorkingDaysGroupDisplayName(workingDaysTag, team?.settings)}
+                                    {team?.settings?.workingDaysGroupNames?.[workingDaysTag] && (
+                                      <span className="ml-1 text-gray-500 font-mono text-[10px]">
+                                        ({workingDaysTag.substring(0, 6)}{workingDaysTag.length > 6 ? '...' : ''})
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                           {team?.settings.enableSubgrouping && member.subgroupTag && (
                             <div className="flex items-center gap-2 mt-1">
                               <span className="text-xs text-gray-500">Subgroup:</span>
@@ -606,6 +793,8 @@ export default function LeaderMembersPage() {
                                 <ShiftScheduleBuilder 
                                   onScheduleChange={setTempSchedule}
                                   initialSchedule={tempSchedule || undefined}
+                                  teamSettings={team?.settings}
+                                  members={members}
                                 />
                               </div>
                               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">

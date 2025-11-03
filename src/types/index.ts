@@ -29,6 +29,7 @@ export interface TeamSettings {
   allowCarryover?: boolean; // Whether unused leave days can carry over to next year
   enableSubgrouping?: boolean; // Whether to enable subgroup organization within the team
   subgroups?: string[]; // List of predefined subgroup names (minimum 2 required if enableSubgrouping is true)
+  workingDaysGroupNames?: Record<string, string>; // Custom names for working days pattern groups (e.g., {"MTWTF__": "Weekday Team"})
 }
 
 export interface LeaveRequest {
