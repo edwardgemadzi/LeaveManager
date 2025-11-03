@@ -432,7 +432,7 @@ export default function MemberDashboard() {
                             <span className="text-white text-xl">✓</span>
                           </div>
                           <div>
-                            <p className="text-2xl font-bold text-green-700">{analytics.willCarryover} days</p>
+                            <p className="text-2xl font-bold text-green-700">{analytics.willCarryover.toFixed(1)} days</p>
                             <p className="text-sm text-green-600">will carry over to next year</p>
                           </div>
                         </div>
@@ -459,7 +459,7 @@ export default function MemberDashboard() {
                             <span className="text-white text-xl">⚠</span>
                           </div>
                           <div>
-                            <p className="text-2xl font-bold text-red-700">{analytics.willLose} days</p>
+                            <p className="text-2xl font-bold text-red-700">{analytics.willLose.toFixed(1)} days</p>
                             <p className="text-sm text-red-600">will be lost at year end</p>
                           </div>
                         </div>

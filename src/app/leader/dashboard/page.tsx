@@ -354,7 +354,7 @@ export default function LeaderDashboard() {
                     <div className="flex items-center justify-between mb-2">
                       <div>
                         <h3 className="text-xs font-medium text-gray-500">Will Carry Over</h3>
-                        <p className="text-2xl font-bold text-green-700 mt-1">{Math.round(analytics.aggregate.totalWillCarryover)}</p>
+                        <p className="text-2xl font-bold text-green-700 mt-1">{analytics.aggregate.totalWillCarryover.toFixed(1)}</p>
                       </div>
                       <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center">
                         <span className="text-white text-lg">✓</span>
@@ -369,7 +369,7 @@ export default function LeaderDashboard() {
                     <div className="flex items-center justify-between mb-2">
                       <div>
                         <h3 className="text-xs font-medium text-gray-500">Will Be Lost</h3>
-                        <p className="text-2xl font-bold text-red-700 mt-1">{analytics.aggregate.totalWillLose}</p>
+                        <p className="text-2xl font-bold text-red-700 mt-1">{analytics.aggregate.totalWillLose.toFixed(1)}</p>
                       </div>
                       <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-red-600 rounded-xl flex items-center justify-center">
                         <span className="text-white text-lg">⚠</span>

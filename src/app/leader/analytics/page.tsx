@@ -272,7 +272,7 @@ export default function LeaderAnalyticsPage() {
               {team.settings.allowCarryover ? (
                 <div className="bg-green-50 rounded-lg p-4">
                   <p className="text-sm font-medium text-green-700 mb-1">Will Carryover</p>
-                  <p className="text-3xl font-bold text-green-900">{Math.round(willCarryover)} days</p>
+                  <p className="text-3xl font-bold text-green-900">{willCarryover.toFixed(1)} days</p>
                   <p className="text-xs text-green-600 mt-2">
                     Unused days carried to next year
                   </p>
@@ -280,7 +280,7 @@ export default function LeaderAnalyticsPage() {
               ) : (
                 <div className="bg-red-50 rounded-lg p-4">
                   <p className="text-sm font-medium text-red-700 mb-1">Will Be Lost</p>
-                  <p className="text-3xl font-bold text-red-900">{Math.round(willLose)} days</p>
+                  <p className="text-3xl font-bold text-red-900">{willLose.toFixed(1)} days</p>
                   <p className="text-xs text-red-600 mt-2">
                     Unused days lost at year end
                   </p>
