@@ -152,6 +152,11 @@ export default function LeaderAnalyticsPage() {
   const avgRemainingBalance = analytics.aggregate.averageRemainingBalance || 0;
   const totalRealisticUsableDays = analytics.aggregate.totalRealisticUsableDays || 0;
 
+  // Calculate total surplus balance across all members
+  const allMembers = analytics.groups.flatMap(group => group.members);
+  const totalSurplus = allMembers.reduce((sum, m) => sum + m.analytics.surplusBalance, 0);
+  const membersWithSurplus = allMembers.filter(m => m.analytics.surplusBalance > 0).length;
+
   // Project end of year usage
   const projectionUsage = totalRemainingBalance > totalRealisticUsableDays 
     ? totalRealisticUsableDays 
@@ -206,7 +211,19 @@ export default function LeaderAnalyticsPage() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-500">Total Remaining</p>
-                  <p className="text-2xl font-bold text-gray-900">{totalRemainingBalance.toFixed(1)}</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {totalRemainingBalance.toFixed(1)}
+                    {totalSurplus > 0 && (
+                      <span className="ml-2 text-lg text-green-600">
+                        (+{totalSurplus.toFixed(1)} surplus)
+                      </span>
+                    )}
+                  </p>
+                  {totalSurplus > 0 && (
+                    <p className="text-xs text-green-600 mt-1">
+                      {membersWithSurplus} member(s) with surplus
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -352,49 +369,65 @@ export default function LeaderAnalyticsPage() {
                     </div>
 
                     {/* Group Aggregate Stats */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <p className="text-xs font-medium text-gray-500">Remaining Balance</p>
-                        <p className="text-xl font-bold text-gray-900 mt-1">
-                          {group.aggregate.groupTotalLeaveBalance.toFixed(1)}
-                        </p>
-                        <p className="text-xs text-gray-600 mt-1">
-                          Avg: {group.aggregate.groupAverageLeaveBalance.toFixed(1)}
-                        </p>
-                      </div>
+                    {(() => {
+                      const groupSurplus = groupMembers.reduce((sum, m) => sum + m.analytics.surplusBalance, 0);
+                      const groupMembersWithSurplus = groupMembers.filter(m => m.analytics.surplusBalance > 0).length;
+                      return (
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                          <div className="bg-gray-50 rounded-lg p-4">
+                            <p className="text-xs font-medium text-gray-500">Remaining Balance</p>
+                            <p className="text-xl font-bold text-gray-900 mt-1">
+                              {group.aggregate.groupTotalLeaveBalance.toFixed(1)}
+                              {groupSurplus > 0 && (
+                                <span className="ml-2 text-sm text-green-600">
+                                  (+{groupSurplus.toFixed(1)})
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-xs text-gray-600 mt-1">
+                              Avg: {group.aggregate.groupAverageLeaveBalance.toFixed(1)}
+                            </p>
+                            {groupSurplus > 0 && (
+                              <p className="text-xs text-green-600 mt-1">
+                                {groupMembersWithSurplus} member(s) with surplus
+                              </p>
+                            )}
+                          </div>
 
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <p className="text-xs font-medium text-gray-500">Realistic Usable Days</p>
-                        <p className="text-xl font-bold text-gray-900 mt-1">
-                          {group.aggregate.groupTotalRealisticUsableDays.toFixed(1)}
-                        </p>
-                        <p className="text-xs text-gray-600 mt-1">
-                          Avg: {group.aggregate.groupAverageRealisticUsableDays.toFixed(1)}
-                        </p>
-                      </div>
+                          <div className="bg-gray-50 rounded-lg p-4">
+                            <p className="text-xs font-medium text-gray-500">Realistic Usable Days</p>
+                            <p className="text-xl font-bold text-gray-900 mt-1">
+                              {group.aggregate.groupTotalRealisticUsableDays.toFixed(1)}
+                            </p>
+                            <p className="text-xs text-gray-600 mt-1">
+                              Avg: {group.aggregate.groupAverageRealisticUsableDays.toFixed(1)}
+                            </p>
+                          </div>
 
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <p className="text-xs font-medium text-gray-500">Usable Days</p>
-                        <p className="text-xl font-bold text-gray-900 mt-1">
-                          {group.aggregate.groupTotalUsableDays.toFixed(1)}
-                        </p>
-                        <p className="text-xs text-gray-600 mt-1">
-                          Avg: {group.aggregate.groupAverageUsableDays.toFixed(1)}
-                        </p>
-                      </div>
+                          <div className="bg-gray-50 rounded-lg p-4">
+                            <p className="text-xs font-medium text-gray-500">Usable Days</p>
+                            <p className="text-xl font-bold text-gray-900 mt-1">
+                              {group.aggregate.groupTotalUsableDays.toFixed(1)}
+                            </p>
+                            <p className="text-xs text-gray-600 mt-1">
+                              Avg: {group.aggregate.groupAverageUsableDays.toFixed(1)}
+                            </p>
+                          </div>
 
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <p className="text-xs font-medium text-gray-500">Competition Level</p>
-                        <p className="text-xl font-bold text-gray-900 mt-1">
-                          {groupMembers.length} members
-                        </p>
-                        <p className="text-xs text-gray-600 mt-1">
-                          {groupMembers.length > 0 
-                            ? (group.aggregate.groupTotalRealisticUsableDays / groupMembers.length).toFixed(1)
-                            : 0} days/member
-                        </p>
-                      </div>
-                    </div>
+                          <div className="bg-gray-50 rounded-lg p-4">
+                            <p className="text-xs font-medium text-gray-500">Competition Level</p>
+                            <p className="text-xl font-bold text-gray-900 mt-1">
+                              {groupMembers.length} members
+                            </p>
+                            <p className="text-xs text-gray-600 mt-1">
+                              {groupMembers.length > 0 
+                                ? (group.aggregate.groupTotalRealisticUsableDays / groupMembers.length).toFixed(1)
+                                : 0} days/member
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Group Members Detail */}
                     <div className="border-t border-gray-200 pt-4">
@@ -413,6 +446,11 @@ export default function LeaderAnalyticsPage() {
                                 <p className="text-xs text-gray-500">Balance</p>
                                 <p className="font-medium text-gray-900">
                                   {member.analytics.remainingLeaveBalance.toFixed(1)}
+                                  {member.analytics.surplusBalance > 0 && (
+                                    <span className="ml-1 text-xs text-green-600">
+                                      (+{member.analytics.surplusBalance.toFixed(1)})
+                                    </span>
+                                  )}
                                 </p>
                               </div>
                               <div className="text-right">
