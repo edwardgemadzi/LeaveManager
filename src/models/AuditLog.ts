@@ -2,7 +2,7 @@ import { getDatabase } from '@/lib/mongodb';
 
 export interface AuditLog {
   _id?: string;
-  action: 'leave_approved' | 'leave_rejected' | 'leave_created' | 'leave_updated' | 'team_settings_updated' | 'user_registered';
+  action: 'leave_approved' | 'leave_rejected' | 'leave_created' | 'leave_updated' | 'leave_deleted' | 'team_settings_updated' | 'user_registered';
   userId: string;
   userName: string;
   userRole: 'leader' | 'member';
@@ -52,7 +52,7 @@ export class AuditLogModel {
   }
 
   static async logLeaveAction(
-    action: 'leave_approved' | 'leave_rejected',
+    action: 'leave_approved' | 'leave_rejected' | 'leave_deleted',
     actorId: string,
     actorName: string,
     actorRole: 'leader' | 'member',
@@ -64,6 +64,7 @@ export class AuditLogModel {
       startDate: string;
       endDate: string;
       reason: string;
+      status?: string;
     },
     additionalDetails?: Record<string, unknown>
   ): Promise<void> {

@@ -85,4 +85,20 @@ export class LeaveRequestModel {
 
     return await requests.find(query).toArray();
   }
+
+  static async delete(id: string): Promise<boolean> {
+    const db = await getDatabase();
+    const requests = db.collection<LeaveRequest>('leaveRequests');
+    try {
+      const objectId = new ObjectId(id);
+      const result = await requests.deleteOne(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { _id: objectId } as any
+      );
+      return result.deletedCount > 0;
+    } catch (error) {
+      console.error('LeaveRequestModel.delete error:', error);
+      return false;
+    }
+  }
 }

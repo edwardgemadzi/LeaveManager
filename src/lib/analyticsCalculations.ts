@@ -498,7 +498,8 @@ export const getMemberAnalytics = (
   const remainingLeaveBalance = calculateLeaveBalance(
     team.settings.maxLeavePerYear,
     approvedRequestsForCalculation,
-    shiftSchedule
+    shiftSchedule,
+    user.manualLeaveBalance
   );
   
   // Calculate competition metrics (using filtered members if subgrouping is enabled)

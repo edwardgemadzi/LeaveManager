@@ -51,7 +51,8 @@ export const countWorkingDays = (startDate: Date, endDate: Date, shiftSchedule: 
 export const calculateLeaveBalance = (
   maxLeavePerYear: number,
   approvedRequests: Array<{ startDate: Date; endDate: Date }>,
-  shiftSchedule: ShiftSchedule
+  shiftSchedule: ShiftSchedule,
+  manualLeaveBalance?: number
 ): number => {
   const currentYear = new Date().getFullYear();
   
@@ -66,5 +67,8 @@ export const calculateLeaveBalance = (
       return total + workingDays;
     }, 0);
 
-  return maxLeavePerYear - approvedWorkingDays;
+  // If manual balance is set, use it as the base and subtract approved requests
+  // Otherwise, use the standard calculation
+  const baseBalance = manualLeaveBalance !== undefined ? manualLeaveBalance : maxLeavePerYear;
+  return baseBalance - approvedWorkingDays;
 };

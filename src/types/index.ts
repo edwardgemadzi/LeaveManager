@@ -9,6 +9,7 @@ export interface User {
   shiftTag?: 'day' | 'night' | 'mixed'; // New field for shift categorization
   workingDaysTag?: string; // Automatic tag grouping members who work on exactly the same days
   subgroupTag?: string; // Custom subgroup name assigned by leader (only when enableSubgrouping is true)
+  manualLeaveBalance?: number; // Manual leave balance override set by leader (for members joining mid-year)
   createdAt: Date;
 }
 

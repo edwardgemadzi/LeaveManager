@@ -20,6 +20,7 @@ export default function LeaderRequestsPage() {
     password: ''
   });
   const [submittingEmergency, setSubmittingEmergency] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -95,6 +96,36 @@ export default function LeaderRequestsPage() {
       }
     } catch (err) {
       console.error('Error rejecting request:', err);
+    }
+  };
+
+  const handleDelete = async (requestId: string) => {
+    if (!confirm('Are you sure you want to delete this approved request? This action cannot be undone and will affect the member\'s leave balance.')) {
+      return;
+    }
+
+    setDeleting(requestId);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/leave-requests/${requestId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        setRequests(requests.filter(req => req._id !== requestId));
+        alert('Request deleted successfully');
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to delete request');
+      }
+    } catch (error) {
+      console.error('Error deleting request:', error);
+      alert('Network error. Please try again.');
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -361,22 +392,34 @@ export default function LeaderRequestsPage() {
                             )}
                           </div>
                         </div>
-                        {request.status === 'pending' && (
-                          <div className="flex space-x-2 ml-4">
+                        <div className="flex space-x-2 ml-4">
+                          {request.status === 'pending' && (
+                            <>
+                              <button
+                                onClick={() => handleApprove(request._id!)}
+                                className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => handleReject(request._id!)}
+                                className="bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
+                          {request.status === 'approved' && (
                             <button
-                              onClick={() => handleApprove(request._id!)}
-                              className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700"
+                              onClick={() => handleDelete(request._id!)}
+                              disabled={deleting === request._id}
+                              className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Delete approved request"
                             >
-                              Approve
+                              {deleting === request._id ? 'Deleting...' : 'Delete'}
                             </button>
-                            <button
-                              onClick={() => handleReject(request._id!)}
-                              className="bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700"
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
                     </div>
                   );

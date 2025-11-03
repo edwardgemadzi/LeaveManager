@@ -13,6 +13,9 @@ export default function LeaderLeaveBalancePage() {
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<'name' | 'balance' | 'used'>('name');
   const [filterBy, setFilterBy] = useState<'all' | 'low' | 'high'>('all');
+  const [editingBalance, setEditingBalance] = useState<string | null>(null);
+  const [tempBalance, setTempBalance] = useState<string>('');
+  const [updating, setUpdating] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -101,10 +104,16 @@ export default function LeaderLeaveBalancePage() {
     }, 0);
 
     // Calculate remaining balance
+    const approvedRequestsForCalculation = approvedRequests.map(req => ({
+      startDate: new Date(req.startDate),
+      endDate: new Date(req.endDate)
+    }));
+    
     const remainingBalance = calculateLeaveBalance(
       team?.settings.maxLeavePerYear || 20,
-      approvedRequests,
-      shiftSchedule
+      approvedRequestsForCalculation,
+      shiftSchedule,
+      member.manualLeaveBalance
     );
 
     // Calculate total days used (all time, not just this year)
@@ -169,6 +178,127 @@ export default function LeaderLeaveBalancePage() {
     }
 
     return memberList;
+  };
+
+  const handleEditBalance = (member: User) => {
+    setEditingBalance(member._id || null);
+    // Get current remaining balance to show in the input
+    const leaveData = getMemberLeaveData(member);
+    setTempBalance(leaveData.remainingBalance.toFixed(1));
+  };
+
+  const handleSaveBalance = async (memberId: string) => {
+    const member = members.find(m => m._id === memberId);
+    if (!member) return;
+
+    const balanceValue = parseFloat(tempBalance);
+    if (isNaN(balanceValue) || balanceValue < 0) {
+      alert('Please enter a valid non-negative number');
+      return;
+    }
+
+    setUpdating(memberId);
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Calculate the manual balance by adding back the approved requests
+      const memberRequests = allRequests.filter(req => req.userId === memberId);
+      const approvedRequests = memberRequests.filter(req => req.status === 'approved');
+      
+      const shiftSchedule = member.shiftSchedule || {
+        pattern: [true, true, true, true, true, false, false],
+        startDate: new Date(),
+        type: 'fixed'
+      };
+      
+      const currentYear = new Date().getFullYear();
+      const approvedWorkingDays = approvedRequests
+        .filter(req => new Date(req.startDate).getFullYear() === currentYear)
+        .reduce((total, req) => {
+          const workingDays = countWorkingDays(
+            new Date(req.startDate),
+            new Date(req.endDate),
+            shiftSchedule
+          );
+          return total + workingDays;
+        }, 0);
+      
+      // Manual balance = desired remaining balance + approved working days
+      const manualBalance = balanceValue + approvedWorkingDays;
+      
+      const response = await fetch(`/api/users/${memberId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ manualLeaveBalance: manualBalance }),
+      });
+
+      if (response.ok) {
+        // Update member in state
+        setMembers(members.map(m => 
+          m._id === memberId 
+            ? { ...m, manualLeaveBalance: manualBalance }
+            : m
+        ));
+        setEditingBalance(null);
+        setTempBalance('');
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to update leave balance');
+      }
+    } catch (error) {
+      console.error('Error updating leave balance:', error);
+      alert('Network error. Please try again.');
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingBalance(null);
+    setTempBalance('');
+  };
+
+  const handleResetBalance = async (memberId: string) => {
+    if (!confirm('Reset balance to auto-calculated? This will remove the manual override.')) {
+      return;
+    }
+
+    setUpdating(memberId);
+    try {
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch(`/api/users/${memberId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ manualLeaveBalance: null }),
+      });
+
+      if (response.ok) {
+        // Update member in state - remove manualLeaveBalance
+        setMembers(members.map(m => {
+          if (m._id === memberId) {
+            const updated = { ...m };
+            delete updated.manualLeaveBalance;
+            return updated;
+          }
+          return m;
+        }));
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to reset leave balance');
+      }
+    } catch (error) {
+      console.error('Error resetting leave balance:', error);
+      alert('Network error. Please try again.');
+    } finally {
+      setUpdating(null);
+    }
   };
 
   if (loading) {
@@ -353,23 +483,93 @@ export default function LeaderLeaveBalancePage() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">
-                              {leaveData.remainingBalance.toFixed(1)} / {maxLeave}
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                              <div
-                                className={`h-2 rounded-full ${
-                                  leaveData.remainingBalance < maxLeave * 0.3
-                                    ? 'bg-red-500'
-                                    : leaveData.remainingBalance < maxLeave * 0.7
-                                    ? 'bg-yellow-500'
-                                    : 'bg-green-500'
-                                }`}
-                                style={{
-                                  width: `${(leaveData.remainingBalance / maxLeave) * 100}%`
-                                }}
-                              ></div>
-                            </div>
+                            {editingBalance === member._id ? (
+                              <div className="space-y-2">
+                                <div className="flex items-center space-x-2">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.1"
+                                    value={tempBalance}
+                                    onChange={(e) => setTempBalance(e.target.value)}
+                                    disabled={updating === member._id}
+                                    className="w-24 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50"
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        handleSaveBalance(member._id!);
+                                      } else if (e.key === 'Escape') {
+                                        handleCancelEdit();
+                                      }
+                                    }}
+                                    autoFocus
+                                  />
+                                  <span className="text-sm text-gray-500">/ {maxLeave}</span>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <button
+                                    onClick={() => handleSaveBalance(member._id!)}
+                                    disabled={updating === member._id}
+                                    className="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded disabled:opacity-50"
+                                  >
+                                    {updating === member._id ? 'Saving...' : 'Save'}
+                                  </button>
+                                  <button
+                                    onClick={handleCancelEdit}
+                                    disabled={updating === member._id}
+                                    className="px-2 py-1 text-xs bg-gray-500 hover:bg-gray-600 text-white rounded disabled:opacity-50"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                                {member.manualLeaveBalance !== undefined && (
+                                  <p className="text-xs text-blue-600">
+                                    Base balance: {member.manualLeaveBalance.toFixed(1)} days
+                                  </p>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="group">
+                                <div className="flex items-center space-x-2">
+                                  <div 
+                                    className="text-sm font-medium text-gray-900 cursor-pointer hover:text-indigo-600"
+                                    onClick={() => handleEditBalance(member)}
+                                    title="Click to edit balance"
+                                  >
+                                    {leaveData.remainingBalance.toFixed(1)} / {maxLeave}
+                                    {member.manualLeaveBalance !== undefined && (
+                                      <span className="ml-2 text-xs text-blue-600" title="Manual balance override">✏️</span>
+                                    )}
+                                  </div>
+                                  {member.manualLeaveBalance !== undefined && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleResetBalance(member._id!);
+                                      }}
+                                      disabled={updating === member._id}
+                                      className="text-xs text-gray-500 hover:text-red-600 disabled:opacity-50"
+                                      title="Reset to auto-calculated"
+                                    >
+                                      ↺
+                                    </button>
+                                  )}
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                                  <div
+                                    className={`h-2 rounded-full ${
+                                      leaveData.remainingBalance < maxLeave * 0.3
+                                        ? 'bg-red-500'
+                                        : leaveData.remainingBalance < maxLeave * 0.7
+                                        ? 'bg-yellow-500'
+                                        : 'bg-green-500'
+                                    }`}
+                                    style={{
+                                      width: `${Math.min((leaveData.remainingBalance / maxLeave) * 100, 100)}%`
+                                    }}
+                                  ></div>
+                                </div>
+                              </div>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {leaveData.totalUsed.toFixed(1)}

@@ -61,9 +61,9 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
-    const { fullName, shiftTag, subgroupTag } = body;
+    const { fullName, shiftTag, subgroupTag, manualLeaveBalance } = body;
 
-    if (!fullName && shiftTag === undefined && subgroupTag === undefined) {
+    if (!fullName && shiftTag === undefined && subgroupTag === undefined && manualLeaveBalance === undefined) {
       return NextResponse.json(
         { error: 'At least one field is required' },
         { status: 400 }
@@ -93,20 +93,49 @@ export async function PATCH(
     }
 
     // Build update object
-    const updateData: { fullName?: string; shiftTag?: string; subgroupTag?: string } = {};
+    const updateData: { fullName?: string; shiftTag?: string; subgroupTag?: string; manualLeaveBalance?: number } = {};
+    const unsetData: { manualLeaveBalance?: string } = {};
+    let shouldUnset = false;
+    
     if (fullName) updateData.fullName = fullName;
     if (shiftTag !== undefined) updateData.shiftTag = shiftTag;
     if (subgroupTag !== undefined) {
       // If subgroupTag is empty string, set to undefined (remove subgroup)
       updateData.subgroupTag = subgroupTag && subgroupTag.trim() ? subgroupTag.trim() : undefined;
     }
+    if (manualLeaveBalance !== undefined) {
+      // If manualLeaveBalance is null, remove it (use calculated balance)
+      if (manualLeaveBalance === null) {
+        unsetData.manualLeaveBalance = '';
+        shouldUnset = true;
+      } else {
+        // Validate manualLeaveBalance is a number and not negative
+        if (typeof manualLeaveBalance !== 'number' || manualLeaveBalance < 0) {
+          return NextResponse.json(
+            { error: 'manualLeaveBalance must be a non-negative number' },
+            { status: 400 }
+          );
+        }
+        updateData.manualLeaveBalance = manualLeaveBalance;
+      }
+    }
 
     // Update user
     const db = await getDatabase();
     const users = db.collection('users');
+    const updateOperation: { $set?: typeof updateData; $unset?: typeof unsetData } = {};
+    
+    if (Object.keys(updateData).length > 0) {
+      updateOperation.$set = updateData;
+    }
+    
+    if (shouldUnset && Object.keys(unsetData).length > 0) {
+      updateOperation.$unset = unsetData;
+    }
+    
     const result = await users.updateOne(
       { _id: new ObjectId(id) },
-      { $set: updateData }
+      updateOperation
     );
 
     if (result.matchedCount === 0) {

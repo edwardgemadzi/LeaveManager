@@ -155,7 +155,8 @@ export default function LeaderDashboard() {
         const remainingBalance = calculateLeaveBalance(
           maxLeavePerYear,
           approvedRequests,
-          member.shiftSchedule
+          member.shiftSchedule,
+          member.manualLeaveBalance
         );
 
         totalRemaining += remainingBalance;

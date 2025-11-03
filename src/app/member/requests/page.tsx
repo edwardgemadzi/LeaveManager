@@ -32,6 +32,7 @@ export default function MemberRequestsPage() {
     { value: 'other', label: '📝 Other (specify below)' },
   ];
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const handleReasonChange = (reasonType: string) => {
     setSelectedReasonType(reasonType);
@@ -145,6 +146,36 @@ export default function MemberRequestsPage() {
       alert('Error submitting request');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (requestId: string) => {
+    if (!confirm('Are you sure you want to cancel this request? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeleting(requestId);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/leave-requests/${requestId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        setMyRequests(myRequests.filter(req => req._id !== requestId));
+        alert('Request cancelled successfully');
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to cancel request');
+      }
+    } catch (error) {
+      console.error('Error deleting request:', error);
+      alert('Network error. Please try again.');
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -311,6 +342,18 @@ export default function MemberRequestsPage() {
                           Requested on {new Date(request.createdAt).toLocaleDateString()}
                         </p>
                       </div>
+                      {request.status === 'pending' && (
+                        <div className="ml-4">
+                          <button
+                            onClick={() => handleDelete(request._id!)}
+                            disabled={deleting === request._id}
+                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Cancel request"
+                          >
+                            {deleting === request._id ? 'Cancelling...' : 'Cancel'}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

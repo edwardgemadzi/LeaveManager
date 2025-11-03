@@ -127,7 +127,8 @@ export default function MemberDashboard() {
     const balance = calculateLeaveBalance(
       team.settings.maxLeavePerYear,
       approvedRequests,
-      user.shiftSchedule || { pattern: [true, true, true, true, true, false, false], startDate: new Date(), type: 'rotating' }
+      user.shiftSchedule || { pattern: [true, true, true, true, true, false, false], startDate: new Date(), type: 'rotating' },
+      user.manualLeaveBalance
     );
     
     console.log('Calculated leave balance:', balance);
