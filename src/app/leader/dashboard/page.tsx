@@ -287,7 +287,7 @@ export default function LeaderDashboard() {
                         <h3 className="text-xs font-medium text-gray-500">Realistic Usable Days</h3>
                         <p className="text-2xl font-bold text-blue-700 mt-1">{Math.round(analytics.aggregate.totalRealisticUsableDays ?? 0)}</p>
                       </div>
-                      <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+                      <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <span className="text-white text-lg">📊</span>
                       </div>
                     </div>
@@ -302,7 +302,7 @@ export default function LeaderDashboard() {
                         <h3 className="text-xs font-medium text-gray-500">Theoretical Working Days</h3>
                         <p className="text-2xl font-bold text-gray-700 mt-1">{Math.round(analytics.aggregate.totalTheoreticalWorkingDays ?? 0)}</p>
                       </div>
-                      <div className="w-12 h-12 bg-gradient-to-r from-gray-500 to-gray-600 rounded-xl flex items-center justify-center">
+                      <div className="w-12 h-12 bg-gradient-to-r from-gray-500 to-gray-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <span className="text-white text-lg">📈</span>
                       </div>
                     </div>
@@ -367,7 +367,7 @@ export default function LeaderDashboard() {
                         <h3 className="text-xs font-medium text-gray-500">Will Carry Over</h3>
                         <p className="text-2xl font-bold text-green-700 mt-1">{analytics.aggregate.totalWillCarryover.toFixed(1)}</p>
                       </div>
-                      <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+                      <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <span className="text-white text-lg">✓</span>
                       </div>
                     </div>
@@ -382,7 +382,7 @@ export default function LeaderDashboard() {
                         <h3 className="text-xs font-medium text-gray-500">Will Be Lost</h3>
                         <p className="text-2xl font-bold text-red-700 mt-1">{analytics.aggregate.totalWillLose.toFixed(1)}</p>
                       </div>
-                      <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-red-600 rounded-xl flex items-center justify-center">
+                      <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-red-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <span className="text-white text-lg">⚠</span>
                       </div>
                     </div>

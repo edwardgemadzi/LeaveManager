@@ -323,24 +323,30 @@ export default function MemberDashboard() {
 
                 <div className="card card-hover slide-up" style={{ animationDelay: '0.3s' }}>
                   <div className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
                         <h3 className="text-sm font-medium text-gray-500">Remaining Leave Balance</h3>
-                        <p className="text-3xl font-bold text-gray-900 mt-2">
-                          {Math.round(analytics.remainingLeaveBalance)} / {team?.settings.maxLeavePerYear || 20}
-                          {analytics.surplusBalance > 0 && (
-                            <span className="ml-2 text-lg text-green-600">(+{Math.round(analytics.surplusBalance)} surplus)</span>
-                          )}
-                        </p>
-                        {analytics.surplusBalance > 0 && (
-                          <p className="mt-2">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              +{Math.round(analytics.surplusBalance)} surplus days
+                        <div className="mt-2">
+                          <div className="flex items-baseline flex-wrap gap-2">
+                            <span className="text-3xl font-bold text-gray-900">
+                              {Math.round(analytics.remainingLeaveBalance)} / {team?.settings.maxLeavePerYear || 20}
                             </span>
-                          </p>
-                        )}
+                            {analytics.surplusBalance > 0 && (
+                              <span className="text-lg text-green-600">
+                                (+{Math.round(analytics.surplusBalance)} surplus)
+                              </span>
+                            )}
+                          </div>
+                          {analytics.surplusBalance > 0 && (
+                            <div className="mt-2">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                +{Math.round(analytics.surplusBalance)} surplus days
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg">
+                      <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
                         <span className="text-white text-2xl">📅</span>
                       </div>
                     </div>
