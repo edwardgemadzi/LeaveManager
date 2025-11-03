@@ -312,36 +312,47 @@ export default function LeaderDashboard() {
 
                 <div className="card card-hover slide-up" style={{ animationDelay: '0.2s' }}>
                   <div className="p-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1">
                         <h3 className="text-xs font-medium text-gray-500">Total Remaining Leave</h3>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">
-                          {Math.round(analytics.aggregate.totalRemainingLeaveBalance)}
-                          {(() => {
-                            // Get all members from groups to check for surplus
-                            const allMembers = analytics.groups.flatMap(group => group.members);
-                            const totalSurplus = allMembers.reduce((sum, m) => sum + m.analytics.surplusBalance, 0);
-                            const membersWithSurplus = allMembers.filter(m => m.analytics.surplusBalance > 0);
-                            
-                            if (totalSurplus > 0) {
-                              return (
-                                <>
-                                  <span className="ml-2 text-lg text-green-600">
+                        <div className="mt-1">
+                          <div className="flex items-baseline flex-wrap gap-2">
+                            <span className="text-2xl font-bold text-gray-900">
+                              {Math.round(analytics.aggregate.totalRemainingLeaveBalance)}
+                            </span>
+                            {(() => {
+                              // Get all members from groups to check for surplus
+                              const allMembers = analytics.groups.flatMap(group => group.members);
+                              const totalSurplus = allMembers.reduce((sum, m) => sum + m.analytics.surplusBalance, 0);
+                              const membersWithSurplus = allMembers.filter(m => m.analytics.surplusBalance > 0);
+                              
+                              if (totalSurplus > 0) {
+                                return (
+                                  <span className="text-lg text-green-600">
                                     (+{Math.round(totalSurplus)} surplus)
                                   </span>
-                                  <p className="mt-2">
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                      {membersWithSurplus.length} member(s) with surplus
-                                    </span>
-                                  </p>
-                                </>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
+                          {(() => {
+                            const allMembers = analytics.groups.flatMap(group => group.members);
+                            const membersWithSurplus = allMembers.filter(m => m.analytics.surplusBalance > 0);
+                            if (membersWithSurplus.length > 0) {
+                              return (
+                                <div className="mt-2">
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    {membersWithSurplus.length} member(s) with surplus
+                                  </span>
+                                </div>
                               );
                             }
                             return null;
                           })()}
-                        </p>
+                        </div>
                       </div>
-                      <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+                      <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center flex-shrink-0">
                         <span className="text-white text-lg">📅</span>
                       </div>
                     </div>
