@@ -554,41 +554,52 @@ export default function LeaderLeaveBalancePage() {
                               </div>
                             ) : (
                               <div className="group">
-                                <div className="flex items-center space-x-2">
-                                  <div 
-                                    className="text-sm font-medium text-gray-900 cursor-pointer hover:text-indigo-600"
-                                    onClick={() => handleEditBalance(member)}
-                                    title="Click to edit balance"
-                                  >
-                                    {Math.round(leaveData.remainingBalance)} / {maxLeave}
-                                    {leaveData.surplusBalance > 0 && (
-                                      <span className="ml-2 text-xs text-green-600" title="Surplus balance">
-                                        (+{Math.round(leaveData.surplusBalance)} surplus)
-                                      </span>
-                                    )}
+                                <div className="flex flex-col space-y-1">
+                                  <div className="flex items-center space-x-2">
+                                    <div 
+                                      className="text-sm font-medium text-gray-900 cursor-pointer hover:text-indigo-600"
+                                      onClick={() => handleEditBalance(member)}
+                                      title="Click to edit balance"
+                                    >
+                                      {Math.round(leaveData.remainingBalance)} / {maxLeave}
+                                      <span className="ml-1 text-xs text-gray-500">(remaining)</span>
+                                      {leaveData.surplusBalance > 0 && (
+                                        <span className="ml-2 text-xs text-green-600" title="Surplus balance">
+                                          (+{Math.round(leaveData.surplusBalance)} surplus)
+                                        </span>
+                                      )}
+                                      {member.manualLeaveBalance !== undefined && (
+                                        <span className="ml-2 text-xs text-blue-600" title="Manual balance override">✏️</span>
+                                      )}
+                                    </div>
                                     {member.manualLeaveBalance !== undefined && (
-                                      <span className="ml-2 text-xs text-blue-600" title="Manual balance override">✏️</span>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleResetBalance(member._id!);
+                                        }}
+                                        disabled={updating === member._id}
+                                        className="text-xs text-gray-500 hover:text-red-600 disabled:opacity-50"
+                                        title="Reset to auto-calculated"
+                                      >
+                                        ↺
+                                      </button>
                                     )}
                                   </div>
+                                  {member.manualLeaveBalance !== undefined && Math.round(member.manualLeaveBalance) !== Math.round(leaveData.remainingBalance) && (
+                                    <div className="text-xs text-gray-600">
+                                      <span className="font-medium">Base balance:</span> {Math.round(member.manualLeaveBalance)} days
+                                      <span className="ml-2 text-gray-500">
+                                        ({Math.round(member.manualLeaveBalance - leaveData.remainingBalance)} days used)
+                                      </span>
+                                    </div>
+                                  )}
                                   {leaveData.surplusBalance > 0 && (
                                     <div className="mt-1">
                                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                         +{Math.round(leaveData.surplusBalance)} surplus days
                                       </span>
                                     </div>
-                                  )}
-                                  {member.manualLeaveBalance !== undefined && (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleResetBalance(member._id!);
-                                      }}
-                                      disabled={updating === member._id}
-                                      className="text-xs text-gray-500 hover:text-red-600 disabled:opacity-50"
-                                      title="Reset to auto-calculated"
-                                    >
-                                      ↺
-                                    </button>
                                   )}
                                 </div>
                                 <div className="w-full bg-gray-200 rounded-full h-2 mt-1">

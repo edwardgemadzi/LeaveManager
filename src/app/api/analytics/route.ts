@@ -42,7 +42,10 @@ export async function GET(request: NextRequest) {
     // Return analytics based on role
     if (user.role === 'member') {
       // Return member's own analytics
-      const memberRequests = allRequests.filter(req => req.userId === user.id);
+      // Filter to only approved requests (matching leave balance page logic)
+      const memberRequests = allRequests.filter(req => 
+        req.userId === user.id && req.status === 'approved'
+      );
       const members = await UserModel.findByTeamId(user.teamId);
       
       // Ensure we only pass members (not leaders) - findByTeamId should already filter this

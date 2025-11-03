@@ -385,6 +385,7 @@ export default function LeaderAnalyticsPage() {
                             <p className="text-xs font-medium text-gray-500">Remaining Balance</p>
                             <p className="text-xl font-bold text-gray-900 mt-1">
                               {Math.round(group.aggregate.groupTotalLeaveBalance)}
+                              <span className="ml-1 text-xs text-gray-500">(remaining)</span>
                               {groupSurplus > 0 && (
                                 <span className="ml-2 text-sm text-green-600">
                                   (+{Math.round(groupSurplus)})
@@ -392,7 +393,7 @@ export default function LeaderAnalyticsPage() {
                               )}
                             </p>
                             <p className="text-xs text-gray-600 mt-1">
-                              Avg: {group.aggregate.groupAverageLeaveBalance.toFixed(1)}
+                              Avg: {group.aggregate.groupAverageLeaveBalance.toFixed(1)} (remaining)
                             </p>
                             {groupSurplus > 0 && (
                               <p className="text-xs text-green-600 mt-1">
@@ -453,12 +454,22 @@ export default function LeaderAnalyticsPage() {
                                 <p className="text-xs text-gray-500">Balance</p>
                                 <p className="font-medium text-gray-900">
                                   {Math.round(member.analytics.remainingLeaveBalance)}
+                                  <span className="ml-1 text-xs text-gray-500">(remaining)</span>
                                   {member.analytics.surplusBalance > 0 && (
                                     <span className="ml-1 text-xs text-green-600">
                                       (+{Math.round(member.analytics.surplusBalance)})
                                     </span>
                                   )}
                                 </p>
+                                {/* Show base balance if different from remaining balance */}
+                                {Math.round(member.analytics.baseLeaveBalance) !== Math.round(member.analytics.remainingLeaveBalance) && (
+                                  <p className="text-xs text-gray-600 mt-0.5">
+                                    <span className="font-medium">Base:</span> {Math.round(member.analytics.baseLeaveBalance)}
+                                    <span className="ml-1 text-gray-500">
+                                      ({Math.round(member.analytics.baseLeaveBalance - member.analytics.remainingLeaveBalance)} used)
+                                    </span>
+                                  </p>
+                                )}
                               </div>
                               <div className="text-right">
                                 <p className="text-xs text-gray-500">Realistic</p>

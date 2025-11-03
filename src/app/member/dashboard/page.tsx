@@ -225,10 +225,19 @@ export default function MemberDashboard() {
                       <dt className="text-sm font-medium text-gray-500 truncate">Leave Balance</dt>
                       <dd className="text-2xl font-bold text-gray-900">
                         {Math.round(leaveBalance.balance)} / {team?.settings.maxLeavePerYear || 20}
+                        <span className="ml-1 text-sm text-gray-500">(remaining)</span>
                         {leaveBalance.surplus > 0 && (
                           <span className="ml-2 text-sm text-green-600">(+{Math.round(leaveBalance.surplus)} surplus)</span>
                         )}
                       </dd>
+                      {user?.manualLeaveBalance !== undefined && Math.round(user.manualLeaveBalance) !== Math.round(leaveBalance.balance) && (
+                        <dd className="text-xs text-gray-600 mt-1">
+                          <span className="font-medium">Base balance:</span> {Math.round(user.manualLeaveBalance)} days
+                          <span className="ml-2 text-gray-500">
+                            ({Math.round(user.manualLeaveBalance - leaveBalance.balance)} days used)
+                          </span>
+                        </dd>
+                      )}
                       {leaveBalance.surplus > 0 && (
                         <dd className="mt-1">
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -331,12 +340,21 @@ export default function MemberDashboard() {
                             <span className="text-3xl font-bold text-gray-900">
                               {Math.round(analytics.remainingLeaveBalance)} / {team?.settings.maxLeavePerYear || 20}
                             </span>
+                            <span className="text-sm text-gray-500">(remaining)</span>
                             {analytics.surplusBalance > 0 && (
                               <span className="text-lg text-green-600">
                                 (+{Math.round(analytics.surplusBalance)} surplus)
                               </span>
                             )}
                           </div>
+                          {analytics.baseLeaveBalance !== undefined && Math.round(analytics.baseLeaveBalance) !== Math.round(analytics.remainingLeaveBalance) && (
+                            <p className="text-xs text-gray-600 mt-2">
+                              <span className="font-medium">Base balance:</span> {Math.round(analytics.baseLeaveBalance)} days
+                              <span className="ml-2 text-gray-500">
+                                ({Math.round(analytics.baseLeaveBalance - analytics.remainingLeaveBalance)} days used)
+                              </span>
+                            </p>
+                          )}
                           {analytics.surplusBalance > 0 && (
                             <div className="mt-2">
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">

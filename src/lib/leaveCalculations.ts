@@ -55,22 +55,50 @@ export const calculateLeaveBalance = (
   manualLeaveBalance?: number
 ): number => {
   const currentYear = new Date().getFullYear();
+  const yearStart = new Date(currentYear, 0, 1);
+  yearStart.setHours(0, 0, 0, 0);
+  const yearEnd = new Date(currentYear, 11, 31);
+  yearEnd.setHours(23, 59, 59, 999);
   
-  const approvedWorkingDays = approvedRequests
-    .filter(req => new Date(req.startDate).getFullYear() === currentYear)
-    .reduce((total, req) => {
-      const workingDays = countWorkingDays(
-        new Date(req.startDate),
-        new Date(req.endDate),
-        shiftSchedule
-      );
+  // Calculate approved working days for the current year only
+  // Include requests that overlap with the current year, but only count days within the year
+  const approvedWorkingDays = approvedRequests.reduce((total, req) => {
+    const reqStart = new Date(req.startDate);
+    const reqEnd = new Date(req.endDate);
+    reqStart.setHours(0, 0, 0, 0);
+    reqEnd.setHours(23, 59, 59, 999);
+    
+    // Check if request overlaps with current year
+    // Request overlaps if: (start <= yearEnd) AND (end >= yearStart)
+    if (reqStart <= yearEnd && reqEnd >= yearStart) {
+      // Calculate the overlap period within the current year
+      const overlapStart = reqStart > yearStart ? reqStart : yearStart;
+      const overlapEnd = reqEnd < yearEnd ? reqEnd : yearEnd;
+      
+      // Count working days only for the overlap period
+      const workingDays = countWorkingDays(overlapStart, overlapEnd, shiftSchedule);
       return total + workingDays;
-    }, 0);
+    }
+    
+    return total;
+  }, 0);
 
   // If manual balance is set, use it as the base and subtract approved requests
   // Otherwise, use the standard calculation
   const baseBalance = manualLeaveBalance !== undefined ? manualLeaveBalance : maxLeavePerYear;
-  return baseBalance - approvedWorkingDays;
+  const remainingBalance = baseBalance - approvedWorkingDays;
+  
+  // Debug logging for specific cases
+  if (manualLeaveBalance !== undefined && approvedRequests.length > 0 && approvedWorkingDays === 0) {
+    console.log(`[DEBUG calculateLeaveBalance] baseBalance=${baseBalance}, approvedRequests=${approvedRequests.length}, approvedWorkingDays=${approvedWorkingDays}, remainingBalance=${remainingBalance}`);
+    approvedRequests.forEach((req, idx) => {
+      const reqStart = new Date(req.startDate);
+      const reqEnd = new Date(req.endDate);
+      console.log(`  Request ${idx + 1}: ${reqStart.toISOString()} to ${reqEnd.toISOString()}, overlaps=${reqStart <= yearEnd && reqEnd >= yearStart}`);
+    });
+  }
+  
+  return remainingBalance;
 };
 
 // Function to calculate surplus balance (when manual balance exceeds team max)

@@ -366,7 +366,8 @@ export interface MemberAnalytics {
   theoreticalWorkingDays: number; // Total working days remaining from today to end of year - NOT adjusted for concurrent leave sharing (raw count)
   usableDays: number; // Days that can be used when shared among members who can use them - adjusted for concurrent leave limits
   realisticUsableDays: number; // Realistic days factoring in members sharing same schedule who also need to use remaining leave days
-  remainingLeaveBalance: number;
+  remainingLeaveBalance: number; // Remaining balance after subtracting approved requests
+  baseLeaveBalance: number; // Base balance (manualLeaveBalance if set, otherwise maxLeavePerYear) - before subtracting approved requests
   workingDaysUsed: number;
   workingDaysInYear: number;
   willCarryover: number;
@@ -489,6 +490,8 @@ export const getMemberAnalytics = (
   const workingDaysUsed = calculateYearToDateWorkingDays(shiftSchedule);
   
   // Calculate remaining leave balance
+  // Note: approvedRequests parameter should already be filtered to approved requests
+  // But we filter again here for safety and consistency with leave balance page
   const approvedRequestsForCalculation = approvedRequests
     .filter(req => req.status === 'approved')
     .map(req => ({
@@ -496,12 +499,33 @@ export const getMemberAnalytics = (
       endDate: new Date(req.endDate)
     }));
   
+  // Calculate base balance (manualLeaveBalance if set, otherwise maxLeavePerYear)
+  const baseLeaveBalance = user.manualLeaveBalance !== undefined ? user.manualLeaveBalance : team.settings.maxLeavePerYear;
+  
+  // Debug: Log if approvedRequests is empty but manualLeaveBalance is set
+  if (user.manualLeaveBalance !== undefined && approvedRequestsForCalculation.length === 0) {
+    console.log(`[DEBUG] User ${user.username}: manualLeaveBalance=${user.manualLeaveBalance}, but no approved requests found`);
+  }
+  
   const remainingLeaveBalance = calculateLeaveBalance(
     team.settings.maxLeavePerYear,
     approvedRequestsForCalculation,
     shiftSchedule,
     user.manualLeaveBalance
   );
+  
+  // Debug: Log if remaining equals base (indicates no approved requests were counted)
+  if (user.manualLeaveBalance !== undefined && Math.round(remainingLeaveBalance) === Math.round(baseLeaveBalance) && approvedRequestsForCalculation.length > 0) {
+    console.log(`[DEBUG getMemberAnalytics] User ${user.username}: remainingBalance=${remainingLeaveBalance}, baseBalance=${baseLeaveBalance}, approvedRequests=${approvedRequestsForCalculation.length}`);
+    approvedRequestsForCalculation.forEach((req, idx) => {
+      console.log(`  [DEBUG] Request ${idx + 1}: ${req.startDate.toISOString()} to ${req.endDate.toISOString()}`);
+    });
+  }
+  
+  // Always log for specific users to debug
+  if (user.username === 'francisbentum' || user.username === 'edgemadzi') {
+    console.log(`[DEBUG getMemberAnalytics] ${user.username}: baseBalance=${baseLeaveBalance}, remainingBalance=${remainingLeaveBalance}, approvedRequests=${approvedRequestsForCalculation.length}`);
+  }
   
   // Calculate surplus balance
   const surplusBalance = calculateSurplusBalance(user.manualLeaveBalance, team.settings.maxLeavePerYear);
@@ -534,6 +558,7 @@ export const getMemberAnalytics = (
     usableDays,
     realisticUsableDays,
     remainingLeaveBalance,
+    baseLeaveBalance,
     workingDaysUsed,
     workingDaysInYear,
     willCarryover,
@@ -557,7 +582,10 @@ export const getTeamAnalytics = (
   const allApprovedRequests = allRequests.filter(req => req.status === 'approved');
   
   const memberAnalytics = memberMembers.map(member => {
-    const memberRequests = allRequests.filter(req => req.userId === member._id);
+    // Filter to only approved requests for this member (matching leave balance page logic)
+    const memberRequests = allRequests.filter(req => 
+      req.userId === member._id && req.status === 'approved'
+    );
     const analytics = getMemberAnalytics(
       member,
       team,
@@ -617,7 +645,35 @@ export const getGroupedTeamAnalytics = (
   
   // Calculate analytics for all members
   const memberAnalytics = memberMembers.map(member => {
-    const memberRequests = allRequests.filter(req => req.userId === member._id);
+    // Filter to only approved requests for this member (matching leave balance page logic)
+    const memberRequests = allRequests.filter(req => {
+      // Convert userId to string for comparison (handle both string and ObjectId types)
+      const reqUserId = req.userId ? String(req.userId) : '';
+      const memberId = member._id ? String(member._id) : '';
+      return reqUserId === memberId && req.status === 'approved';
+    });
+    
+    // Debug logging for specific users
+    if (member.username === 'francisbentum' || member.username === 'edgemadzi') {
+      console.log(`[DEBUG getGroupedTeamAnalytics] ${member.username}:`);
+      console.log(`  member._id: ${member._id} (type: ${typeof member._id})`);
+      console.log(`  memberRequests.length=${memberRequests.length}, manualLeaveBalance=${member.manualLeaveBalance}`);
+      console.log(`  allRequests.length=${allRequests.length}`);
+      memberRequests.forEach((req, idx) => {
+        console.log(`  Request ${idx + 1}: userId=${req.userId} (type: ${typeof req.userId}), ${req.startDate} to ${req.endDate}, status=${req.status}`);
+      });
+      // Also check allRequests for this user
+      const allUserRequests = allRequests.filter(req => {
+        const reqUserId = req.userId ? String(req.userId) : '';
+        const memberId = member._id ? String(member._id) : '';
+        return reqUserId === memberId;
+      });
+      console.log(`  All requests for ${member.username}: ${allUserRequests.length}`);
+      allUserRequests.forEach((req, idx) => {
+        console.log(`    All Request ${idx + 1}: userId=${req.userId}, ${req.startDate} to ${req.endDate}, status=${req.status}`);
+      });
+    }
+    
     const analytics = getMemberAnalytics(
       member,
       team,
@@ -625,6 +681,11 @@ export const getGroupedTeamAnalytics = (
       allApprovedRequests,
       members
     );
+    
+    // Debug logging for specific users
+    if (member.username === 'francisbentum' || member.username === 'edgemadzi') {
+      console.log(`[DEBUG getGroupedTeamAnalytics] ${member.username}: remainingLeaveBalance=${analytics.remainingLeaveBalance}, baseLeaveBalance=${analytics.baseLeaveBalance}`);
+    }
     
     return {
       userId: member._id || '',
