@@ -452,15 +452,36 @@ export default function LeaderAnalyticsPage() {
                             <div className="flex items-center space-x-4 text-sm">
                               <div className="text-right">
                                 <p className="text-xs text-gray-500">Balance</p>
-                                <p className="font-medium text-gray-900">
-                                  {Math.round(member.analytics.remainingLeaveBalance)}
-                                  <span className="ml-1 text-xs text-gray-500">(remaining)</span>
-                                  {member.analytics.surplusBalance > 0 && (
-                                    <span className="ml-1 text-xs text-green-600">
-                                      (+{Math.round(member.analytics.surplusBalance)})
-                                    </span>
-                                  )}
-                                </p>
+                                {(() => {
+                                  // Color balance text based on realistic usable days vs remaining balance
+                                  const realisticUsableDays = member.analytics.realisticUsableDays ?? 0;
+                                  const remainingBalance = member.analytics.remainingLeaveBalance;
+                                  const balanceColor = realisticUsableDays >= remainingBalance
+                                    ? 'text-green-600' // Good - can use all days
+                                    : (() => {
+                                        const realisticPercentage = remainingBalance > 0
+                                          ? (realisticUsableDays / remainingBalance) * 100
+                                          : 0;
+                                        if (realisticPercentage < 30) {
+                                          return 'text-red-600'; // Very bad - will lose most days
+                                        } else if (realisticPercentage < 70) {
+                                          return 'text-orange-600'; // Moderate - will lose some days
+                                        } else {
+                                          return 'text-red-500'; // Bad - will lose some days
+                                        }
+                                      })();
+                                  return (
+                                    <p className={`font-medium ${balanceColor}`}>
+                                      {Math.round(member.analytics.remainingLeaveBalance)}
+                                      <span className="ml-1 text-xs text-gray-500">(remaining)</span>
+                                      {member.analytics.surplusBalance > 0 && (
+                                        <span className="ml-1 text-xs text-green-600">
+                                          (+{Math.round(member.analytics.surplusBalance)})
+                                        </span>
+                                      )}
+                                    </p>
+                                  );
+                                })()}
                                 {/* Show base balance if different from remaining balance */}
                                 {Math.round(member.analytics.baseLeaveBalance) !== Math.round(member.analytics.remainingLeaveBalance) && (
                                   <p className="text-xs text-gray-600 mt-0.5">

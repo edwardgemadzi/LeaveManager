@@ -61,9 +61,9 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
-    const { fullName, shiftTag, subgroupTag, manualLeaveBalance } = body;
+    const { fullName, shiftTag, subgroupTag, manualLeaveBalance, manualYearToDateUsed } = body;
 
-    if (!fullName && shiftTag === undefined && subgroupTag === undefined && manualLeaveBalance === undefined) {
+    if (!fullName && shiftTag === undefined && subgroupTag === undefined && manualLeaveBalance === undefined && manualYearToDateUsed === undefined) {
       return NextResponse.json(
         { error: 'At least one field is required' },
         { status: 400 }
@@ -93,8 +93,8 @@ export async function PATCH(
     }
 
     // Build update object
-    const updateData: { fullName?: string; shiftTag?: string; subgroupTag?: string; manualLeaveBalance?: number } = {};
-    const unsetData: { manualLeaveBalance?: string } = {};
+    const updateData: { fullName?: string; shiftTag?: string; subgroupTag?: string; manualLeaveBalance?: number; manualYearToDateUsed?: number } = {};
+    const unsetData: { manualLeaveBalance?: string; manualYearToDateUsed?: string } = {};
     let shouldUnset = false;
     
     if (fullName) updateData.fullName = fullName;
@@ -127,6 +127,32 @@ export async function PATCH(
         }
         
         updateData.manualLeaveBalance = manualLeaveBalance;
+      }
+    }
+    if (manualYearToDateUsed !== undefined) {
+      // If manualYearToDateUsed is null, remove it (use calculated value)
+      if (manualYearToDateUsed === null) {
+        unsetData.manualYearToDateUsed = '';
+        shouldUnset = true;
+      } else {
+        // Validate manualYearToDateUsed is a number and not negative
+        if (typeof manualYearToDateUsed !== 'number' || manualYearToDateUsed < 0) {
+          return NextResponse.json(
+            { error: 'manualYearToDateUsed must be a non-negative number' },
+            { status: 400 }
+          );
+        }
+        
+        // Validate maximum limit to prevent abuse (100 days should be sufficient for year-to-date)
+        const MAX_MANUAL_DAYS_TAKEN = 100;
+        if (manualYearToDateUsed > MAX_MANUAL_DAYS_TAKEN) {
+          return NextResponse.json(
+            { error: `manualYearToDateUsed cannot exceed ${MAX_MANUAL_DAYS_TAKEN} days` },
+            { status: 400 }
+          );
+        }
+        
+        updateData.manualYearToDateUsed = manualYearToDateUsed;
       }
     }
 

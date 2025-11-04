@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
         subgroupTag: currentUser.subgroupTag,
         // Include manualLeaveBalance for current user (they can see their own)
         manualLeaveBalance: currentUser.manualLeaveBalance,
+        manualYearToDateUsed: currentUser.manualYearToDateUsed,
       } : null,
       members: allMembers.map(member => {
         const baseMember = {
@@ -63,11 +64,12 @@ export async function GET(request: NextRequest) {
           createdAt: member.createdAt,
         };
         
-        // Include manualLeaveBalance for leaders (to edit balances) or if it's the current user's own data
+        // Include manualLeaveBalance and manualYearToDateUsed for leaders (to edit balances) or if it's the current user's own data
         if (isLeader || member._id === user.id) {
           return {
             ...baseMember,
             manualLeaveBalance: member.manualLeaveBalance,
+            manualYearToDateUsed: member.manualYearToDateUsed,
           };
         }
         

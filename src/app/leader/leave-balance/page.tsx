@@ -5,6 +5,7 @@ import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { Team, User, LeaveRequest } from '@/types';
 import { calculateLeaveBalance, countWorkingDays, calculateSurplusBalance } from '@/lib/leaveCalculations';
+import { calculateUsableDays, calculateMembersSharingSameShift } from '@/lib/analyticsCalculations';
 
 export default function LeaderLeaveBalancePage() {
   const [team, setTeam] = useState<Team | null>(null);
@@ -15,6 +16,8 @@ export default function LeaderLeaveBalancePage() {
   const [filterBy, setFilterBy] = useState<'all' | 'low' | 'high'>('all');
   const [editingBalance, setEditingBalance] = useState<string | null>(null);
   const [tempBalance, setTempBalance] = useState<string>('');
+  const [editingDaysTaken, setEditingDaysTaken] = useState<string | null>(null);
+  const [tempDaysTaken, setTempDaysTaken] = useState<string>('');
   const [updating, setUpdating] = useState<string | null>(null);
 
   // Extract fetchData function to be reusable
@@ -130,34 +133,73 @@ export default function LeaderLeaveBalancePage() {
       endDate: new Date(req.endDate)
     }));
     
+    // Use manualYearToDateUsed if set, otherwise use calculated value
+    const yearToDateUsed = member.manualYearToDateUsed !== undefined 
+      ? member.manualYearToDateUsed 
+      : yearToDateWorkingDays;
+    
     const remainingBalance = calculateLeaveBalance(
       team?.settings.maxLeavePerYear || 20,
       approvedRequestsForCalculation,
       shiftSchedule,
-      member.manualLeaveBalance
+      member.manualLeaveBalance,
+      member.manualYearToDateUsed
     );
 
     // Calculate total days used (all time, not just this year)
-    const totalUsed = approvedRequests.reduce((total, req) => {
+    // First, calculate total from all approved requests
+    const totalFromAllRequests = approvedRequests.reduce((total, req) => {
       const start = new Date(req.startDate);
       const end = new Date(req.endDate);
       return total + countWorkingDays(start, end, shiftSchedule);
     }, 0);
+    
+    // If manualYearToDateUsed is set, replace the current year's year-to-date portion with manual value
+    // Total = (all approved requests) - (calculated current year year-to-date days) + (manualYearToDateUsed)
+    // We use yearToDateWorkingDays which already calculates only up to today
+    const totalUsed = member.manualYearToDateUsed !== undefined
+      ? totalFromAllRequests - yearToDateWorkingDays + member.manualYearToDateUsed
+      : totalFromAllRequests;
 
-    // Calculate percentage used
+    // Calculate percentage used - use year-to-date used, not total used
     const maxLeave = team?.settings.maxLeavePerYear || 20;
-    const percentageUsed = maxLeave > 0 ? (totalUsed / maxLeave) * 100 : 0;
+    const percentageUsed = maxLeave > 0 ? (yearToDateUsed / maxLeave) * 100 : 0;
 
     // Calculate surplus balance
     const surplusBalance = calculateSurplusBalance(member.manualLeaveBalance, maxLeave);
 
+    // Calculate realistic usable days (factors in members sharing same schedule)
+    const membersSharingSameShift = calculateMembersSharingSameShift(member, members);
+    const usableDays = team ? calculateUsableDays(
+      member,
+      team,
+      allRequests.filter(req => req.status === 'approved'),
+      members,
+      shiftSchedule
+    ) : 0;
+    
+    // Realistic usable days divides usable days by members sharing the same shift, capped by remaining leave balance
+    const realisticUsableDays = membersSharingSameShift > 0
+      ? Math.min(
+          Math.round((usableDays / membersSharingSameShift) * 10) / 10,
+          remainingBalance
+        )
+      : Math.min(usableDays, remainingBalance);
+
+    // Calculate willLoseDays (days that will be lost if realisticUsableDays < remainingBalance)
+    const willLoseDays = realisticUsableDays < remainingBalance
+      ? remainingBalance - realisticUsableDays
+      : 0;
+
     return {
       remainingBalance,
       totalUsed,
-      yearToDateUsed: yearToDateWorkingDays,
+      yearToDateUsed,
       totalWorkingDaysInYear,
       percentageUsed,
       surplusBalance,
+      realisticUsableDays,
+      willLoseDays,
       approvedCount: approvedRequests.length,
       pendingCount: memberRequests.filter(req => req.status === 'pending').length,
       rejectedCount: memberRequests.filter(req => req.status === 'rejected').length,
@@ -225,31 +267,48 @@ export default function LeaderLeaveBalancePage() {
     setUpdating(memberId);
     try {
       const token = localStorage.getItem('token');
+      const maxLeave = team?.settings.maxLeavePerYear || 20;
       
-      // Calculate the manual balance by adding back the approved requests
-      const memberRequests = allRequests.filter(req => req.userId === memberId);
-      const approvedRequests = memberRequests.filter(req => req.status === 'approved');
-      
-      const shiftSchedule = member.shiftSchedule || {
-        pattern: [true, true, true, true, true, false, false],
-        startDate: new Date(),
-        type: 'fixed'
-      };
-      
-      const currentYear = new Date().getFullYear();
-      const approvedWorkingDays = approvedRequests
-        .filter(req => new Date(req.startDate).getFullYear() === currentYear)
-        .reduce((total, req) => {
-          const workingDays = countWorkingDays(
-            new Date(req.startDate),
-            new Date(req.endDate),
-            shiftSchedule
-          );
-          return total + workingDays;
+      // Get days used - use manualYearToDateUsed if set, otherwise calculate from approved requests
+      let daysUsed: number;
+      if (member.manualYearToDateUsed !== undefined) {
+        daysUsed = member.manualYearToDateUsed;
+      } else {
+        const memberRequests = allRequests.filter(req => req.userId === memberId);
+        const approvedRequests = memberRequests.filter(req => req.status === 'approved');
+        
+        const shiftSchedule = member.shiftSchedule || {
+          pattern: [true, true, true, true, true, false, false],
+          startDate: new Date(),
+          type: 'fixed'
+        };
+        
+        const currentYear = new Date().getFullYear();
+        const yearStart = new Date(currentYear, 0, 1);
+        yearStart.setHours(0, 0, 0, 0);
+        const yearEnd = new Date(currentYear, 11, 31);
+        yearEnd.setHours(23, 59, 59, 999);
+        
+        daysUsed = approvedRequests.reduce((total, req) => {
+          const reqStart = new Date(req.startDate);
+          const reqEnd = new Date(req.endDate);
+          reqStart.setHours(0, 0, 0, 0);
+          reqEnd.setHours(23, 59, 59, 999);
+          
+          if (reqStart <= yearEnd && reqEnd >= yearStart) {
+            const overlapStart = reqStart > yearStart ? reqStart : yearStart;
+            const overlapEnd = reqEnd < yearEnd ? reqEnd : yearEnd;
+            const workingDays = countWorkingDays(overlapStart, overlapEnd, shiftSchedule);
+            return total + workingDays;
+          }
+          return total;
         }, 0);
+      }
       
-      // Manual balance = desired remaining balance + approved working days
-      const manualBalance = balanceValue + approvedWorkingDays;
+      // Calculate what manualLeaveBalance should be to achieve desired remaining balance
+      // Simplified formula: remainingBalance = manualLeaveBalance - daysUsed
+      // So: manualLeaveBalance = desiredRemaining + daysUsed
+      const manualBalance = balanceValue + daysUsed;
       
       const response = await fetch(`/api/users/${memberId}`, {
         method: 'PATCH',
@@ -320,6 +379,102 @@ export default function LeaderLeaveBalancePage() {
       }
     } catch (error) {
       console.error('Error resetting leave balance:', error);
+      alert('Network error. Please try again.');
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const handleEditDaysTaken = (member: User) => {
+    setEditingDaysTaken(member._id || null);
+    // Get current year-to-date used to show in the input
+    const leaveData = getMemberLeaveData(member);
+    setTempDaysTaken(leaveData.yearToDateUsed.toFixed(1));
+  };
+
+  const handleSaveDaysTaken = async (memberId: string) => {
+    const member = members.find(m => m._id === memberId);
+    if (!member) return;
+
+    const daysTakenValue = parseFloat(tempDaysTaken);
+    if (isNaN(daysTakenValue) || daysTakenValue < 0) {
+      alert('Please enter a valid non-negative number');
+      return;
+    }
+
+    setUpdating(memberId);
+    try {
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch(`/api/users/${memberId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ manualYearToDateUsed: daysTakenValue }),
+      });
+
+      if (response.ok) {
+        // Update member in state
+        setMembers(members.map(m => 
+          m._id === memberId 
+            ? { ...m, manualYearToDateUsed: daysTakenValue }
+            : m
+        ));
+        setEditingDaysTaken(null);
+        setTempDaysTaken('');
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to update days taken');
+      }
+    } catch (error) {
+      console.error('Error updating days taken:', error);
+      alert('Network error. Please try again.');
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const handleCancelEditDaysTaken = () => {
+    setEditingDaysTaken(null);
+    setTempDaysTaken('');
+  };
+
+  const handleResetDaysTaken = async (memberId: string) => {
+    if (!confirm('Reset days taken to auto-calculated? This will remove the manual override.')) {
+      return;
+    }
+
+    setUpdating(memberId);
+    try {
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch(`/api/users/${memberId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ manualYearToDateUsed: null }),
+      });
+
+      if (response.ok) {
+        // Update member in state - remove manualYearToDateUsed
+        setMembers(members.map(m => {
+          if (m._id === memberId) {
+            const updated = { ...m };
+            delete updated.manualYearToDateUsed;
+            return updated;
+          }
+          return m;
+        }));
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to reset days taken');
+      }
+    } catch (error) {
+      console.error('Error resetting days taken:', error);
       alert('Network error. Please try again.');
     } finally {
       setUpdating(null);
@@ -489,11 +644,25 @@ export default function LeaderLeaveBalancePage() {
                     memberList.map((member) => {
                       const leaveData = getMemberLeaveData(member);
                       const maxLeave = team?.settings.maxLeavePerYear || 20;
-                      const percentageColor = leaveData.percentageUsed > 80 
-                        ? 'text-red-600' 
-                        : leaveData.percentageUsed > 60 
-                        ? 'text-orange-600' 
-                        : 'text-green-600';
+                      
+                      // Color based on realistic usable days vs remaining balance
+                      // Green when realisticUsableDays >= remainingBalance (can use all days)
+                      // Red/yellow when realisticUsableDays < remainingBalance (will lose days)
+                      let percentageColor: string;
+                      if (leaveData.realisticUsableDays >= leaveData.remainingBalance) {
+                        percentageColor = 'text-green-600'; // Good - can use all days
+                      } else {
+                        const realisticPercentage = leaveData.remainingBalance > 0
+                          ? (leaveData.realisticUsableDays / leaveData.remainingBalance) * 100
+                          : 0;
+                        if (realisticPercentage < 30) {
+                          percentageColor = 'text-red-600'; // Very bad - will lose most days
+                        } else if (realisticPercentage < 70) {
+                          percentageColor = 'text-orange-600'; // Moderate - will lose some days
+                        } else {
+                          percentageColor = 'text-red-500'; // Bad - will lose some days
+                        }
+                      }
 
                       return (
                         <tr key={member._id} className="hover:bg-gray-50">
@@ -549,6 +718,16 @@ export default function LeaderLeaveBalancePage() {
                                 {member.manualLeaveBalance !== undefined && (
                                   <p className="text-xs text-blue-600">
                                     Base balance: {Math.round(member.manualLeaveBalance)} days
+                                    {member.manualLeaveBalance < maxLeave && (
+                                      <span className="ml-1 text-red-600">
+                                        ({Math.round(maxLeave - member.manualLeaveBalance)} less than team standard of {maxLeave})
+                                      </span>
+                                    )}
+                                    {member.manualLeaveBalance > maxLeave && (
+                                      <span className="ml-1 text-green-600">
+                                        (+{Math.round(member.manualLeaveBalance - maxLeave)} surplus)
+                                      </span>
+                                    )}
                                   </p>
                                 )}
                               </div>
@@ -589,6 +768,16 @@ export default function LeaderLeaveBalancePage() {
                                   {member.manualLeaveBalance !== undefined && Math.round(member.manualLeaveBalance) !== Math.round(leaveData.remainingBalance) && (
                                     <div className="text-xs text-gray-600">
                                       <span className="font-medium">Base balance:</span> {Math.round(member.manualLeaveBalance)} days
+                                      {member.manualLeaveBalance < maxLeave && (
+                                        <span className="ml-2 text-red-600">
+                                          ({Math.round(maxLeave - member.manualLeaveBalance)} less than team standard of {maxLeave})
+                                        </span>
+                                      )}
+                                      {member.manualLeaveBalance > maxLeave && (
+                                        <span className="ml-2 text-green-600">
+                                          (+{Math.round(member.manualLeaveBalance - maxLeave)} surplus)
+                                        </span>
+                                      )}
                                       <span className="ml-2 text-gray-500">
                                         ({Math.round(member.manualLeaveBalance - leaveData.remainingBalance)} days used)
                                       </span>
@@ -605,11 +794,20 @@ export default function LeaderLeaveBalancePage() {
                                 <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
                                   <div
                                     className={`h-2 rounded-full ${
-                                      leaveData.remainingBalance < maxLeave * 0.3
-                                        ? 'bg-red-500'
-                                        : leaveData.remainingBalance < maxLeave * 0.7
-                                        ? 'bg-yellow-500'
-                                        : 'bg-green-500'
+                                      leaveData.realisticUsableDays >= leaveData.remainingBalance
+                                        ? 'bg-green-500' // Good - can use all days
+                                        : (() => {
+                                            const realisticPercentage = leaveData.remainingBalance > 0
+                                              ? (leaveData.realisticUsableDays / leaveData.remainingBalance) * 100
+                                              : 0;
+                                            if (realisticPercentage < 30) {
+                                              return 'bg-red-600'; // Very bad - will lose most days
+                                            } else if (realisticPercentage < 70) {
+                                              return 'bg-yellow-500'; // Moderate - will lose some days
+                                            } else {
+                                              return 'bg-red-500'; // Bad - will lose some days
+                                            }
+                                          })()
                                     }`}
                                     style={{
                                       width: `${Math.min((leaveData.remainingBalance / maxLeave) * 100, 100)}%`
@@ -622,8 +820,62 @@ export default function LeaderLeaveBalancePage() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {Math.round(leaveData.totalUsed)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {Math.round(leaveData.yearToDateUsed)}
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {editingDaysTaken === member._id ? (
+                              <div className="flex items-center space-x-2">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.1"
+                                  value={tempDaysTaken}
+                                  onChange={(e) => setTempDaysTaken(e.target.value)}
+                                  className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => handleSaveDaysTaken(member._id!)}
+                                  disabled={updating === member._id}
+                                  className="text-xs px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={handleCancelEditDaysTaken}
+                                  disabled={updating === member._id}
+                                  className="text-xs px-2 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 disabled:opacity-50"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="group">
+                                <div className="flex items-center space-x-2">
+                                  <div 
+                                    className="text-sm text-gray-900 cursor-pointer hover:text-indigo-600"
+                                    onClick={() => handleEditDaysTaken(member)}
+                                    title="Click to edit days taken"
+                                  >
+                                    {Math.round(leaveData.yearToDateUsed)}
+                                    {member.manualYearToDateUsed !== undefined && (
+                                      <span className="ml-1 text-xs text-blue-600" title="Manual override">✏️</span>
+                                    )}
+                                  </div>
+                                  {member.manualYearToDateUsed !== undefined && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleResetDaysTaken(member._id!);
+                                      }}
+                                      disabled={updating === member._id}
+                                      className="text-xs text-gray-500 hover:text-red-600 disabled:opacity-50"
+                                      title="Reset to auto-calculated"
+                                    >
+                                      ↺
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`text-sm font-medium ${percentageColor}`}>

@@ -159,7 +159,8 @@ export default function LeaderDashboard() {
           maxLeavePerYear,
           approvedRequests,
           member.shiftSchedule,
-          member.manualLeaveBalance
+          member.manualLeaveBalance,
+          member.manualYearToDateUsed
         );
 
         const surplus = calculateSurplusBalance(member.manualLeaveBalance, maxLeavePerYear);

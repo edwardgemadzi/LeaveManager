@@ -10,6 +10,7 @@ export interface User {
   workingDaysTag?: string; // Automatic tag grouping members who work on exactly the same days
   subgroupTag?: string; // Custom subgroup name assigned by leader (only when enableSubgrouping is true)
   manualLeaveBalance?: number; // Manual leave balance override set by leader (for members joining mid-year)
+  manualYearToDateUsed?: number; // Manual year-to-date used days override set by leader
   createdAt: Date;
 }
 

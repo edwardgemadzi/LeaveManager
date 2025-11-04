@@ -128,7 +128,8 @@ export default function MemberDashboard() {
       team.settings.maxLeavePerYear,
       approvedRequests,
       user.shiftSchedule || { pattern: [true, true, true, true, true, false, false], startDate: new Date(), type: 'rotating' },
-      user.manualLeaveBalance
+      user.manualLeaveBalance,
+      user.manualYearToDateUsed
     );
     
     const surplus = calculateSurplusBalance(user.manualLeaveBalance, team.settings.maxLeavePerYear);
@@ -216,9 +217,30 @@ export default function MemberDashboard() {
               <div className="p-6">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
-                    <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg">
-                      <span className="text-white text-xl">📅</span>
-                    </div>
+                    {(() => {
+                      // Color icon based on realistic usable days vs remaining balance
+                      const realisticUsableDays = analytics?.realisticUsableDays ?? 0;
+                      const remainingBalance = leaveBalance.balance;
+                      const iconColor = realisticUsableDays >= remainingBalance
+                        ? 'from-green-500 to-green-600' // Good - can use all days
+                        : (() => {
+                            const realisticPercentage = remainingBalance > 0
+                              ? (realisticUsableDays / remainingBalance) * 100
+                              : 0;
+                            if (realisticPercentage < 30) {
+                              return 'from-red-500 to-red-600'; // Very bad - will lose most days
+                            } else if (realisticPercentage < 70) {
+                              return 'from-yellow-500 to-yellow-600'; // Moderate - will lose some days
+                            } else {
+                              return 'from-orange-500 to-orange-600'; // Bad - will lose some days
+                            }
+                          })();
+                      return (
+                        <div className={`w-12 h-12 bg-gradient-to-r ${iconColor} rounded-xl flex items-center justify-center shadow-lg`}>
+                          <span className="text-white text-xl">📅</span>
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div className="ml-5 flex-1">
                     <dl>
@@ -245,7 +267,52 @@ export default function MemberDashboard() {
                           </span>
                         </dd>
                       )}
+                      {analytics && (() => {
+                        const realisticUsableDays = analytics.realisticUsableDays ?? 0;
+                        const remainingBalance = leaveBalance.balance;
+                        const willLoseDays = realisticUsableDays < remainingBalance ? remainingBalance - realisticUsableDays : 0;
+                        if (willLoseDays > 0) {
+                          return (
+                            <dd className="mt-2">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                ⚠️ {Math.round(willLoseDays)} days at risk of being lost
+                              </span>
+                            </dd>
+                          );
+                        }
+                        return null;
+                      })()}
                     </dl>
+                    {analytics && (() => {
+                      const realisticUsableDays = analytics.realisticUsableDays ?? 0;
+                      const remainingBalance = leaveBalance.balance;
+                      const maxLeave = team?.settings.maxLeavePerYear || 20;
+                      return (
+                        <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
+                          <div
+                            className={`h-2 rounded-full ${
+                              realisticUsableDays >= remainingBalance
+                                ? 'bg-green-500' // Good - can use all days
+                                : (() => {
+                                    const realisticPercentage = remainingBalance > 0
+                                      ? (realisticUsableDays / remainingBalance) * 100
+                                      : 0;
+                                    if (realisticPercentage < 30) {
+                                      return 'bg-red-600'; // Very bad - will lose most days
+                                    } else if (realisticPercentage < 70) {
+                                      return 'bg-yellow-500'; // Moderate - will lose some days
+                                    } else {
+                                      return 'bg-red-500'; // Bad - will lose some days
+                                    }
+                                  })()
+                            }`}
+                            style={{
+                              width: `${Math.min((remainingBalance / maxLeave) * 100, 100)}%`
+                            }}
+                          ></div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

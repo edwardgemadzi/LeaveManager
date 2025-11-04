@@ -52,7 +52,8 @@ export const calculateLeaveBalance = (
   maxLeavePerYear: number,
   approvedRequests: Array<{ startDate: Date; endDate: Date }>,
   shiftSchedule: ShiftSchedule,
-  manualLeaveBalance?: number
+  manualLeaveBalance?: number,
+  manualYearToDateUsed?: number
 ): number => {
   const currentYear = new Date().getFullYear();
   const yearStart = new Date(currentYear, 0, 1);
@@ -83,10 +84,14 @@ export const calculateLeaveBalance = (
     return total;
   }, 0);
 
-  // If manual balance is set, use it as the base and subtract approved requests
-  // Otherwise, use the standard calculation
+  // Simplified base balance logic:
+  // - If manualLeaveBalance is set, always use it as base (whether above or below maxLeavePerYear)
+  // - If manualLeaveBalance is not set, use maxLeavePerYear
   const baseBalance = manualLeaveBalance !== undefined ? manualLeaveBalance : maxLeavePerYear;
-  const remainingBalance = baseBalance - approvedWorkingDays;
+  
+  // If manualYearToDateUsed is set, use it instead of calculated approved working days
+  const daysUsed = manualYearToDateUsed !== undefined ? manualYearToDateUsed : approvedWorkingDays;
+  const remainingBalance = baseBalance - daysUsed;
   
   // Debug logging for specific cases
   if (manualLeaveBalance !== undefined && approvedRequests.length > 0 && approvedWorkingDays === 0) {

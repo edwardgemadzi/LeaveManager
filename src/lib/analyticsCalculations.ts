@@ -499,7 +499,9 @@ export const getMemberAnalytics = (
       endDate: new Date(req.endDate)
     }));
   
-  // Calculate base balance (manualLeaveBalance if set, otherwise maxLeavePerYear)
+  // Calculate base balance (same simplified logic as calculateLeaveBalance):
+  // - If manualLeaveBalance is set, always use it as base (whether above or below maxLeavePerYear)
+  // - If manualLeaveBalance is not set, use maxLeavePerYear
   const baseLeaveBalance = user.manualLeaveBalance !== undefined ? user.manualLeaveBalance : team.settings.maxLeavePerYear;
   
   // Debug: Log if approvedRequests is empty but manualLeaveBalance is set
@@ -511,7 +513,8 @@ export const getMemberAnalytics = (
     team.settings.maxLeavePerYear,
     approvedRequestsForCalculation,
     shiftSchedule,
-    user.manualLeaveBalance
+    user.manualLeaveBalance,
+    user.manualYearToDateUsed
   );
   
   // Debug: Log if remaining equals base (indicates no approved requests were counted)
