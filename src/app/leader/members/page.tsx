@@ -206,10 +206,10 @@ export default function LeaderMembersPage() {
 
   const getShiftTagColor = (shiftTag?: string) => {
     switch (shiftTag) {
-      case 'day': return 'bg-yellow-100 text-yellow-800';
-      case 'night': return 'bg-purple-100 text-purple-800';
-      case 'mixed': return 'bg-blue-100 text-blue-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'day': return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400';
+      case 'night': return 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-400';
+      case 'mixed': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400';
+      default: return 'bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-300';
     }
   };
 
@@ -405,12 +405,12 @@ export default function LeaderMembersPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 dark:bg-black">
         <Navbar />
         <div className="flex items-center justify-center h-64 pt-24">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-            <p className="text-gray-500 text-lg">Loading team members...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-gray-400 dark:border-t-gray-500 mx-auto mb-4"></div>
+            <p className="text-gray-500 dark:text-gray-400 text-lg">Loading team members...</p>
           </div>
         </div>
       </div>
@@ -418,25 +418,25 @@ export default function LeaderMembersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-black">
       <Navbar />
       
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 pt-24">
         <div className="px-4 py-6 sm:px-0">
-          <h1 className="text-3xl font-bold text-gray-900">Team Members</h1>
-          <p className="mt-2 text-gray-600">Manage your team members and their shift assignments.</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Team Members</h1>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">Manage your team members and their shift assignments.</p>
         </div>
 
-        <div className="bg-white shadow rounded-lg">
+        <div className="bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-100 dark:border-gray-800">
           <div className="px-4 py-5 sm:p-6">
             {/* Filter Section */}
             {members.length > 0 && (
-              <div className="mb-6 space-y-4 border-b border-gray-200 pb-4">
+              <div className="mb-6 space-y-4 border-b border-gray-200 dark:border-gray-800 pb-4">
                 {/* Search and Quick Filters Row */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Search Input */}
                   <div>
-                    <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="search" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Search
                     </label>
                     <input
@@ -445,20 +445,20 @@ export default function LeaderMembersPage() {
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Search by name or username..."
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
                     />
                   </div>
 
                   {/* Shift Tag Filter */}
                   <div>
-                    <label htmlFor="shift-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="shift-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Shift Tag
                     </label>
                     <select
                       id="shift-filter"
                       value={filterShiftTag}
                       onChange={(e) => setFilterShiftTag(e.target.value)}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
                     >
                       <option value="">All Shifts</option>
                       <option value="day">☀️ Day Shift</option>
@@ -474,14 +474,14 @@ export default function LeaderMembersPage() {
                   {/* Working Days Tag Filter */}
                   {uniqueWorkingDaysTags.length > 0 && (
                     <div>
-                      <label htmlFor="working-days-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="working-days-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Working Days Pattern
                       </label>
                       <select
                         id="working-days-filter"
                         value={filterWorkingDaysTag}
                         onChange={(e) => setFilterWorkingDaysTag(e.target.value)}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
                       >
                         <option value="">All Patterns</option>
                         {uniqueWorkingDaysTags
@@ -509,14 +509,14 @@ export default function LeaderMembersPage() {
                   {/* Subgroup Filter */}
                   {uniqueSubgroups.length > 0 && (
                     <div>
-                      <label htmlFor="subgroup-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="subgroup-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Subgroup
                       </label>
                       <select
                         id="subgroup-filter"
                         value={filterSubgroup}
                         onChange={(e) => setFilterSubgroup(e.target.value)}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
                       >
                         <option value="">All Subgroups</option>
                         {uniqueSubgroups.map((subgroup) => (
@@ -530,14 +530,14 @@ export default function LeaderMembersPage() {
 
                   {/* Sort By */}
                   <div>
-                    <label htmlFor="sort-by" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="sort-by" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Sort By
                     </label>
                     <select
                       id="sort-by"
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value as 'name' | 'joinDate')}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
                     >
                       <option value="name">Name (A-Z)</option>
                       <option value="joinDate">Join Date (Newest First)</option>
@@ -547,17 +547,17 @@ export default function LeaderMembersPage() {
 
                 {/* Filter Summary and Clear Button */}
                 <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-600">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
                     Showing <span className="font-medium">{filteredAndSortedMembers.length}</span> of{' '}
                     <span className="font-medium">{members.length}</span> member{members.length !== 1 ? 's' : ''}
                     {hasActiveFilters && (
-                      <span className="ml-2 text-gray-500">(filtered)</span>
+                      <span className="ml-2 text-gray-500 dark:text-gray-400">(filtered)</span>
                     )}
                   </div>
                   {hasActiveFilters && (
                     <button
                       onClick={clearFilters}
-                      className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                      className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium"
                     >
                       Clear All Filters
                     </button>
@@ -568,11 +568,11 @@ export default function LeaderMembersPage() {
 
             {/* Working Days Group Names Management Section */}
             {members.length > 0 && uniqueWorkingDaysTags.length > 0 && (
-              <div className="mb-6 border-t border-gray-200 pt-4">
+              <div className="mb-6 border-t border-gray-200 dark:border-gray-800 pt-4">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-lg font-medium text-gray-900">Working Days Group Names</h3>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">Working Days Group Names</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                       Assign custom names to groups of members who work on the same days pattern.
                     </p>
                   </div>
@@ -580,7 +580,7 @@ export default function LeaderMembersPage() {
                     <button
                       onClick={handleSaveGroupNames}
                       disabled={savingGroupNames}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {savingGroupNames ? 'Saving...' : 'Save Names'}
                     </button>
@@ -597,12 +597,12 @@ export default function LeaderMembersPage() {
                     const hasChanges = editingName !== currentName;
                     
                     return (
-                      <div key={tag} className="border rounded-lg p-3 bg-gray-50">
+                      <div key={tag} className="border border-gray-200 dark:border-gray-800 rounded-lg p-3 bg-gray-50 dark:bg-gray-900">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="text-xs font-mono text-gray-600">{tag}</span>
-                              <span className="text-xs text-gray-500">
+                              <span className="text-xs font-mono text-gray-600 dark:text-gray-400">{tag}</span>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">
                                 ({memberCount} {memberCount === 1 ? 'member' : 'members'})
                               </span>
                             </div>
@@ -611,12 +611,12 @@ export default function LeaderMembersPage() {
                               value={editingName}
                               onChange={(e) => handleGroupNameChange(tag, e.target.value)}
                               placeholder="Enter group name..."
-                              className={`w-full text-sm border rounded-md px-2 py-1.5 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 ${
-                                hasChanges ? 'border-indigo-400 bg-white' : 'border-gray-300 bg-white'
+                              className={`w-full text-sm border rounded-md px-2 py-1.5 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 ${
+                                hasChanges ? 'border-indigo-400 dark:border-indigo-500' : 'border-gray-300 dark:border-gray-700'
                               }`}
                             />
                             {currentName && !hasChanges && (
-                              <p className="text-xs text-green-600 mt-1">✓ {currentName}</p>
+                              <p className="text-xs text-green-600 dark:text-green-400 mt-1">✓ {currentName}</p>
                             )}
                           </div>
                         </div>
@@ -626,7 +626,7 @@ export default function LeaderMembersPage() {
                 </div>
                 
                 {Object.keys(editingGroupNames).length === 0 && (
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                     Click on any input above to start editing group names. Changes will be saved for all members with that pattern.
                   </p>
                 )}
@@ -634,14 +634,14 @@ export default function LeaderMembersPage() {
             )}
 
             {members.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No team members found.</p>
+              <p className="text-gray-500 dark:text-gray-400 text-center py-8">No team members found.</p>
             ) : filteredAndSortedMembers.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-gray-500">No members match your filters.</p>
+                <p className="text-gray-500 dark:text-gray-400">No members match your filters.</p>
                 {hasActiveFilters && (
                   <button
                     onClick={clearFilters}
-                    className="mt-2 text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                    className="mt-2 text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium"
                   >
                     Clear filters to see all members
                   </button>
@@ -650,13 +650,13 @@ export default function LeaderMembersPage() {
             ) : (
               <div className="space-y-4">
                 {filteredAndSortedMembers.map((member) => (
-                  <div key={member._id} className="border rounded-lg p-4 sm:p-6 hover:bg-gray-50 transition-colors">
+                  <div key={member._id} className="border border-gray-200 dark:border-gray-800 rounded-lg p-4 sm:p-6 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors bg-white dark:bg-gray-900">
                     <div className="space-y-4">
                       {/* Header Section */}
                       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start space-y-3 sm:space-y-0">
                         <div className="flex-1">
                           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                            <h4 className="text-lg font-medium text-gray-900">
+                            <h4 className="text-lg font-medium text-gray-900 dark:text-white">
                               {member.fullName || member.username}
                             </h4>
                             {member.role !== 'leader' && (
@@ -665,12 +665,12 @@ export default function LeaderMembersPage() {
                               </span>
                             )}
                             {member.role === 'leader' && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400">
                                 👑 Leader
                               </span>
                             )}
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                             Username: {member.username}
                           </p>
                           {member.shiftSchedule && (() => {
@@ -682,11 +682,11 @@ export default function LeaderMembersPage() {
                             if (workingDaysTag && workingDaysTag !== 'no-schedule') {
                               return (
                                 <div className="flex items-center gap-2 mt-1">
-                                  <span className="text-xs text-gray-500">Working Days:</span>
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">Working Days:</span>
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400">
                                     {getWorkingDaysGroupDisplayName(workingDaysTag, team?.settings)}
                                     {team?.settings?.workingDaysGroupNames?.[workingDaysTag] && (
-                                      <span className="ml-1 text-gray-500 font-mono text-[10px]">
+                                      <span className="ml-1 text-gray-500 dark:text-gray-400 font-mono text-[10px]">
                                         ({workingDaysTag.substring(0, 6)}{workingDaysTag.length > 6 ? '...' : ''})
                                       </span>
                                     )}
@@ -698,21 +698,21 @@ export default function LeaderMembersPage() {
                           })()}
                           {team?.settings.enableSubgrouping && member.subgroupTag && (
                             <div className="flex items-center gap-2 mt-1">
-                              <span className="text-xs text-gray-500">Subgroup:</span>
-                              <span className="text-xs font-medium bg-purple-50 text-purple-700 px-2 py-0.5 rounded">
+                              <span className="text-xs text-gray-500 dark:text-gray-400">Subgroup:</span>
+                              <span className="text-xs font-medium bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 px-2 py-0.5 rounded">
                                 {member.subgroupTag}
                               </span>
                             </div>
                           )}
                           {team?.settings.enableSubgrouping && !member.subgroupTag && (
                             <div className="flex items-center gap-2 mt-1">
-                              <span className="text-xs text-gray-500">Subgroup:</span>
-                              <span className="text-xs font-medium bg-gray-50 text-gray-600 px-2 py-0.5 rounded">
+                              <span className="text-xs text-gray-500 dark:text-gray-400">Subgroup:</span>
+                              <span className="text-xs font-medium bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded">
                                 Ungrouped
                               </span>
                             </div>
                           )}
-                          <p className="text-sm text-gray-600">
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
                             Joined: {member.createdAt ? new Date(member.createdAt).toLocaleDateString() : 'Unknown'}
                           </p>
                         </div>
@@ -722,12 +722,12 @@ export default function LeaderMembersPage() {
                           <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
                             {/* Shift Tag Selector */}
                             <div className="flex items-center space-x-2">
-                              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Shift:</label>
+                              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Shift:</label>
                               <select
                                 value={member.shiftTag || ''}
                                 onChange={(e) => handleUpdateShiftTag(member._id!, e.target.value as 'day' | 'night' | 'mixed')}
                                 disabled={updating === member._id}
-                                className="text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 min-w-0 flex-1"
+                                className="text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 disabled:opacity-50 min-w-0 flex-1"
                               >
                                 <option value="">Select shift</option>
                                 <option value="day">☀️ Day Shift</option>
@@ -740,7 +740,7 @@ export default function LeaderMembersPage() {
                             <button
                               onClick={() => handleDeleteMember(member._id!, member.fullName || member.username)}
                               disabled={deleting === member._id}
-                              className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                              className="bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                             >
                               {deleting === member._id ? 'Removing...' : 'Remove'}
                             </button>
@@ -750,9 +750,9 @@ export default function LeaderMembersPage() {
                       
                       {/* Subgroup Section - Only for members when subgrouping is enabled */}
                       {member.role !== 'leader' && team?.settings.enableSubgrouping && team?.settings.subgroups && team.settings.subgroups.length >= 2 && (
-                        <div className="border-t border-gray-200 pt-4">
+                        <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
                           <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
-                            <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Subgroup:</label>
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Subgroup:</label>
                             <select
                               value={member.subgroupTag || ''}
                               onChange={(e) => {
@@ -767,7 +767,7 @@ export default function LeaderMembersPage() {
                                 handleUpdateSubgroup(member._id!, newValue);
                               }}
                               disabled={updating === member._id}
-                              className="text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 flex-1 max-w-xs"
+                              className="text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 disabled:opacity-50 flex-1 max-w-xs"
                             >
                               <option value="">Ungrouped</option>
                               {team.settings.subgroups.map((subgroupName) => (
@@ -777,7 +777,7 @@ export default function LeaderMembersPage() {
                               ))}
                             </select>
                           </div>
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                             Members in the same subgroup share concurrent leave limits and analytics.
                           </p>
                         </div>
@@ -785,11 +785,11 @@ export default function LeaderMembersPage() {
 
                       {/* Schedule Section - Only for members */}
                       {member.role !== 'leader' && (
-                        <div className="border-t border-gray-200 pt-4">
+                        <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
                           {editingSchedule === member._id ? (
                             <div className="space-y-3">
-                              <div className="border rounded-lg p-4 bg-gray-50">
-                                <h5 className="text-sm font-medium text-gray-700 mb-3">Edit Shift Schedule</h5>
+                              <div className="border border-gray-200 dark:border-gray-800 rounded-lg p-4 bg-gray-50 dark:bg-gray-900">
+                                <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Edit Shift Schedule</h5>
                                 <ShiftScheduleBuilder 
                                   onScheduleChange={setTempSchedule}
                                   initialSchedule={tempSchedule || undefined}
@@ -801,13 +801,13 @@ export default function LeaderMembersPage() {
                                 <button
                                   onClick={() => handleSaveSchedule(member._id!)}
                                   disabled={updating === member._id}
-                                  className="bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+                                  className="bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
                                 >
                                   {updating === member._id ? 'Saving...' : 'Save Schedule'}
                                 </button>
                                 <button
                                   onClick={handleCancelEdit}
-                                  className="bg-gray-500 hover:bg-gray-600 text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
+                                  className="bg-gray-500 hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-700 text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
                                 >
                                   Cancel
                                 </button>
@@ -815,7 +815,7 @@ export default function LeaderMembersPage() {
                             </div>
                           ) : (
                             <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
-                              <p className="text-sm text-gray-600">
+                              <p className="text-sm text-gray-600 dark:text-gray-400">
                                 Schedule: {member.shiftSchedule?.type === 'rotating' ? 'Rotating' : 'Fixed'} 
                                 {member.shiftSchedule?.pattern && (
                                   <span className="ml-2">
@@ -825,7 +825,7 @@ export default function LeaderMembersPage() {
                               </p>
                               <button
                                 onClick={() => handleEditSchedule(member)}
-                                className="text-blue-600 hover:text-blue-800 text-sm font-medium self-start"
+                                className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm font-medium self-start"
                               >
                                 Edit
                               </button>
@@ -842,13 +842,13 @@ export default function LeaderMembersPage() {
         </div>
 
         {/* Shift Information */}
-        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="text-sm font-medium text-blue-900 mb-2">💡 Shift Tag Information</h3>
-          <div className="text-sm text-blue-800 space-y-1">
+        <div className="mt-6 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <h3 className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-2">💡 Shift Tag Information</h3>
+          <div className="text-sm text-blue-800 dark:text-blue-400 space-y-1">
             <p><strong>☀️ Day Shift:</strong> Members who primarily work during day hours</p>
             <p><strong>🌙 Night Shift:</strong> Members who primarily work during night hours</p>
             <p><strong>🔄 Mixed Shifts:</strong> Members who work both day and night shifts</p>
-            <p className="mt-2 text-blue-700">
+            <p className="mt-2 text-blue-700 dark:text-blue-400">
               <strong>Note:</strong> Shift tags help with concurrent leave management - members with different shift tags can take leave simultaneously without affecting coverage. Team leaders don&apos;t need shift tags as they manage the team.
             </p>
           </div>

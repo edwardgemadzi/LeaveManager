@@ -6,6 +6,7 @@ import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { LeaveRequest, User } from '@/types';
 import { getWorkingDays, isWorkingDay } from '@/lib/leaveCalculations';
+import { CheckCircleIcon, ClockIcon, XCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 const localizer = momentLocalizer(moment);
 
@@ -52,16 +53,16 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
   const isMember = currentUser?.role === 'member';
   
   const leaveReasons = useMemo(() => [
-    { value: 'vacation', label: '🏖️ Vacation' },
-    { value: 'sick', label: '🤒 Sick Leave' },
-    { value: 'personal', label: '👤 Personal' },
-    { value: 'family', label: '👨‍👩‍👧‍👦 Family Emergency' },
-    { value: 'medical', label: '🏥 Medical Appointment' },
-    { value: 'bereavement', label: '🕊️ Bereavement' },
-    { value: 'maternity', label: '👶 Maternity/Paternity' },
-    { value: 'study', label: '📚 Study/Education' },
-    { value: 'religious', label: '⛪ Religious Holiday' },
-    { value: 'other', label: '📝 Other (specify below)' },
+    { value: 'vacation', label: 'Vacation' },
+    { value: 'sick', label: 'Sick Leave' },
+    { value: 'personal', label: 'Personal' },
+    { value: 'family', label: 'Family Emergency' },
+    { value: 'medical', label: 'Medical Appointment' },
+    { value: 'bereavement', label: 'Bereavement' },
+    { value: 'maternity', label: 'Maternity/Paternity' },
+    { value: 'study', label: 'Study/Education' },
+    { value: 'religious', label: 'Religious Holiday' },
+    { value: 'other', label: 'Other (specify below)' },
   ], []);
 
   // Fetch team settings for validation
@@ -116,7 +117,7 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
           if (!shiftSchedule) {
             // If no shift schedule, create a single event for the entire period
             const eventTitle = isEmergency 
-              ? `🚨 ${memberName} - ${request.reason}` 
+              ? `[EMERGENCY] ${memberName} - ${request.reason}` 
               : `${memberName} - ${request.reason}`;
               
             calendarEvents.push({
@@ -143,7 +144,7 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
             
             workingDays.forEach((workingDay, index) => {
               const eventTitle = isEmergency 
-                ? `🚨 ${memberName} - ${request.reason}` 
+                ? `[EMERGENCY] ${memberName} - ${request.reason}` 
                 : `${memberName} - ${request.reason}`;
                 
               calendarEvents.push({
@@ -174,7 +175,7 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
   }, [teamId, members]);
 
   const eventStyleGetter = useCallback((event: CalendarEvent) => {
-    // Extract reason from title (format: "Name - Reason" or "🚨 Name - Reason")
+    // Extract reason from title (format: "Name - Reason" or "[EMERGENCY] Name - Reason")
     const titleParts = event.title.split(' - ');
     const reason = titleParts.length > 1 ? titleParts[1].toLowerCase() : '';
     
@@ -384,7 +385,7 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
         
         if (!shiftSchedule) {
           const eventTitle = isEmergency 
-            ? `🚨 ${memberName} - ${request.reason}` 
+            ? `[EMERGENCY] ${memberName} - ${request.reason}` 
             : `${memberName} - ${request.reason}`;
             
           calendarEvents.push({
@@ -410,7 +411,7 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
           
           workingDays.forEach((workingDay, index) => {
             const eventTitle = isEmergency 
-              ? `🚨 ${memberName} - ${request.reason}` 
+              ? `[EMERGENCY] ${memberName} - ${request.reason}` 
               : `${memberName} - ${request.reason}`;
               
             calendarEvents.push({
@@ -605,7 +606,7 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
         <div className="mb-4 flex justify-center">
           <button
             onClick={handleRequestLeave}
-            className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors shadow-lg"
+            className="bg-indigo-600 dark:bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 dark:hover:bg-indigo-700 transition-colors shadow-lg"
           >
             Request Leave ({selectedDates.length} date{selectedDates.length !== 1 ? 's' : ''})
           </button>
@@ -653,10 +654,10 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
       <div className="mt-6 space-y-4">
         {/* Working Days Highlight (only for members) */}
         {currentUser && currentUser.role === 'member' && currentUser.shiftSchedule && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
             <div className="flex items-center">
               <div className="w-6 h-6 rounded mr-2" style={{ backgroundColor: '#f0f9ff', borderLeft: '3px solid #3b82f6' }}></div>
-              <p className="text-sm text-blue-800">
+              <p className="text-sm text-blue-800 dark:text-blue-300">
                 <span className="font-semibold">Highlighted dates</span> indicate your scheduled working days
               </p>
             </div>
@@ -664,58 +665,58 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
         )}
         {/* Status Priority */}
         <div>
-          <h4 className="text-sm font-semibold text-gray-800 mb-2">Status Priority:</h4>
+          <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">Status Priority:</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
             <div className="flex items-center">
               <div className="w-4 h-4 rounded mr-2 font-bold" style={{ backgroundColor: '#dc3545' }}></div>
-              <span className="text-gray-700 font-bold">🚨 Emergency (Always Red)</span>
+              <span className="text-gray-700 dark:text-gray-300 font-bold">Emergency (Always Red)</span>
             </div>
             <div className="flex items-center">
               <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#ffc107' }}></div>
-              <span className="text-gray-700">⏳ Pending (Always Yellow)</span>
+              <span className="text-gray-700 dark:text-gray-300">Pending (Always Yellow)</span>
             </div>
           </div>
         </div>
         
         {/* Approved Leave Types */}
         <div>
-          <h4 className="text-sm font-semibold text-gray-800 mb-2">Approved Leave Types:</h4>
+          <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">Approved Leave Types:</h4>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
             <div className="flex items-center">
               <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#17a2b8' }}></div>
-              <span className="text-gray-700">🏖️ Vacation</span>
+              <span className="text-gray-700 dark:text-gray-300">Vacation</span>
             </div>
             <div className="flex items-center">
               <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#fd7e14' }}></div>
-              <span className="text-gray-700">🤒 Sick Leave</span>
+              <span className="text-gray-700 dark:text-gray-300">Sick Leave</span>
             </div>
             <div className="flex items-center">
               <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#6f42c1' }}></div>
-              <span className="text-gray-700">🏥 Medical</span>
+              <span className="text-gray-700 dark:text-gray-300">Medical</span>
             </div>
             <div className="flex items-center">
               <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#20c997' }}></div>
-              <span className="text-gray-700">👨‍👩‍👧‍👦 Family</span>
+              <span className="text-gray-700 dark:text-gray-300">Family</span>
             </div>
             <div className="flex items-center">
               <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#6c757d' }}></div>
-              <span className="text-gray-700">👤 Personal</span>
+              <span className="text-gray-700 dark:text-gray-300">Personal</span>
             </div>
             <div className="flex items-center">
               <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#e83e8c' }}></div>
-              <span className="text-gray-700">👶 Maternity/Paternity</span>
+              <span className="text-gray-700 dark:text-gray-300">Maternity/Paternity</span>
             </div>
             <div className="flex items-center">
               <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#6c757d' }}></div>
-              <span className="text-gray-700">🕊️ Bereavement</span>
+              <span className="text-gray-700 dark:text-gray-300">Bereavement</span>
             </div>
             <div className="flex items-center">
               <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#20c997' }}></div>
-              <span className="text-gray-700">📚 Study/Education</span>
+              <span className="text-gray-700 dark:text-gray-300">Study/Education</span>
             </div>
             <div className="flex items-center">
               <div className="w-4 h-4 rounded mr-2" style={{ backgroundColor: '#ffc107' }}></div>
-              <span className="text-gray-700">⛪ Religious</span>
+              <span className="text-gray-700 dark:text-gray-300">Religious</span>
             </div>
           </div>
         </div>
@@ -752,19 +753,21 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
               });
               
               const statusConfig = {
-                'approved': { color: 'text-green-600', bg: 'bg-green-100', icon: '✅' },
-                'pending': { color: 'text-yellow-600', bg: 'bg-yellow-100', icon: '⏳' },
-                'rejected': { color: 'text-red-600', bg: 'bg-red-100', icon: '❌' }
+                'approved': { color: 'text-green-600', bg: 'bg-green-100', Icon: CheckCircleIcon },
+                'pending': { color: 'text-yellow-600', bg: 'bg-yellow-100', Icon: ClockIcon },
+                'rejected': { color: 'text-red-600', bg: 'bg-red-100', Icon: XCircleIcon }
               };
               
               const status = selectedEvent.resource.isEmergency 
-                ? { color: 'text-red-600', bg: 'bg-red-100', icon: '🚨' }
+                ? { color: 'text-red-600', bg: 'bg-red-100', Icon: ExclamationTriangleIcon }
                 : statusConfig[selectedEvent.resource.status as keyof typeof statusConfig];
+              
+              const StatusIcon = status.Icon;
               
               return (
                 <div className="space-y-4">
                   <div className="flex items-center space-x-3">
-                    <span className="text-2xl">{status.icon}</span>
+                    <StatusIcon className="h-8 w-8 text-gray-700" />
                     <div>
                       <p className="font-semibold text-gray-900">{memberName}</p>
                       <p className="text-sm text-gray-600">@{selectedEvent.resource.username}</p>
@@ -914,8 +917,9 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
                 )}
 
                 {teamSettings?.minimumNoticePeriod && teamSettings.minimumNoticePeriod > 0 && (
-                  <p className="mt-2 text-xs text-gray-500">
-                    ⚠️ Leave requests must be submitted at least {teamSettings.minimumNoticePeriod} day(s) in advance
+                  <p className="mt-2 text-xs text-gray-500 flex items-center gap-2">
+                    <ExclamationTriangleIcon className="h-4 w-4 text-orange-600" />
+                    Leave requests must be submitted at least {teamSettings.minimumNoticePeriod} day(s) in advance
                   </p>
                 )}
               </div>

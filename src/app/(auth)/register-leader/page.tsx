@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { SunIcon, MoonIcon } from '@heroicons/react/24/outline';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function RegisterLeaderPage() {
   const [formData, setFormData] = useState({
@@ -16,6 +18,7 @@ export default function RegisterLeaderPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
+  const { theme, toggleTheme } = useTheme();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,15 +64,29 @@ export default function RegisterLeaderPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-black py-12 px-4 sm:px-6 lg:px-8">
+      <div className="absolute top-4 right-4">
+        <button
+          onClick={toggleTheme}
+          className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors duration-200"
+          aria-label="Toggle dark mode"
+          title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+        >
+          {theme === 'light' ? (
+            <MoonIcon className="h-5 w-5" />
+          ) : (
+            <SunIcon className="h-5 w-5" />
+          )}
+        </button>
+      </div>
       <div className="max-w-md w-full space-y-8">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
             Create a new team
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
             Already have an account?{' '}
-            <Link href="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+            <Link href="/login" className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300">
               Sign in
             </Link>
           </p>
@@ -77,7 +94,7 @@ export default function RegisterLeaderPage() {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Full Name
               </label>
               <input
@@ -85,7 +102,7 @@ export default function RegisterLeaderPage() {
                 name="fullName"
                 type="text"
                 required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
                 placeholder="Your full name"
                 value={formData.fullName}
                 onChange={(e) => {
@@ -98,7 +115,7 @@ export default function RegisterLeaderPage() {
             </div>
 
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Username
               </label>
               <input
@@ -106,7 +123,7 @@ export default function RegisterLeaderPage() {
                 name="username"
                 type="text"
                 required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
                 placeholder="Your username"
                 value={formData.username}
                 onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase() })}
@@ -114,7 +131,7 @@ export default function RegisterLeaderPage() {
             </div>
             
             <div>
-              <label htmlFor="teamName" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="teamName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Team Name
               </label>
               <input
@@ -122,7 +139,7 @@ export default function RegisterLeaderPage() {
                 name="teamName"
                 type="text"
                 required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
                 placeholder="Your team name"
                 value={formData.teamName}
                 onChange={(e) => setFormData({ ...formData, teamName: e.target.value })}
@@ -130,7 +147,7 @@ export default function RegisterLeaderPage() {
             </div>
 
             <div>
-              <label htmlFor="teamUsername" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="teamUsername" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Team Username
               </label>
               <input
@@ -138,18 +155,18 @@ export default function RegisterLeaderPage() {
                 name="teamUsername"
                 type="text"
                 required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
                 placeholder="Unique team identifier"
                 value={formData.teamUsername}
                 onChange={(e) => setFormData({ ...formData, teamUsername: e.target.value })}
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 This will be used by team members to join your team
               </p>
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Password
               </label>
               <input
@@ -157,7 +174,7 @@ export default function RegisterLeaderPage() {
                 name="password"
                 type="password"
                 required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
                 placeholder="Password"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -165,7 +182,7 @@ export default function RegisterLeaderPage() {
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Confirm Password
               </label>
               <input
@@ -173,7 +190,7 @@ export default function RegisterLeaderPage() {
                 name="confirmPassword"
                 type="password"
                 required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
                 placeholder="Confirm password"
                 value={formData.confirmPassword}
                 onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
@@ -182,14 +199,14 @@ export default function RegisterLeaderPage() {
           </div>
 
           {error && (
-            <div className="text-red-600 text-sm text-center">{error}</div>
+            <div className="text-red-600 dark:text-red-400 text-sm text-center bg-red-50 dark:bg-red-900/30 p-3 rounded-md border border-red-200 dark:border-red-800">{error}</div>
           )}
 
           <div>
             <button
               type="submit"
               disabled={isLoading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-900 disabled:opacity-50"
             >
               {isLoading ? 'Creating team...' : 'Create team'}
             </button>

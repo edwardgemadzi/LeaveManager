@@ -161,7 +161,7 @@ export default function LeaderProfilePage() {
   if (loading) {
     return (
       <ProtectedRoute requiredRole="leader">
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gray-50 dark:bg-black">
           <Navbar />
           <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 pt-24">
             <div className="flex justify-center items-center h-64">
@@ -175,38 +175,38 @@ export default function LeaderProfilePage() {
 
   return (
     <ProtectedRoute requiredRole="leader">
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 dark:bg-black">
         <Navbar />
         <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 pt-24">
           <div className="px-4 py-6 sm:px-0">
-            <h1 className="text-3xl font-bold text-gray-900">My Profile</h1>
-            <p className="mt-2 text-gray-600">Manage your account settings and password.</p>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Profile</h1>
+            <p className="mt-2 text-gray-600 dark:text-gray-400">Manage your account settings and password.</p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Profile Information */}
-            <div className="bg-white shadow-xl rounded-xl border border-gray-200">
+            <div className="bg-white dark:bg-gray-900 shadow-xl rounded-xl border border-gray-200 dark:border-gray-800">
               <div className="p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-6">Profile Information</h2>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Profile Information</h2>
                 
                 <form onSubmit={handleProfileUpdate} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Username</label>
-                    <p className="mt-1 text-sm text-gray-900 bg-gray-50 px-3 py-2 rounded-md">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Username</label>
+                    <p className="mt-1 text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded-md border border-gray-200 dark:border-gray-800">
                       {user?.username}
                     </p>
-                    <p className="mt-1 text-xs text-gray-500">Username cannot be changed</p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Username cannot be changed</p>
                   </div>
                   
                   <div>
-                    <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
+                    <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Full Name
                     </label>
                     <input
                       type="text"
                       id="fullName"
                       required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
                       value={profileForm.fullName}
                       onChange={(e) => {
                         const value = e.target.value;
@@ -221,24 +221,24 @@ export default function LeaderProfilePage() {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Role</label>
-                    <p className="mt-1 text-sm text-gray-900 bg-gray-50 px-3 py-2 rounded-md">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Role</label>
+                    <p className="mt-1 text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded-md border border-gray-200 dark:border-gray-800">
                       👑 Team Leader
                     </p>
                   </div>
 
                   {team && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Team</label>
-                      <p className="mt-1 text-sm text-gray-900 bg-gray-50 px-3 py-2 rounded-md">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Team</label>
+                      <p className="mt-1 text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded-md border border-gray-200 dark:border-gray-800">
                         {team.name}
                       </p>
                     </div>
                   )}
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Member Since</label>
-                    <p className="mt-1 text-sm text-gray-900 bg-gray-50 px-3 py-2 rounded-md">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Member Since</label>
+                    <p className="mt-1 text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded-md border border-gray-200 dark:border-gray-800">
                       {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown'}
                     </p>
                   </div>
@@ -246,7 +246,7 @@ export default function LeaderProfilePage() {
                   <button
                     type="submit"
                     disabled={updatingProfile}
-                    className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                    className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-900 disabled:opacity-50"
                   >
                     {updatingProfile ? 'Updating...' : 'Update Profile'}
                   </button>
@@ -255,20 +255,20 @@ export default function LeaderProfilePage() {
             </div>
 
             {/* Change Password */}
-            <div className="bg-white shadow-xl rounded-xl border border-gray-200">
+            <div className="bg-white dark:bg-gray-900 shadow-xl rounded-xl border border-gray-200 dark:border-gray-800">
               <div className="p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-6">Change Password</h2>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Change Password</h2>
                 
                 <form onSubmit={handlePasswordChange} className="space-y-4">
                   <div>
-                    <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700">
+                    <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Current Password
                     </label>
                     <input
                       type="password"
                       id="currentPassword"
                       required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
                       value={passwordForm.currentPassword}
                       onChange={(e) => setPasswordForm({
                         ...passwordForm,
@@ -278,34 +278,34 @@ export default function LeaderProfilePage() {
                   </div>
 
                   <div>
-                    <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700">
+                    <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       New Password
                     </label>
                     <input
                       type="password"
                       id="newPassword"
                       required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
                       value={passwordForm.newPassword}
                       onChange={(e) => setPasswordForm({
                         ...passwordForm,
                         newPassword: e.target.value
                       })}
                     />
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       Password must be at least 6 characters long
                     </p>
                   </div>
 
                   <div>
-                    <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+                    <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Confirm New Password
                     </label>
                     <input
                       type="password"
                       id="confirmPassword"
                       required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
                       value={passwordForm.confirmPassword}
                       onChange={(e) => setPasswordForm({
                         ...passwordForm,
@@ -315,13 +315,13 @@ export default function LeaderProfilePage() {
                   </div>
 
                   {error && (
-                    <div className="text-red-600 text-sm bg-red-50 p-3 rounded-md">
+                    <div className="text-red-600 dark:text-red-400 text-sm bg-red-50 dark:bg-red-900/30 p-3 rounded-md border border-red-200 dark:border-red-800">
                       {error}
                     </div>
                   )}
 
                   {message && (
-                    <div className="text-green-600 text-sm bg-green-50 p-3 rounded-md">
+                    <div className="text-green-600 dark:text-green-400 text-sm bg-green-50 dark:bg-green-900/30 p-3 rounded-md border border-green-200 dark:border-green-800">
                       {message}
                     </div>
                   )}
@@ -329,7 +329,7 @@ export default function LeaderProfilePage() {
                   <button
                     type="submit"
                     disabled={changingPassword}
-                    className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                    className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-900 disabled:opacity-50"
                   >
                     {changingPassword ? 'Changing Password...' : 'Change Password'}
                   </button>

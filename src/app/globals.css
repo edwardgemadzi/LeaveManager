@@ -51,6 +51,11 @@ body {
   color: var(--gray-800);
 }
 
+.dark body {
+  background: #000000;
+  color: #f3f4f6;
+}
+
 /* Glass Morphism Effect */
 .glass {
   background: rgba(255, 255, 255, 0.25);
@@ -67,38 +72,38 @@ body {
 
 /* Modern Card Styles */
 .card {
-  @apply bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden;
+  @apply bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800 overflow-hidden;
   backdrop-filter: blur(10px);
 }
 
 .card-hover {
-  @apply transition-all duration-300 hover:shadow-2xl hover:-translate-y-1;
+  @apply transition-shadow duration-200 hover:shadow-lg;
 }
 
 /* Modern Button Styles */
 .btn-primary {
-  @apply bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200;
+  @apply bg-blue-600 text-white font-semibold py-3 px-6 rounded-xl shadow-md hover:bg-blue-700 hover:shadow-lg transition-colors duration-200;
 }
 
 .btn-secondary {
-  @apply bg-white text-gray-700 font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl border border-gray-200 hover:border-gray-300 transform hover:-translate-y-0.5 transition-all duration-200;
+  @apply bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 font-semibold py-3 px-6 rounded-xl shadow-md hover:shadow-lg border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition-all duration-200;
 }
 
 .btn-success {
-  @apply bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200;
+  @apply bg-green-600 text-white font-semibold py-3 px-6 rounded-xl shadow-md hover:bg-green-700 hover:shadow-lg transition-colors duration-200;
 }
 
 .btn-warning {
-  @apply bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200;
+  @apply bg-yellow-600 text-white font-semibold py-3 px-6 rounded-xl shadow-md hover:bg-yellow-700 hover:shadow-lg transition-colors duration-200;
 }
 
 .btn-danger {
-  @apply bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200;
+  @apply bg-red-600 text-white font-semibold py-3 px-6 rounded-xl shadow-md hover:bg-red-700 hover:shadow-lg transition-colors duration-200;
 }
 
 /* Modern Input Styles */
 .input-modern {
-  @apply w-full px-4 py-3 rounded-xl border-2 border-gray-200 bg-white/80 backdrop-blur-sm text-gray-800 placeholder-gray-500 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all duration-200;
+  @apply w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm text-gray-800 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-500 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/50 transition-all duration-200;
 }
 
 .input-modern:focus {
@@ -124,15 +129,15 @@ body {
 
 /* Tab Styles */
 .tab-active {
-  @apply border-indigo-500 text-indigo-600 bg-indigo-50;
+  @apply border-indigo-500 dark:border-indigo-400 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30;
 }
 
 .tab-inactive {
-  @apply border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-100;
+  @apply border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900;
 }
 
 .nav-tab {
-  @apply text-gray-700 hover:text-gray-900 hover:bg-gray-100 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200;
+  @apply text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 px-4 py-2 rounded-xl text-sm font-medium transition-colors duration-200;
 }
 
 /* React Big Calendar Modern Styles */
@@ -401,15 +406,7 @@ body {
 
 /* Animation Classes */
 .fade-in {
-  animation: fadeIn 0.5s ease-in-out;
-}
-
-.slide-up {
-  animation: slideUp 0.5s ease-out;
-}
-
-.bounce-in {
-  animation: bounceIn 0.6s ease-out;
+  animation: fadeIn 0.3s ease-in-out;
 }
 
 @keyframes fadeIn {
@@ -417,38 +414,9 @@ body {
   to { opacity: 1; }
 }
 
-@keyframes slideUp {
-  from { 
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to { 
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes bounceIn {
-  0% {
-    opacity: 0;
-    transform: scale(0.3);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.05);
-  }
-  70% {
-    transform: scale(0.9);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-/* Loading Spinner */
+/* Loading Spinner - Muted Professional Style */
 .spinner {
-  @apply animate-spin rounded-full border-4 border-gray-200 border-t-blue-500;
+  @apply animate-spin rounded-full border-2 border-gray-200 dark:border-gray-800 border-t-gray-400 dark:border-t-gray-500;
 }
 
 /* Custom Scrollbar */

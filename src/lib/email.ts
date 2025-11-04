@@ -52,7 +52,7 @@ export class EmailService {
   ): Promise<boolean> {
     const notification: EmailNotification = {
       to: userEmail,
-      subject: '✅ Leave Request Approved',
+      subject: 'Leave Request Approved',
       body: `
         Dear ${userName},
         
@@ -84,7 +84,7 @@ export class EmailService {
   ): Promise<boolean> {
     const notification: EmailNotification = {
       to: userEmail,
-      subject: '❌ Leave Request Rejected',
+      subject: 'Leave Request Rejected',
       body: `
         Dear ${userName},
         
@@ -117,7 +117,7 @@ export class EmailService {
   ): Promise<boolean> {
     const notification: EmailNotification = {
       to: leaderEmail,
-      subject: '📋 New Leave Request',
+      subject: 'New Leave Request',
       body: `
         Dear ${leaderName},
         

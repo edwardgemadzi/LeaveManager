@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import { LeaveRequest } from '@/types';
+import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 export default function MemberRequestsPage() {
   const [myRequests, setMyRequests] = useState<LeaveRequest[]>([]);
@@ -20,16 +21,16 @@ export default function MemberRequestsPage() {
   const [selectedReasonType, setSelectedReasonType] = useState('');
 
   const leaveReasons = [
-    { value: 'vacation', label: '🏖️ Vacation' },
-    { value: 'sick', label: '🤒 Sick Leave' },
-    { value: 'personal', label: '👤 Personal' },
-    { value: 'family', label: '👨‍👩‍👧‍👦 Family Emergency' },
-    { value: 'medical', label: '🏥 Medical Appointment' },
-    { value: 'bereavement', label: '🕊️ Bereavement' },
-    { value: 'maternity', label: '👶 Maternity/Paternity' },
-    { value: 'study', label: '📚 Study/Education' },
-    { value: 'religious', label: '⛪ Religious Holiday' },
-    { value: 'other', label: '📝 Other (specify below)' },
+    { value: 'vacation', label: 'Vacation' },
+    { value: 'sick', label: 'Sick Leave' },
+    { value: 'personal', label: 'Personal' },
+    { value: 'family', label: 'Family Emergency' },
+    { value: 'medical', label: 'Medical Appointment' },
+    { value: 'bereavement', label: 'Bereavement' },
+    { value: 'maternity', label: 'Maternity/Paternity' },
+    { value: 'study', label: 'Study/Education' },
+    { value: 'religious', label: 'Religious Holiday' },
+    { value: 'other', label: 'Other (specify below)' },
   ];
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -181,38 +182,38 @@ export default function MemberRequestsPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'approved': return 'bg-green-100 text-green-800';
-      case 'rejected': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'pending': return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400';
+      case 'approved': return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400';
+      case 'rejected': return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400';
+      default: return 'bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-300';
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 dark:bg-black">
         <Navbar />
         <div className="flex items-center justify-center h-64 pt-24">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
+          <div className="animate-spin rounded-full h-32 w-32 border-2 border-gray-200 dark:border-gray-800 border-t-gray-400 dark:border-t-gray-500"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-black">
       <Navbar />
       
       <div className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8 pt-24">
         <div className="px-4 py-6 sm:px-0">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">My Leave Requests</h1>
-              <p className="mt-2 text-gray-600">Manage your leave requests and view their status.</p>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Leave Requests</h1>
+              <p className="mt-2 text-gray-600 dark:text-gray-400">Manage your leave requests and view their status.</p>
             </div>
             <button
               onClick={() => setShowForm(!showForm)}
-              className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700"
+              className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
             >
               {showForm ? 'Cancel' : 'New Request'}
             </button>
@@ -221,13 +222,13 @@ export default function MemberRequestsPage() {
 
         {/* Request Form */}
         {showForm && (
-          <div className="bg-white shadow rounded-lg mb-6">
+          <div className="bg-white dark:bg-gray-900 shadow rounded-lg mb-6 border border-gray-100 dark:border-gray-800">
             <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Submit Leave Request</h3>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Submit Leave Request</h3>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">
+                    <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Start Date
                     </label>
                     <input
@@ -236,11 +237,11 @@ export default function MemberRequestsPage() {
                       required
                       value={formData.startDate}
                       onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
                     />
                   </div>
                   <div>
-                    <label htmlFor="endDate" className="block text-sm font-medium text-gray-700">
+                    <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       End Date
                     </label>
                     <input
@@ -249,20 +250,21 @@ export default function MemberRequestsPage() {
                       required
                       value={formData.endDate}
                       onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
                     />
-                    <p className="mt-1 text-xs text-gray-500">
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       For single-day leave, use the same date for both start and end
                       {teamSettings.minimumNoticePeriod > 0 && (
-                        <span className="block mt-1 text-orange-600">
-                          ⚠️ Leave requests must be submitted at least {teamSettings.minimumNoticePeriod} day(s) in advance
+                        <span className="flex items-center gap-2 mt-1 text-orange-600 dark:text-orange-400">
+                          <ExclamationTriangleIcon className="h-4 w-4" />
+                          Leave requests must be submitted at least {teamSettings.minimumNoticePeriod} day(s) in advance
                         </span>
                       )}
                     </p>
                   </div>
                 </div>
                 <div>
-                  <label htmlFor="reason" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="reason" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Reason for Leave
                   </label>
                   <select
@@ -270,7 +272,7 @@ export default function MemberRequestsPage() {
                     required
                     value={selectedReasonType}
                     onChange={(e) => handleReasonChange(e.target.value)}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
                   >
                     <option value="">Select a reason...</option>
                     {leaveReasons.map((reason) => (
@@ -282,7 +284,7 @@ export default function MemberRequestsPage() {
                   
                   {selectedReasonType === 'other' && (
                     <div className="mt-3">
-                      <label htmlFor="customReason" className="block text-sm font-medium text-gray-700">
+                      <label htmlFor="customReason" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                         Please specify
                       </label>
                       <textarea
@@ -291,7 +293,7 @@ export default function MemberRequestsPage() {
                         required
                         value={formData.customReason}
                         onChange={(e) => setFormData({ ...formData, customReason: e.target.value })}
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
                         placeholder="Please provide details for your leave request..."
                       />
                     </div>
@@ -301,14 +303,14 @@ export default function MemberRequestsPage() {
                   <button
                     type="button"
                     onClick={() => setShowForm(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    className="px-4 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 rounded-md text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-900 disabled:opacity-50"
                   >
                     {submitting ? 'Submitting...' : 'Submit Request'}
                   </button>
@@ -319,14 +321,14 @@ export default function MemberRequestsPage() {
         )}
 
         {/* Requests List */}
-        <div className="bg-white shadow rounded-lg">
+        <div className="bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-100 dark:border-gray-800">
           <div className="px-4 py-5 sm:p-6">
             {myRequests.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No requests yet. Create your first request above.</p>
+              <p className="text-gray-500 dark:text-gray-400 text-center py-8">No requests yet. Create your first request above.</p>
             ) : (
               <div className="space-y-4">
                 {myRequests.map((request) => (
-                  <div key={request._id} className="border rounded-lg p-6">
+                  <div key={request._id} className="border border-gray-200 dark:border-gray-800 rounded-lg p-6 bg-gray-50 dark:bg-gray-900">
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
                         <div className="flex items-center space-x-3">
@@ -334,11 +336,11 @@ export default function MemberRequestsPage() {
                             {request.status}
                           </span>
                         </div>
-                        <p className="text-sm text-gray-600 mt-1">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                           {new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()}
                         </p>
-                        <p className="text-gray-700 mt-2">{request.reason}</p>
-                        <p className="text-xs text-gray-500 mt-2">
+                        <p className="text-gray-700 dark:text-gray-300 mt-2">{request.reason}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                           Requested on {new Date(request.createdAt).toLocaleDateString()}
                         </p>
                       </div>
@@ -347,7 +349,7 @@ export default function MemberRequestsPage() {
                           <button
                             onClick={() => handleDelete(request._id!)}
                             disabled={deleting === request._id}
-                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Cancel request"
                           >
                             {deleting === request._id ? 'Cancelling...' : 'Cancel'}

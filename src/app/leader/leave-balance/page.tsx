@@ -6,6 +6,7 @@ import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { Team, User, LeaveRequest } from '@/types';
 import { calculateLeaveBalance, countWorkingDays, calculateSurplusBalance } from '@/lib/leaveCalculations';
 import { calculateUsableDays, calculateMembersSharingSameShift } from '@/lib/analyticsCalculations';
+import { UsersIcon, CalendarIcon, ChartBarIcon, ArrowTrendingUpIcon } from '@heroicons/react/24/outline';
 
 export default function LeaderLeaveBalancePage() {
   const [team, setTeam] = useState<Team | null>(null);
@@ -483,12 +484,12 @@ export default function LeaderLeaveBalancePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 dark:bg-black">
         <Navbar />
-        <div className="flex items-center justify-center h-64 pt-24">
+            <div className="flex items-center justify-center h-64 pt-24">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-            <p className="text-gray-600 text-lg">Loading leave balances...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-gray-400 dark:border-t-gray-500 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400 text-lg">Loading leave balances...</p>
           </div>
         </div>
       </div>
@@ -508,83 +509,83 @@ export default function LeaderLeaveBalancePage() {
 
   return (
     <ProtectedRoute requiredRole="leader">
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 dark:bg-black">
         <Navbar />
         
         <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 pt-24">
           <div className="px-4 py-6 sm:px-0 mb-6">
-            <h1 className="text-3xl font-bold text-gray-900">Detailed Leave Balance</h1>
-            <p className="mt-2 text-gray-600">View comprehensive leave balance information for all team members.</p>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Detailed Leave Balance</h1>
+            <p className="mt-2 text-gray-600 dark:text-gray-400">View comprehensive leave balance information for all team members.</p>
           </div>
 
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-            <div className="bg-white shadow rounded-lg p-6">
+            <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-6 border border-gray-100 dark:border-gray-800">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <span className="text-blue-600 text-xl">👥</span>
+                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                    <UsersIcon className="h-6 w-6 text-blue-700 dark:text-blue-400" />
                   </div>
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">Total Members</p>
-                  <p className="text-2xl font-bold text-gray-900">{totalMembers}</p>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Members</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalMembers}</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white shadow rounded-lg p-6">
+            <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-6 border border-gray-100 dark:border-gray-800">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                    <span className="text-green-600 text-xl">📅</span>
+                  <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                    <CalendarIcon className="h-6 w-6 text-green-700 dark:text-green-400" />
                   </div>
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">Total Remaining</p>
-                  <p className="text-2xl font-bold text-gray-900">{Math.round(totalRemainingBalance)}</p>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Remaining</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{Math.round(totalRemainingBalance)}</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white shadow rounded-lg p-6">
+            <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-6 border border-gray-100 dark:border-gray-800">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                    <span className="text-yellow-600 text-xl">📊</span>
+                  <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg flex items-center justify-center">
+                    <ChartBarIcon className="h-6 w-6 text-yellow-700 dark:text-yellow-400" />
                   </div>
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">Total Used</p>
-                  <p className="text-2xl font-bold text-gray-900">{Math.round(totalUsed)}</p>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Used</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{Math.round(totalUsed)}</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white shadow rounded-lg p-6">
+            <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-6 border border-gray-100 dark:border-gray-800">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <span className="text-purple-600 text-xl">📈</span>
+                  <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+                    <ArrowTrendingUpIcon className="h-6 w-6 text-purple-700 dark:text-purple-400" />
                   </div>
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">Avg Balance</p>
-                  <p className="text-2xl font-bold text-gray-900">{averageBalance.toFixed(1)}</p>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Avg Balance</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{averageBalance.toFixed(1)}</p>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Filters and Sort */}
-          <div className="bg-white shadow rounded-lg p-4 mb-6">
+          <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-4 mb-6 border border-gray-100 dark:border-gray-800">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
               <div className="flex items-center space-x-4">
-                <label className="text-sm font-medium text-gray-700">Filter:</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Filter:</label>
                 <select
                   value={filterBy}
                   onChange={(e) => setFilterBy(e.target.value as 'all' | 'low' | 'high')}
-                  className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  className="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
                 >
                   <option value="all">All Members</option>
                   <option value="low">Low Balance (&lt;30%)</option>
@@ -593,11 +594,11 @@ export default function LeaderLeaveBalancePage() {
               </div>
 
               <div className="flex items-center space-x-4">
-                <label className="text-sm font-medium text-gray-700">Sort by:</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Sort by:</label>
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as 'name' | 'balance' | 'used')}
-                  className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  className="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
                 >
                   <option value="name">Name</option>
                   <option value="balance">Remaining Balance</option>
@@ -608,35 +609,35 @@ export default function LeaderLeaveBalancePage() {
           </div>
 
           {/* Members Table */}
-          <div className="bg-white shadow rounded-lg overflow-hidden">
+          <div className="bg-white dark:bg-gray-900 shadow rounded-lg overflow-hidden border border-gray-100 dark:border-gray-800">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+                <thead className="bg-gray-50 dark:bg-gray-900">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Member
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Remaining Balance
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Total Used
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Year-to-Date Used
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Usage %
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Requests
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
                   {memberList.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                      <td colSpan={6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                         No members found
                       </td>
                     </tr>
@@ -650,29 +651,29 @@ export default function LeaderLeaveBalancePage() {
                       // Red/yellow when realisticUsableDays < remainingBalance (will lose days)
                       let percentageColor: string;
                       if (leaveData.realisticUsableDays >= leaveData.remainingBalance) {
-                        percentageColor = 'text-green-600'; // Good - can use all days
+                        percentageColor = 'text-green-600 dark:text-green-400'; // Good - can use all days
                       } else {
                         const realisticPercentage = leaveData.remainingBalance > 0
                           ? (leaveData.realisticUsableDays / leaveData.remainingBalance) * 100
                           : 0;
                         if (realisticPercentage < 30) {
-                          percentageColor = 'text-red-600'; // Very bad - will lose most days
+                          percentageColor = 'text-red-600 dark:text-red-400'; // Very bad - will lose most days
                         } else if (realisticPercentage < 70) {
-                          percentageColor = 'text-orange-600'; // Moderate - will lose some days
+                          percentageColor = 'text-orange-600 dark:text-orange-400'; // Moderate - will lose some days
                         } else {
-                          percentageColor = 'text-red-500'; // Bad - will lose some days
+                          percentageColor = 'text-red-500 dark:text-red-400'; // Bad - will lose some days
                         }
                       }
 
                       return (
-                        <tr key={member._id} className="hover:bg-gray-50">
+                        <tr key={member._id} className="hover:bg-gray-50 dark:hover:bg-gray-900">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
                               <div>
-                                <div className="text-sm font-medium text-gray-900">
+                                <div className="text-sm font-medium text-gray-900 dark:text-white">
                                   {member.fullName || member.username}
                                 </div>
-                                <div className="text-sm text-gray-500">{member.username}</div>
+                                <div className="text-sm text-gray-500 dark:text-gray-400">{member.username}</div>
                               </div>
                             </div>
                           </td>
@@ -687,7 +688,7 @@ export default function LeaderLeaveBalancePage() {
                                     value={tempBalance}
                                     onChange={(e) => setTempBalance(e.target.value)}
                                     disabled={updating === member._id}
-                                    className="w-24 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50"
+                                    className="w-24 px-2 py-1 text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 disabled:opacity-50"
                                     onKeyDown={(e) => {
                                       if (e.key === 'Enter') {
                                         handleSaveBalance(member._id!);
@@ -697,7 +698,7 @@ export default function LeaderLeaveBalancePage() {
                                     }}
                                     autoFocus
                                   />
-                                  <span className="text-sm text-gray-500">/ {maxLeave}</span>
+                                  <span className="text-sm text-gray-500 dark:text-gray-400">/ {maxLeave}</span>
                                 </div>
                                 <div className="flex items-center space-x-2">
                                   <button
@@ -716,15 +717,15 @@ export default function LeaderLeaveBalancePage() {
                                   </button>
                                 </div>
                                 {member.manualLeaveBalance !== undefined && (
-                                  <p className="text-xs text-blue-600">
+                                  <p className="text-xs text-blue-600 dark:text-blue-400">
                                     Base balance: {Math.round(member.manualLeaveBalance)} days
                                     {member.manualLeaveBalance < maxLeave && (
-                                      <span className="ml-1 text-red-600">
+                                      <span className="ml-1 text-red-600 dark:text-red-400">
                                         ({Math.round(maxLeave - member.manualLeaveBalance)} less than team standard of {maxLeave})
                                       </span>
                                     )}
                                     {member.manualLeaveBalance > maxLeave && (
-                                      <span className="ml-1 text-green-600">
+                                      <span className="ml-1 text-green-600 dark:text-green-400">
                                         (+{Math.round(member.manualLeaveBalance - maxLeave)} surplus)
                                       </span>
                                     )}
@@ -736,19 +737,19 @@ export default function LeaderLeaveBalancePage() {
                                 <div className="flex flex-col space-y-1">
                                   <div className="flex items-center space-x-2">
                                     <div 
-                                      className="text-sm font-medium text-gray-900 cursor-pointer hover:text-indigo-600"
+                                      className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400"
                                       onClick={() => handleEditBalance(member)}
                                       title="Click to edit balance"
                                     >
                                       {Math.round(leaveData.remainingBalance)} / {maxLeave}
-                                      <span className="ml-1 text-xs text-gray-500">(remaining)</span>
+                                      <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">(remaining)</span>
                                       {leaveData.surplusBalance > 0 && (
-                                        <span className="ml-2 text-xs text-green-600" title="Surplus balance">
+                                        <span className="ml-2 text-xs text-green-600 dark:text-green-400" title="Surplus balance">
                                           (+{Math.round(leaveData.surplusBalance)} surplus)
                                         </span>
                                       )}
                                       {member.manualLeaveBalance !== undefined && (
-                                        <span className="ml-2 text-xs text-blue-600" title="Manual balance override">✏️</span>
+                                        <span className="ml-2 text-xs text-blue-600 dark:text-blue-400" title="Manual balance override">✏️</span>
                                       )}
                                     </div>
                                     {member.manualLeaveBalance !== undefined && (
@@ -758,7 +759,7 @@ export default function LeaderLeaveBalancePage() {
                                           handleResetBalance(member._id!);
                                         }}
                                         disabled={updating === member._id}
-                                        className="text-xs text-gray-500 hover:text-red-600 disabled:opacity-50"
+                                        className="text-xs text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
                                         title="Reset to auto-calculated"
                                       >
                                         ↺
@@ -766,32 +767,32 @@ export default function LeaderLeaveBalancePage() {
                                     )}
                                   </div>
                                   {member.manualLeaveBalance !== undefined && Math.round(member.manualLeaveBalance) !== Math.round(leaveData.remainingBalance) && (
-                                    <div className="text-xs text-gray-600">
+                                    <div className="text-xs text-gray-600 dark:text-gray-400">
                                       <span className="font-medium">Base balance:</span> {Math.round(member.manualLeaveBalance)} days
                                       {member.manualLeaveBalance < maxLeave && (
-                                        <span className="ml-2 text-red-600">
+                                        <span className="ml-2 text-red-600 dark:text-red-400">
                                           ({Math.round(maxLeave - member.manualLeaveBalance)} less than team standard of {maxLeave})
                                         </span>
                                       )}
                                       {member.manualLeaveBalance > maxLeave && (
-                                        <span className="ml-2 text-green-600">
+                                        <span className="ml-2 text-green-600 dark:text-green-400">
                                           (+{Math.round(member.manualLeaveBalance - maxLeave)} surplus)
                                         </span>
                                       )}
-                                      <span className="ml-2 text-gray-500">
+                                      <span className="ml-2 text-gray-500 dark:text-gray-400">
                                         ({Math.round(member.manualLeaveBalance - leaveData.remainingBalance)} days used)
                                       </span>
                                     </div>
                                   )}
                                   {leaveData.surplusBalance > 0 && (
                                     <div className="mt-1">
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400">
                                         +{Math.round(leaveData.surplusBalance)} surplus days
                                       </span>
                                     </div>
                                   )}
                                 </div>
-                                <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                                <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2 mt-1">
                                   <div
                                     className={`h-2 rounded-full ${
                                       leaveData.realisticUsableDays >= leaveData.remainingBalance
@@ -817,7 +818,7 @@ export default function LeaderLeaveBalancePage() {
                               </div>
                             )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                             {Math.round(leaveData.totalUsed)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -829,20 +830,20 @@ export default function LeaderLeaveBalancePage() {
                                   step="0.1"
                                   value={tempDaysTaken}
                                   onChange={(e) => setTempDaysTaken(e.target.value)}
-                                  className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                                  className="w-20 px-2 py-1 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
                                   autoFocus
                                 />
                                 <button
                                   onClick={() => handleSaveDaysTaken(member._id!)}
                                   disabled={updating === member._id}
-                                  className="text-xs px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+                                  className="text-xs px-2 py-1 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white rounded disabled:opacity-50"
                                 >
                                   Save
                                 </button>
                                 <button
                                   onClick={handleCancelEditDaysTaken}
                                   disabled={updating === member._id}
-                                  className="text-xs px-2 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 disabled:opacity-50"
+                                  className="text-xs px-2 py-1 bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-400 dark:hover:bg-gray-600 disabled:opacity-50"
                                 >
                                   Cancel
                                 </button>
@@ -851,13 +852,13 @@ export default function LeaderLeaveBalancePage() {
                               <div className="group">
                                 <div className="flex items-center space-x-2">
                                   <div 
-                                    className="text-sm text-gray-900 cursor-pointer hover:text-indigo-600"
+                                    className="text-sm text-gray-900 dark:text-white cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400"
                                     onClick={() => handleEditDaysTaken(member)}
                                     title="Click to edit days taken"
                                   >
                                     {Math.round(leaveData.yearToDateUsed)}
                                     {member.manualYearToDateUsed !== undefined && (
-                                      <span className="ml-1 text-xs text-blue-600" title="Manual override">✏️</span>
+                                      <span className="ml-1 text-xs text-blue-600 dark:text-blue-400" title="Manual override">✏️</span>
                                     )}
                                   </div>
                                   {member.manualYearToDateUsed !== undefined && (
@@ -867,7 +868,7 @@ export default function LeaderLeaveBalancePage() {
                                         handleResetDaysTaken(member._id!);
                                       }}
                                       disabled={updating === member._id}
-                                      className="text-xs text-gray-500 hover:text-red-600 disabled:opacity-50"
+                                      className="text-xs text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
                                       title="Reset to auto-calculated"
                                     >
                                       ↺
@@ -882,12 +883,12 @@ export default function LeaderLeaveBalancePage() {
                               {leaveData.percentageUsed.toFixed(1)}%
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             <div className="flex items-center space-x-2">
-                              <span className="text-green-600">{leaveData.approvedCount} approved</span>
-                              <span className="text-yellow-600">{leaveData.pendingCount} pending</span>
+                              <span className="text-green-600 dark:text-green-400">{leaveData.approvedCount} approved</span>
+                              <span className="text-yellow-600 dark:text-yellow-400">{leaveData.pendingCount} pending</span>
                               {leaveData.rejectedCount > 0 && (
-                                <span className="text-red-600">{leaveData.rejectedCount} rejected</span>
+                                <span className="text-red-600 dark:text-red-400">{leaveData.rejectedCount} rejected</span>
                               )}
                             </div>
                           </td>

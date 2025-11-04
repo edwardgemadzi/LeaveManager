@@ -103,34 +103,34 @@ export default function TeamSettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 dark:bg-black">
         <Navbar />
         <div className="flex items-center justify-center h-64 pt-24">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
+          <div className="animate-spin rounded-full h-32 w-32 border-2 border-gray-200 dark:border-gray-800 border-t-gray-400 dark:border-t-gray-500"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-black">
       <Navbar />
       
       <div className="max-w-3xl mx-auto py-6 sm:px-6 lg:px-8 pt-24">
         <div className="px-4 py-6 sm:px-0">
-          <h1 className="text-3xl font-bold text-gray-900">Team Settings</h1>
-          <p className="mt-2 text-gray-600">Configure your team&apos;s leave policies.</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Team Settings</h1>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">Configure your team&apos;s leave policies.</p>
         </div>
 
-        <div className="bg-white shadow rounded-lg">
+        <div className="bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-100 dark:border-gray-800">
           <form onSubmit={handleSave} className="px-4 py-5 sm:p-6">
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Leave Policies</h3>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Leave Policies</h3>
                 
                 <div className="grid grid-cols-1 gap-6">
                   <div>
-                    <label htmlFor="concurrentLeave" className="block text-sm font-medium text-gray-700">
+                    <label htmlFor="concurrentLeave" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Maximum Concurrent Leave
                     </label>
                     <div className="mt-1">
@@ -144,16 +144,16 @@ export default function TeamSettingsPage() {
                           ...settings,
                           concurrentLeave: parseInt(e.target.value)
                         })}
-                        className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm text-gray-900 bg-white border border-gray-300 rounded-md"
+                        className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
                       />
                     </div>
-                    <p className="mt-2 text-sm text-gray-500">
+                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                       Maximum number of team members who can be on leave at the same time.
                     </p>
                   </div>
 
                   <div>
-                    <label htmlFor="maxLeavePerYear" className="block text-sm font-medium text-gray-700">
+                    <label htmlFor="maxLeavePerYear" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Maximum Leave Days Per Year
                     </label>
                     <div className="mt-1">
@@ -167,16 +167,16 @@ export default function TeamSettingsPage() {
                           ...settings,
                           maxLeavePerYear: parseInt(e.target.value)
                         })}
-                        className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm text-gray-900 bg-white border border-gray-300 rounded-md"
+                        className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
                       />
                     </div>
-                    <p className="mt-2 text-sm text-gray-500">
+                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                       Maximum number of leave days each team member can take per year.
                     </p>
                   </div>
 
                   <div>
-                    <label htmlFor="minimumNoticePeriod" className="block text-sm font-medium text-gray-700">
+                    <label htmlFor="minimumNoticePeriod" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Minimum Notice Period (Days)
                     </label>
                     <div className="mt-1">
@@ -190,10 +190,10 @@ export default function TeamSettingsPage() {
                           ...settings,
                           minimumNoticePeriod: parseInt(e.target.value)
                         })}
-                        className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm text-gray-900 bg-white border border-gray-300 rounded-md"
+                        className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
                       />
                     </div>
-                    <p className="mt-2 text-sm text-gray-500">
+                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                       Minimum number of days in advance that leave requests must be submitted. Set to 0 to allow same-day requests.
                     </p>
                   </div>
@@ -207,13 +207,13 @@ export default function TeamSettingsPage() {
                         ...settings,
                         allowCarryover: e.target.checked
                       })}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900"
                     />
-                    <label htmlFor="allowCarryover" className="ml-2 block text-sm font-medium text-gray-700">
+                    <label htmlFor="allowCarryover" className="ml-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Allow Leave Carryover
                     </label>
                   </div>
-                  <p className="mt-1 ml-6 text-sm text-gray-500">
+                  <p className="mt-1 ml-6 text-sm text-gray-500 dark:text-gray-400">
                     If enabled, unused leave days will carry over to the next year. If disabled, unused days will be lost at year end.
                   </p>
                   
@@ -233,20 +233,20 @@ export default function TeamSettingsPage() {
                             : (isEnabled ? settings.subgroups : [])
                         });
                       }}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900"
                     />
-                    <label htmlFor="enableSubgrouping" className="ml-2 block text-sm font-medium text-gray-700">
+                    <label htmlFor="enableSubgrouping" className="ml-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                       Enable Subgrouping
                     </label>
                   </div>
-                  <p className="mt-1 ml-6 text-sm text-gray-500">
+                  <p className="mt-1 ml-6 text-sm text-gray-500 dark:text-gray-400">
                     If enabled, leaders can organize members into custom subgroups. Each subgroup operates independently with separate concurrent leave limits and analytics. Minimum 2 subgroups required.
                   </p>
                   
                   {/* Subgroup Naming Section */}
                   {settings.enableSubgrouping && (
                     <div className="mt-4 ml-6 space-y-3">
-                      <label className="block text-sm font-medium text-gray-700">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                         Subgroup Names (Minimum 2 required)
                       </label>
                       <div className="space-y-2">
@@ -268,7 +268,7 @@ export default function TeamSettingsPage() {
                                 });
                               }}
                               placeholder={`Subgroup ${index + 1} name`}
-                              className="flex-1 text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                              className="flex-1 text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
                             />
                             {index >= 2 && (
                               <button
@@ -285,7 +285,7 @@ export default function TeamSettingsPage() {
                                     subgroups: newSubgroups
                                   });
                                 }}
-                                className="text-red-600 hover:text-red-800 text-sm font-medium"
+                                className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm font-medium"
                               >
                                 Remove
                               </button>
@@ -300,12 +300,12 @@ export default function TeamSettingsPage() {
                               subgroups: [...(settings.subgroups || ['', '']), '']
                             });
                           }}
-                          className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                          className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium"
                         >
                           + Add Another Subgroup
                         </button>
                       </div>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
                         Members without a subgroup assignment will be treated as &quot;Ungrouped&quot;
                       </p>
                     </div>
@@ -313,17 +313,17 @@ export default function TeamSettingsPage() {
                 </div>
               </div>
 
-              <div className="border-t pt-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Team Information</h3>
+              <div className="border-t border-gray-200 dark:border-gray-800 pt-6">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Team Information</h3>
                 <div className="grid grid-cols-1 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Team Name</label>
-                    <p className="mt-1 text-sm text-gray-900">{team?.name}</p>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Team Name</label>
+                    <p className="mt-1 text-sm text-gray-900 dark:text-white">{team?.name}</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Team Username</label>
-                    <p className="mt-1 text-sm text-gray-900">{team?.teamUsername}</p>
-                    <p className="mt-1 text-xs text-gray-500">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Team Username</label>
+                    <p className="mt-1 text-sm text-gray-900 dark:text-white">{team?.teamUsername}</p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       Share this with team members so they can join your team.
                     </p>
                   </div>
@@ -332,8 +332,8 @@ export default function TeamSettingsPage() {
             </div>
 
             {error && (
-              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                <p className="text-sm text-red-800">{error}</p>
+              <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md">
+                <p className="text-sm text-red-800 dark:text-red-400">{error}</p>
               </div>
             )}
 
@@ -341,7 +341,7 @@ export default function TeamSettingsPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                className="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-900 disabled:opacity-50"
               >
                 {saving ? 'Saving...' : 'Save Settings'}
               </button>

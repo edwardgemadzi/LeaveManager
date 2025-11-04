@@ -117,11 +117,11 @@ export default function ShiftScheduleBuilder({
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           Schedule Type
         </label>
         <div className="flex space-x-4">
-          <label className="flex items-center">
+          <label className="flex items-center text-gray-700 dark:text-gray-300">
             <input
               type="radio"
               value="rotating"
@@ -138,11 +138,11 @@ export default function ShiftScheduleBuilder({
                 });
                 setIsInitialized(true);
               }}
-              className="mr-2"
+              className="mr-2 text-indigo-600 focus:ring-indigo-500 dark:text-indigo-400"
             />
             Rotating Schedule
           </label>
-          <label className="flex items-center">
+          <label className="flex items-center text-gray-700 dark:text-gray-300">
             <input
               type="radio"
               value="fixed"
@@ -156,7 +156,7 @@ export default function ShiftScheduleBuilder({
                   type: 'fixed'
                 });
               }}
-              className="mr-2"
+              className="mr-2 text-indigo-600 focus:ring-indigo-500 dark:text-indigo-400"
             />
             Fixed Weekly Schedule
           </label>
@@ -164,14 +164,14 @@ export default function ShiftScheduleBuilder({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           Start Date
         </label>
         <input
           type="date"
           value={startDate}
           onChange={(e) => handleStartDateChange(e.target.value)}
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
         />
       </div>
 
@@ -179,8 +179,8 @@ export default function ShiftScheduleBuilder({
         <div className="space-y-4">
           {/* Group Selection for Rotating Schedules */}
           {teamSettings?.workingDaysGroupNames && Object.keys(teamSettings.workingDaysGroupNames).length > 0 && (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Select from Named Rotating Groups
               </label>
               <div className="flex flex-wrap gap-2 mb-2">
@@ -232,21 +232,21 @@ export default function ShiftScheduleBuilder({
                         }}
                         className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                           isSelected
-                            ? 'bg-indigo-100 text-indigo-800 border-2 border-indigo-400'
-                            : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                            ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-400 border-2 border-indigo-400 dark:border-indigo-500'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700'
                         }`}
                         title={`Tag: ${tag}`}
                         disabled={!memberWithTag}
                       >
                         {name}
-                        <span className="ml-1.5 text-[10px] text-gray-500 font-mono opacity-75">({tag.substring(0, 6)}...)</span>
-                        {!memberWithTag && <span className="ml-1 text-xs text-red-500">(no pattern found)</span>}
+                        <span className="ml-1.5 text-[10px] text-gray-500 dark:text-gray-400 font-mono opacity-75">({tag.substring(0, 6)}...)</span>
+                        {!memberWithTag && <span className="ml-1 text-xs text-red-500 dark:text-red-400">(no pattern found)</span>}
                       </button>
                     );
                   })}
               </div>
               {Object.entries(teamSettings.workingDaysGroupNames).filter(([tag]) => /^[01]+$/.test(tag)).length > 0 && (
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-gray-600 dark:text-gray-400">
                   Click a group tag above to quickly apply that rotating schedule pattern (if a member with that pattern exists)
                 </p>
               )}
@@ -254,7 +254,7 @@ export default function ShiftScheduleBuilder({
           )}
           
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Rotation Pattern
             </label>
             <div className="flex items-center space-x-4">
@@ -265,11 +265,11 @@ export default function ShiftScheduleBuilder({
                   max="14"
                   value={daysOn}
                   onChange={(e) => setDaysOn(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-16 px-2 py-1 border border-gray-300 rounded-md text-center"
+                  className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md text-center"
                 />
-                <span className="text-sm text-gray-600">days on</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">days on</span>
               </div>
-              <span className="text-gray-400">/</span>
+              <span className="text-gray-400 dark:text-gray-500">/</span>
               <div className="flex items-center space-x-2">
                 <input
                   type="number"
@@ -277,18 +277,18 @@ export default function ShiftScheduleBuilder({
                   max="14"
                   value={daysOff}
                   onChange={(e) => setDaysOff(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-16 px-2 py-1 border border-gray-300 rounded-md text-center"
+                  className="w-16 px-2 py-1 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md text-center"
                 />
-                <span className="text-sm text-gray-600">days off</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">days off</span>
               </div>
-              <span className="text-sm text-gray-500">
+              <span className="text-sm text-gray-500 dark:text-gray-400">
                 (Total cycle: {daysOn + daysOff} days)
               </span>
             </div>
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Work Pattern (click to toggle individual days)
             </label>
             <div className="flex flex-wrap gap-2">
@@ -299,8 +299,8 @@ export default function ShiftScheduleBuilder({
                   onClick={() => handlePatternChange(index)}
                   className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     isWorking
-                      ? 'bg-green-100 text-green-800 border border-green-300 hover:bg-green-200'
-                      : 'bg-red-100 text-red-800 border border-red-300 hover:bg-red-200'
+                      ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 border border-green-300 dark:border-green-700 hover:bg-green-200 dark:hover:bg-green-900/50'
+                      : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400 border border-red-300 dark:border-red-700 hover:bg-red-200 dark:hover:bg-red-900/50'
                   }`}
                 >
                   Day {index + 1}
@@ -309,7 +309,7 @@ export default function ShiftScheduleBuilder({
                 </button>
               ))}
             </div>
-            <p className="mt-2 text-xs text-gray-500">
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
               This {daysOn + daysOff}-day pattern will repeat continuously starting from the selected date
             </p>
           </div>
@@ -318,8 +318,8 @@ export default function ShiftScheduleBuilder({
         <div className="space-y-4">
           {/* Group Selection for Fixed Schedules */}
           {teamSettings?.workingDaysGroupNames && Object.keys(teamSettings.workingDaysGroupNames).length > 0 && (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Select from Named Groups
               </label>
               <div className="flex flex-wrap gap-2 mb-2">
@@ -348,25 +348,25 @@ export default function ShiftScheduleBuilder({
                         }}
                         className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                           isSelected
-                            ? 'bg-indigo-100 text-indigo-800 border-2 border-indigo-400'
-                            : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                            ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-400 border-2 border-indigo-400 dark:border-indigo-500'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700'
                         }`}
                         title={`Tag: ${tag}`}
                       >
                         {name}
-                        <span className="ml-1.5 text-[10px] text-gray-500 font-mono opacity-75">({tag})</span>
+                        <span className="ml-1.5 text-[10px] text-gray-500 dark:text-gray-400 font-mono opacity-75">({tag})</span>
                       </button>
                     );
                   })}
               </div>
-              <p className="text-xs text-gray-600">
+              <p className="text-xs text-gray-600 dark:text-gray-400">
                 Click a group tag above to quickly apply that schedule pattern
               </p>
             </div>
           )}
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Weekly Schedule (click to toggle)
             </label>
             <div className="grid grid-cols-7 gap-2">
@@ -375,10 +375,10 @@ export default function ShiftScheduleBuilder({
                   key={index}
                   type="button"
                   onClick={() => handleWorkingDayChange(index)}
-                  className={`px-2 py-2 rounded-md text-xs font-medium ${
+                  className={`px-2 py-2 rounded-md text-xs font-medium transition-colors ${
                     workingDays[index]
-                      ? 'bg-green-100 text-green-800 border border-green-300'
-                      : 'bg-red-100 text-red-800 border border-red-300'
+                      ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 border border-green-300 dark:border-green-700 hover:bg-green-200 dark:hover:bg-green-900/50'
+                      : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400 border border-red-300 dark:border-red-700 hover:bg-red-200 dark:hover:bg-red-900/50'
                   }`}
                 >
                   {day.substring(0, 3)}

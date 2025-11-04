@@ -59,42 +59,42 @@ export default function MemberCalendarPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 dark:bg-black">
         <Navbar />
         <div className="flex items-center justify-center h-64 pt-24">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
+          <div className="animate-spin rounded-full h-32 w-32 border-2 border-gray-200 dark:border-gray-800 border-t-gray-400 dark:border-t-gray-500"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-black">
       <Navbar />
       
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 pt-24">
         <div className="px-4 py-6 sm:px-0">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
             {team?.settings?.enableSubgrouping && user?.subgroupTag 
               ? `${user.subgroupTag} Calendar`
               : 'Team Calendar'}
           </h1>
-          <p className="text-lg text-gray-600">
+          <p className="text-lg text-gray-600 dark:text-gray-400">
             {team?.settings?.enableSubgrouping && user?.subgroupTag
               ? `View all leave requests for your subgroup.`
               : 'View all leave requests for your team.'}
           </p>
         </div>
 
-        <div className="bg-white shadow-xl rounded-xl border border-gray-200">
+        <div className="bg-white dark:bg-gray-900 shadow-xl rounded-xl border border-gray-200 dark:border-gray-800">
           <div className="px-6 py-8">
             {team?._id ? (
               <TeamCalendar teamId={team._id} members={members} currentUser={user || undefined} />
             ) : (
               <div className="flex items-center justify-center h-64">
                 <div className="text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-                  <p className="text-gray-500 text-lg">Loading team data...</p>
+                  <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-gray-400 dark:border-t-gray-500 mx-auto mb-4"></div>
+                  <p className="text-gray-500 dark:text-gray-400 text-lg">Loading team data...</p>
                 </div>
               </div>
             )}
