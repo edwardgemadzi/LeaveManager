@@ -464,6 +464,15 @@ export const getMemberAnalytics = (
       return memberSubgroup === userSubgroup;
     });
   }
+  
+  // Filter out members with 0 base balance from realistic calculations
+  // Members with 0 base balance should not affect competition/realistic calculations
+  const membersWithNonZeroBase = filteredMembers.filter(member => {
+    const memberBaseBalance = member.manualLeaveBalance !== undefined 
+      ? member.manualLeaveBalance 
+      : team.settings.maxLeavePerYear;
+    return memberBaseBalance > 0;
+  });
 
   // Calculate theoretical remaining working days in year
   // This is the raw count of working days remaining - NOT adjusted for concurrent leave sharing
@@ -471,11 +480,12 @@ export const getMemberAnalytics = (
   
   // Calculate usable days - adjusted for concurrent leave constraints
   // This shows how many days can be used when shared among members who can use them
+  // Only include members with non-zero base balance in calculations
   const usableDays = calculateUsableDays(
     user,
     team,
     allApprovedRequests,
-    filteredMembers, // Use filtered members list
+    membersWithNonZeroBase, // Use members with non-zero base balance
     shiftSchedule
   );
   
@@ -534,7 +544,8 @@ export const getMemberAnalytics = (
   const surplusBalance = calculateSurplusBalance(user.manualLeaveBalance, team.settings.maxLeavePerYear);
   
   // Calculate competition metrics (using filtered members if subgrouping is enabled)
-  const membersSharingSameShift = calculateMembersSharingSameShift(user, filteredMembers);
+  // Only include members with non-zero base balance in competition calculations
+  const membersSharingSameShift = calculateMembersSharingSameShift(user, membersWithNonZeroBase);
   
   // Calculate realistic usable days - factors in members sharing same schedule
   // This divides usable days by members sharing the same shift, capped by remaining leave balance

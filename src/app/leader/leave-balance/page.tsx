@@ -164,18 +164,30 @@ export default function LeaderLeaveBalancePage() {
 
     // Calculate percentage used - use year-to-date used, not total used
     const maxLeave = team?.settings.maxLeavePerYear || 20;
-    const percentageUsed = maxLeave > 0 ? (yearToDateUsed / maxLeave) * 100 : 0;
+    // Calculate base balance (manualLeaveBalance if set, otherwise maxLeavePerYear)
+    const baseBalance = member.manualLeaveBalance !== undefined ? member.manualLeaveBalance : maxLeave;
+    // If base is 0, percentage should be null (display as "-")
+    const percentageUsed = baseBalance > 0 ? (yearToDateUsed / baseBalance) * 100 : null;
 
     // Calculate surplus balance
     const surplusBalance = calculateSurplusBalance(member.manualLeaveBalance, maxLeave);
 
+    // Filter out members with 0 base balance from realistic calculations
+    // Members with 0 base balance should not affect competition/realistic calculations
+    const membersWithNonZeroBase = members.filter(m => {
+      const memberBaseBalance = m.manualLeaveBalance !== undefined 
+        ? m.manualLeaveBalance 
+        : (team?.settings.maxLeavePerYear || 20);
+      return memberBaseBalance > 0;
+    });
+    
     // Calculate realistic usable days (factors in members sharing same schedule)
-    const membersSharingSameShift = calculateMembersSharingSameShift(member, members);
+    const membersSharingSameShift = calculateMembersSharingSameShift(member, membersWithNonZeroBase);
     const usableDays = team ? calculateUsableDays(
       member,
       team,
       allRequests.filter(req => req.status === 'approved'),
-      members,
+      membersWithNonZeroBase,
       shiftSchedule
     ) : 0;
     
@@ -204,6 +216,7 @@ export default function LeaderLeaveBalancePage() {
       approvedCount: approvedRequests.length,
       pendingCount: memberRequests.filter(req => req.status === 'pending').length,
       rejectedCount: memberRequests.filter(req => req.status === 'rejected').length,
+      baseBalance
     };
   };
 
@@ -252,16 +265,16 @@ export default function LeaderLeaveBalancePage() {
     setEditingBalance(member._id || null);
     // Get current remaining balance to show in the input
     const leaveData = getMemberLeaveData(member);
-    setTempBalance(leaveData.remainingBalance.toFixed(1));
+    setTempBalance(Math.round(leaveData.remainingBalance).toString());
   };
 
   const handleSaveBalance = async (memberId: string) => {
     const member = members.find(m => m._id === memberId);
     if (!member) return;
 
-    const balanceValue = parseFloat(tempBalance);
+    const balanceValue = Math.floor(parseFloat(tempBalance));
     if (isNaN(balanceValue) || balanceValue < 0) {
-      alert('Please enter a valid non-negative number');
+      alert('Please enter a valid non-negative whole number');
       return;
     }
 
@@ -306,10 +319,18 @@ export default function LeaderLeaveBalancePage() {
         }, 0);
       }
       
-      // Calculate what manualLeaveBalance should be to achieve desired remaining balance
-      // Simplified formula: remainingBalance = manualLeaveBalance - daysUsed
-      // So: manualLeaveBalance = desiredRemaining + daysUsed
-      const manualBalance = balanceValue + daysUsed;
+      // If balanceValue is less than maxLeavePerYear, set it as the base for that year
+      // Otherwise, calculate what manualLeaveBalance should be to achieve desired remaining balance
+      let manualBalance: number;
+      if (balanceValue < maxLeave) {
+        // The entered remaining balance becomes the base for that year
+        manualBalance = balanceValue;
+      } else {
+        // Calculate what manualLeaveBalance should be to achieve desired remaining balance
+        // Formula: remainingBalance = manualLeaveBalance - daysUsed
+        // So: manualLeaveBalance = desiredRemaining + daysUsed
+        manualBalance = balanceValue + daysUsed;
+      }
       
       const response = await fetch(`/api/users/${memberId}`, {
         method: 'PATCH',
@@ -390,16 +411,16 @@ export default function LeaderLeaveBalancePage() {
     setEditingDaysTaken(member._id || null);
     // Get current year-to-date used to show in the input
     const leaveData = getMemberLeaveData(member);
-    setTempDaysTaken(leaveData.yearToDateUsed.toFixed(1));
+    setTempDaysTaken(Math.round(leaveData.yearToDateUsed).toString());
   };
 
   const handleSaveDaysTaken = async (memberId: string) => {
     const member = members.find(m => m._id === memberId);
     if (!member) return;
 
-    const daysTakenValue = parseFloat(tempDaysTaken);
+    const daysTakenValue = Math.floor(parseFloat(tempDaysTaken));
     if (isNaN(daysTakenValue) || daysTakenValue < 0) {
-      alert('Please enter a valid non-negative number');
+      alert('Please enter a valid non-negative whole number');
       return;
     }
 
@@ -502,10 +523,18 @@ export default function LeaderLeaveBalancePage() {
     leaveData: getMemberLeaveData(m),
   }));
 
+  // Filter out members with 0 base balance from aggregate calculations
+  const membersWithNonZeroBase = allMembersData.filter(m => {
+    const baseBalance = m.member.manualLeaveBalance !== undefined 
+      ? m.member.manualLeaveBalance 
+      : (team?.settings.maxLeavePerYear || 20);
+    return baseBalance > 0;
+  });
+  
   const totalMembers = allMembersData.length;
-  const totalRemainingBalance = allMembersData.reduce((sum, m) => sum + m.leaveData.remainingBalance, 0);
-  const totalUsed = allMembersData.reduce((sum, m) => sum + m.leaveData.totalUsed, 0);
-  const averageBalance = totalMembers > 0 ? totalRemainingBalance / totalMembers : 0;
+  const totalRemainingBalance = membersWithNonZeroBase.reduce((sum, m) => sum + m.leaveData.remainingBalance, 0);
+  const totalUsed = membersWithNonZeroBase.reduce((sum, m) => sum + m.leaveData.totalUsed, 0);
+  const averageBalance = membersWithNonZeroBase.length > 0 ? totalRemainingBalance / membersWithNonZeroBase.length : 0;
 
   return (
     <ProtectedRoute requiredRole="leader">
@@ -571,7 +600,7 @@ export default function LeaderLeaveBalancePage() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Avg Balance</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{averageBalance.toFixed(1)}</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{Math.round(averageBalance)}</p>
                 </div>
               </div>
             </div>
@@ -684,7 +713,7 @@ export default function LeaderLeaveBalancePage() {
                                   <input
                                     type="number"
                                     min="0"
-                                    step="0.1"
+                                    step="1"
                                     value={tempBalance}
                                     onChange={(e) => setTempBalance(e.target.value)}
                                     disabled={updating === member._id}
@@ -741,7 +770,15 @@ export default function LeaderLeaveBalancePage() {
                                       onClick={() => handleEditBalance(member)}
                                       title="Click to edit balance"
                                     >
-                                      {Math.round(leaveData.remainingBalance)} / {maxLeave}
+                                      {(() => {
+                                        const baseBalance = member.manualLeaveBalance !== undefined 
+                                          ? member.manualLeaveBalance 
+                                          : maxLeave;
+                                        if (baseBalance === 0) {
+                                          return <>0 / 0</>;
+                                        }
+                                        return <>{Math.round(leaveData.remainingBalance)} / {maxLeave}</>;
+                                      })()}
                                       <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">(remaining)</span>
                                       {leaveData.surplusBalance > 0 && (
                                         <span className="ml-2 text-xs text-green-600 dark:text-green-400" title="Surplus balance">
@@ -819,7 +856,7 @@ export default function LeaderLeaveBalancePage() {
                             )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                            {Math.round(leaveData.totalUsed)}
+                            {leaveData.baseBalance > 0 ? Math.round(leaveData.totalUsed) : '-'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             {editingDaysTaken === member._id ? (
@@ -827,7 +864,7 @@ export default function LeaderLeaveBalancePage() {
                                 <input
                                   type="number"
                                   min="0"
-                                  step="0.1"
+                                  step="1"
                                   value={tempDaysTaken}
                                   onChange={(e) => setTempDaysTaken(e.target.value)}
                                   className="w-20 px-2 py-1 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
@@ -856,8 +893,8 @@ export default function LeaderLeaveBalancePage() {
                                     onClick={() => handleEditDaysTaken(member)}
                                     title="Click to edit days taken"
                                   >
-                                    {Math.round(leaveData.yearToDateUsed)}
-                                    {member.manualYearToDateUsed !== undefined && (
+                                    {leaveData.baseBalance > 0 ? Math.round(leaveData.yearToDateUsed) : '-'}
+                                    {member.manualYearToDateUsed !== undefined && leaveData.baseBalance > 0 && (
                                       <span className="ml-1 text-xs text-blue-600 dark:text-blue-400" title="Manual override">✏️</span>
                                     )}
                                   </div>
@@ -880,7 +917,7 @@ export default function LeaderLeaveBalancePage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`text-sm font-medium ${percentageColor}`}>
-                              {leaveData.percentageUsed.toFixed(1)}%
+                              {leaveData.percentageUsed !== null ? `${Math.round(leaveData.percentageUsed)}%` : '-'}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">

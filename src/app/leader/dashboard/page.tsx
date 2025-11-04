@@ -447,7 +447,7 @@ export default function LeaderDashboard() {
                     <div className="flex items-center justify-between mb-2">
                       <div>
                         <h3 className="text-xs font-medium text-gray-500 dark:text-gray-400">Will Carry Over</h3>
-                        <p className="text-2xl font-bold text-green-700 dark:text-green-400 mt-1">{analytics.aggregate.totalWillCarryover.toFixed(1)}</p>
+                        <p className="text-2xl font-bold text-green-700 dark:text-green-400 mt-1">{Math.round(analytics.aggregate.totalWillCarryover)}</p>
                       </div>
                       <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center flex-shrink-0">
                         <CheckCircleIcon className="h-6 w-6 text-green-700 dark:text-green-400" />
@@ -462,7 +462,7 @@ export default function LeaderDashboard() {
                     <div className="flex items-center justify-between mb-2">
                       <div>
                         <h3 className="text-xs font-medium text-gray-500 dark:text-gray-400">Will Be Lost</h3>
-                        <p className="text-2xl font-bold text-red-700 dark:text-red-400 mt-1">{analytics.aggregate.totalWillLose.toFixed(1)}</p>
+                        <p className="text-2xl font-bold text-red-700 dark:text-red-400 mt-1">{Math.round(analytics.aggregate.totalWillLose)}</p>
                       </div>
                       <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-xl flex items-center justify-center flex-shrink-0">
                         <ExclamationTriangleIcon className="h-6 w-6 text-red-700 dark:text-red-400" />
@@ -484,10 +484,10 @@ export default function LeaderDashboard() {
                       <p className="font-semibold text-blue-900 dark:text-blue-300 mb-1">Team Competition Context</p>
                       <p className="text-sm text-blue-700 dark:text-blue-400 mb-2">
                         <strong>{analytics.aggregate.membersCount}</strong> team member{analytics.aggregate.membersCount !== 1 ? 's' : ''} 
-                        {' '}need to coordinate use of <strong>{analytics.aggregate.totalRealisticUsableDays.toFixed(1)}</strong> realistic usable days.
+                        {' '}need to coordinate use of <strong>{Math.round(analytics.aggregate.totalRealisticUsableDays)}</strong> realistic usable days.
                       </p>
                       <p className="text-sm text-blue-700 dark:text-blue-400">
-                        Average of <strong>{analytics.aggregate.averageDaysPerMemberAcrossTeam.toFixed(1)}</strong> days per member available across the team.
+                        Average of <strong>{Math.round(analytics.aggregate.averageDaysPerMemberAcrossTeam)}</strong> days per member available across the team.
                       </p>
                     </div>
                   </div>
@@ -505,7 +505,7 @@ export default function LeaderDashboard() {
                       <div>
                         <p className="font-semibold text-orange-900 dark:text-orange-300 mb-1">Concurrent Leave Constraints Active</p>
                         <p className="text-sm text-orange-700 dark:text-orange-400">
-                          Team members can realistically use <strong>{analytics.aggregate.totalRealisticUsableDays.toFixed(1)}</strong> of <strong>{analytics.aggregate.totalTheoreticalWorkingDays.toFixed(1)}</strong> theoretical working days remaining.
+                          Team members can realistically use <strong>{Math.round(analytics.aggregate.totalRealisticUsableDays)}</strong> of <strong>{Math.round(analytics.aggregate.totalTheoreticalWorkingDays)}</strong> theoretical working days remaining.
                           Some periods are fully booked due to concurrent leave limits.
                         </p>
                       </div>
@@ -611,15 +611,15 @@ export default function LeaderDashboard() {
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-3">
                                 <div className="bg-white dark:bg-gray-900 p-3 rounded-md border border-gray-200 dark:border-gray-800">
                                   <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Avg. Usable Days</p>
-                                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{group.aggregate.groupAverageUsableDays.toFixed(1)}</p>
+                                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{Math.round(group.aggregate.groupAverageUsableDays)}</p>
                                 </div>
                                 <div className="bg-white dark:bg-gray-900 p-3 rounded-md border border-gray-200 dark:border-gray-800">
                                   <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Avg. Realistic Usable Days</p>
-                                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{group.aggregate.groupAverageRealisticUsableDays.toFixed(1)}</p>
+                                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{Math.round(group.aggregate.groupAverageRealisticUsableDays)}</p>
                                 </div>
                                 <div className="bg-white dark:bg-gray-900 p-3 rounded-md border border-gray-200 dark:border-gray-800">
                                   <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Avg. Remaining Balance</p>
-                                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{group.aggregate.groupAverageLeaveBalance.toFixed(1)}</p>
+                                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{Math.round(group.aggregate.groupAverageLeaveBalance)}</p>
                                 </div>
                               </div>
                             </div>

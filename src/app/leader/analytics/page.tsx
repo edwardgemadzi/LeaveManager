@@ -253,7 +253,7 @@ export default function LeaderAnalyticsPage() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Avg Balance</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{avgRemainingBalance.toFixed(1)}</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{Math.round(avgRemainingBalance)}</p>
                 </div>
               </div>
             </div>
@@ -274,7 +274,7 @@ export default function LeaderAnalyticsPage() {
               {team.settings.allowCarryover ? (
                 <div className="bg-green-50 dark:bg-green-900/30 rounded-lg p-4 border border-green-200 dark:border-green-800">
                   <p className="text-sm font-medium text-green-700 dark:text-green-400 mb-1">Will Carryover</p>
-                  <p className="text-3xl font-bold text-green-900 dark:text-green-300">{willCarryover.toFixed(1)} days</p>
+                  <p className="text-3xl font-bold text-green-900 dark:text-green-300">{Math.round(willCarryover)} days</p>
                   <p className="text-xs text-green-600 dark:text-green-400 mt-2">
                     Unused days carried to next year
                   </p>
@@ -282,7 +282,7 @@ export default function LeaderAnalyticsPage() {
               ) : (
                 <div className="bg-red-50 dark:bg-red-900/30 rounded-lg p-4 border border-red-200 dark:border-red-800">
                   <p className="text-sm font-medium text-red-700 dark:text-red-400 mb-1">Will Be Lost</p>
-                  <p className="text-3xl font-bold text-red-900 dark:text-red-300">{willLose.toFixed(1)} days</p>
+                  <p className="text-3xl font-bold text-red-900 dark:text-red-300">{Math.round(willLose)} days</p>
                   <p className="text-xs text-red-600 dark:text-red-400 mt-2">
                     Unused days lost at year end
                   </p>
@@ -293,7 +293,7 @@ export default function LeaderAnalyticsPage() {
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Utilization Rate</p>
                 <p className="text-3xl font-bold text-gray-900 dark:text-white">
                   {totalRemainingBalance > 0 
-                    ? ((projectionUsage / totalRemainingBalance) * 100).toFixed(1)
+                    ? Math.round((projectionUsage / totalRemainingBalance) * 100)
                     : 0}%
                 </p>
                 <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
@@ -394,7 +394,7 @@ export default function LeaderAnalyticsPage() {
                               )}
                             </p>
                             <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                              Avg: {group.aggregate.groupAverageLeaveBalance.toFixed(1)} (remaining)
+                              Avg: {Math.round(group.aggregate.groupAverageLeaveBalance)} (remaining)
                             </p>
                             {groupSurplus > 0 && (
                               <p className="text-xs text-green-600 dark:text-green-400 mt-1">
@@ -409,7 +409,7 @@ export default function LeaderAnalyticsPage() {
                           {Math.round(group.aggregate.groupTotalRealisticUsableDays)}
                         </p>
                             <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                              Avg: {group.aggregate.groupAverageRealisticUsableDays.toFixed(1)}
+                              Avg: {Math.round(group.aggregate.groupAverageRealisticUsableDays)}
                             </p>
                           </div>
 
@@ -419,7 +419,7 @@ export default function LeaderAnalyticsPage() {
                           {Math.round(group.aggregate.groupTotalUsableDays)}
                         </p>
                             <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                              Avg: {group.aggregate.groupAverageUsableDays.toFixed(1)}
+                              Avg: {Math.round(group.aggregate.groupAverageUsableDays)}
                             </p>
                           </div>
 
@@ -430,7 +430,7 @@ export default function LeaderAnalyticsPage() {
                             </p>
                             <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                               {groupMembers.length > 0 
-                                ? (group.aggregate.groupTotalRealisticUsableDays / groupMembers.length).toFixed(1)
+                                ? Math.round(group.aggregate.groupTotalRealisticUsableDays / groupMembers.length)
                                 : 0} days/member
                             </p>
                           </div>

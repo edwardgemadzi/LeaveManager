@@ -486,7 +486,7 @@ export default function MemberDashboard() {
                       </p>
                       <p className="text-sm text-blue-700 dark:text-blue-400 font-medium">
                         Realistic usable days per member: <strong>{Math.round(analytics.realisticUsableDays ?? 0)}</strong> days 
-                        ({analytics.averageDaysPerMember.toFixed(1)} average)
+                        ({Math.round(analytics.averageDaysPerMember)} average)
                       </p>
                     </div>
                   </div>
@@ -504,7 +504,7 @@ export default function MemberDashboard() {
                       <div>
                         <p className="font-semibold text-red-900 dark:text-red-300 mb-1">High Demand Alert</p>
                         <p className="text-sm text-red-700 dark:text-red-400">
-                          You have <strong>{Math.round(analytics.remainingLeaveBalance)}</strong> leave days remaining, but on average only <strong>{analytics.averageDaysPerMember.toFixed(1)}</strong> days per member are available.
+                          You have <strong>{Math.round(analytics.remainingLeaveBalance)}</strong> leave days remaining, but on average only <strong>{Math.round(analytics.averageDaysPerMember)}</strong> days per member are available.
                           Consider coordinating with your team members to avoid conflicts.
                         </p>
                       </div>
@@ -548,7 +548,7 @@ export default function MemberDashboard() {
                             <CheckCircleIcon className="h-6 w-6 text-green-700 dark:text-green-400" />
                           </div>
                           <div>
-                            <p className="text-2xl font-bold text-green-700 dark:text-green-400">{analytics.willCarryover.toFixed(1)} days</p>
+                            <p className="text-2xl font-bold text-green-700 dark:text-green-400">{Math.round(analytics.willCarryover)} days</p>
                             <p className="text-sm text-green-600 dark:text-green-400">will carry over to next year</p>
                           </div>
                         </div>
@@ -575,7 +575,7 @@ export default function MemberDashboard() {
                             <ExclamationTriangleIcon className="h-6 w-6 text-red-700 dark:text-red-400" />
                           </div>
                           <div>
-                            <p className="text-2xl font-bold text-red-700 dark:text-red-400">{analytics.willLose.toFixed(1)} days</p>
+                            <p className="text-2xl font-bold text-red-700 dark:text-red-400">{Math.round(analytics.willLose)} days</p>
                             <p className="text-sm text-red-600 dark:text-red-400">will be lost at year end</p>
                           </div>
                         </div>
@@ -609,7 +609,7 @@ export default function MemberDashboard() {
                       ></div>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                      {((analytics.workingDaysUsed / analytics.workingDaysInYear) * 100).toFixed(1)}% of working days used this year
+                      {Math.round((analytics.workingDaysUsed / analytics.workingDaysInYear) * 100)}% of working days used this year
                     </p>
                   </div>
                 </div>
