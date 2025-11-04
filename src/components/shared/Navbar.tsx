@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { CalendarIcon, SunIcon, MoonIcon } from '@heroicons/react/24/outline';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -17,6 +17,7 @@ export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
@@ -53,43 +54,127 @@ export default function Navbar() {
               <div className="flex items-center space-x-1">
                         {user.role === 'leader' ? (
                           <>
-                            <Link href="/leader/dashboard" className="nav-tab">
+                            <Link 
+                              href="/leader/dashboard" 
+                              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors duration-200 ${
+                                pathname === '/leader/dashboard' 
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' 
+                                  : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
+                              }`}
+                            >
                               Dashboard
                             </Link>
-                            <Link href="/leader/leave-balance" className="nav-tab">
+                            <Link 
+                              href="/leader/leave-balance" 
+                              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors duration-200 ${
+                                pathname === '/leader/leave-balance' 
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' 
+                                  : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
+                              }`}
+                            >
                               Leave Balance
                             </Link>
-                            <Link href="/leader/analytics" className="nav-tab">
+                            <Link 
+                              href="/leader/analytics" 
+                              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors duration-200 ${
+                                pathname === '/leader/analytics' 
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' 
+                                  : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
+                              }`}
+                            >
                               Analytics
                             </Link>
-                            <Link href="/leader/requests" className="nav-tab">
+                            <Link 
+                              href="/leader/requests" 
+                              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors duration-200 ${
+                                pathname === '/leader/requests' 
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' 
+                                  : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
+                              }`}
+                            >
                               Requests
                             </Link>
-                            <Link href="/leader/calendar" className="nav-tab">
+                            <Link 
+                              href="/leader/calendar" 
+                              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors duration-200 ${
+                                pathname === '/leader/calendar' 
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' 
+                                  : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
+                              }`}
+                            >
                               Calendar
                             </Link>
-                            <Link href="/leader/members" className="nav-tab">
+                            <Link 
+                              href="/leader/members" 
+                              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors duration-200 ${
+                                pathname === '/leader/members' 
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' 
+                                  : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
+                              }`}
+                            >
                               Members
                             </Link>
-                            <Link href="/leader/settings" className="nav-tab">
+                            <Link 
+                              href="/leader/settings" 
+                              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors duration-200 ${
+                                pathname === '/leader/settings' 
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' 
+                                  : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
+                              }`}
+                            >
                               Settings
                             </Link>
-                            <Link href="/leader/profile" className="nav-tab">
+                            <Link 
+                              href="/leader/profile" 
+                              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors duration-200 ${
+                                pathname === '/leader/profile' 
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' 
+                                  : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
+                              }`}
+                            >
                               Profile
                             </Link>
                           </>
                         ) : (
                   <>
-                    <Link href="/member/dashboard" className="nav-tab">
+                    <Link 
+                      href="/member/dashboard" 
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors duration-200 ${
+                        pathname === '/member/dashboard' 
+                          ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' 
+                          : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
+                      }`}
+                    >
                       Dashboard
                     </Link>
-                    <Link href="/member/requests" className="nav-tab">
+                    <Link 
+                      href="/member/requests" 
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors duration-200 ${
+                        pathname === '/member/requests' 
+                          ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' 
+                          : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
+                      }`}
+                    >
                       My Requests
                     </Link>
-                    <Link href="/member/calendar" className="nav-tab">
+                    <Link 
+                      href="/member/calendar" 
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors duration-200 ${
+                        pathname === '/member/calendar' 
+                          ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' 
+                          : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
+                      }`}
+                    >
                       Calendar
                     </Link>
-                    <Link href="/member/profile" className="nav-tab">
+                    <Link 
+                      href="/member/profile" 
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors duration-200 ${
+                        pathname === '/member/profile' 
+                          ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' 
+                          : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'
+                      }`}
+                    >
                       Profile
                     </Link>
                   </>
@@ -155,43 +240,43 @@ export default function Navbar() {
             <div className="px-2 pt-2 pb-3 space-y-1">
               {user.role === 'leader' ? (
                 <>
-                  <Link href="/leader/dashboard" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-900 rounded-xl text-sm font-medium transition-colors duration-200">
+                  <Link href="/leader/dashboard" onClick={() => setIsOpen(false)} className={`block px-4 py-3 rounded-xl text-sm font-medium transition-colors duration-200 ${pathname === '/leader/dashboard' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-900'}`}>
                     Dashboard
                   </Link>
-                  <Link href="/leader/leave-balance" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-sm font-medium transition-colors duration-200">
+                  <Link href="/leader/leave-balance" onClick={() => setIsOpen(false)} className={`block px-4 py-3 rounded-xl text-sm font-medium transition-colors duration-200 ${pathname === '/leader/leave-balance' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                     Leave Balance
                   </Link>
-                  <Link href="/leader/analytics" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-sm font-medium transition-colors duration-200">
+                  <Link href="/leader/analytics" onClick={() => setIsOpen(false)} className={`block px-4 py-3 rounded-xl text-sm font-medium transition-colors duration-200 ${pathname === '/leader/analytics' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                     Analytics
                   </Link>
-                  <Link href="/leader/requests" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-sm font-medium transition-colors duration-200">
+                  <Link href="/leader/requests" onClick={() => setIsOpen(false)} className={`block px-4 py-3 rounded-xl text-sm font-medium transition-colors duration-200 ${pathname === '/leader/requests' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                     Requests
                   </Link>
-                  <Link href="/leader/calendar" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-sm font-medium transition-colors duration-200">
+                  <Link href="/leader/calendar" onClick={() => setIsOpen(false)} className={`block px-4 py-3 rounded-xl text-sm font-medium transition-colors duration-200 ${pathname === '/leader/calendar' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                     Calendar
                   </Link>
-                  <Link href="/leader/members" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-sm font-medium transition-colors duration-200">
+                  <Link href="/leader/members" onClick={() => setIsOpen(false)} className={`block px-4 py-3 rounded-xl text-sm font-medium transition-colors duration-200 ${pathname === '/leader/members' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                     Members
                   </Link>
-                  <Link href="/leader/settings" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-sm font-medium transition-colors duration-200">
+                  <Link href="/leader/settings" onClick={() => setIsOpen(false)} className={`block px-4 py-3 rounded-xl text-sm font-medium transition-colors duration-200 ${pathname === '/leader/settings' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                     Settings
                   </Link>
-                  <Link href="/leader/profile" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-sm font-medium transition-colors duration-200">
+                  <Link href="/leader/profile" onClick={() => setIsOpen(false)} className={`block px-4 py-3 rounded-xl text-sm font-medium transition-colors duration-200 ${pathname === '/leader/profile' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                     Profile
                   </Link>
                 </>
               ) : (
                 <>
-                  <Link href="/member/dashboard" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-900 rounded-xl text-sm font-medium transition-colors duration-200">
+                  <Link href="/member/dashboard" onClick={() => setIsOpen(false)} className={`block px-4 py-3 rounded-xl text-sm font-medium transition-colors duration-200 ${pathname === '/member/dashboard' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-900'}`}>
                     Dashboard
                   </Link>
-                  <Link href="/member/requests" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-sm font-medium transition-colors duration-200">
+                  <Link href="/member/requests" onClick={() => setIsOpen(false)} className={`block px-4 py-3 rounded-xl text-sm font-medium transition-colors duration-200 ${pathname === '/member/requests' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                     My Requests
                   </Link>
-                  <Link href="/member/calendar" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-sm font-medium transition-colors duration-200">
+                  <Link href="/member/calendar" onClick={() => setIsOpen(false)} className={`block px-4 py-3 rounded-xl text-sm font-medium transition-colors duration-200 ${pathname === '/member/calendar' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                     Calendar
                   </Link>
-                  <Link href="/member/profile" onClick={() => setIsOpen(false)} className="block px-4 py-3 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl text-sm font-medium transition-colors duration-200">
+                  <Link href="/member/profile" onClick={() => setIsOpen(false)} className={`block px-4 py-3 rounded-xl text-sm font-medium transition-colors duration-200 ${pathname === '/member/profile' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                     Profile
                   </Link>
                 </>
