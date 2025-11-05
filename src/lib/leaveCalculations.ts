@@ -139,15 +139,6 @@ export const calculateLeaveBalance = (
   const daysUsed = manualYearToDateUsed !== undefined ? manualYearToDateUsed : approvedWorkingDays;
   const remainingBalance = baseBalance - daysUsed;
   
-  // Debug logging for specific cases
-  if (manualLeaveBalance !== undefined && approvedRequests.length > 0 && approvedWorkingDays === 0) {
-    console.log(`[DEBUG calculateLeaveBalance] baseBalance=${baseBalance}, approvedRequests=${approvedRequests.length}, approvedWorkingDays=${approvedWorkingDays}, remainingBalance=${remainingBalance}`);
-    approvedRequests.forEach((req, idx) => {
-      const reqStart = new Date(req.startDate);
-      const reqEnd = new Date(req.endDate);
-      console.log(`  Request ${idx + 1}: ${reqStart.toISOString()} to ${reqEnd.toISOString()}, overlaps=${reqStart <= yearEnd && reqEnd >= yearStart}`);
-    });
-  }
   
   return remainingBalance;
 };

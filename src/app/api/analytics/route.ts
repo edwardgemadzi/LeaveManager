@@ -53,16 +53,6 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString()
     });
     
-    // Debug: Log team object structure to verify it's properly fetched
-    console.log('[Analytics API] Team fetched from MongoDB:', {
-      _id: team._id,
-      hasSettings: !!team.settings,
-      settingsType: typeof team.settings,
-      concurrentLeave: team.settings?.concurrentLeave,
-      concurrentLeaveType: typeof team.settings?.concurrentLeave,
-      settingsKeys: team.settings ? Object.keys(team.settings) : []
-    });
-    
     // Verify team.settings exists and has concurrentLeave - DO NOT override actual values
     // This validation ensures all calculation functions receive a valid team object with concurrent leave settings
     if (!team.settings) {
@@ -83,8 +73,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid concurrent leave setting' }, { status: 500 });
     }
     
-    console.log('[Analytics API] Team validated - concurrentLeave:', team.settings.concurrentLeave);
-    console.log('[Analytics API] Full team settings:', JSON.stringify(team.settings, null, 2));
 
     // Fetch user data
     const currentUser = await UserModel.findById(user.id);

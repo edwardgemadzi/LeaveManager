@@ -7,7 +7,7 @@ import { useToast } from '@/contexts/ToastContext';
 import { MinusIcon, PlusIcon } from '@heroicons/react/24/outline';
 
 export default function TeamSettingsPage() {
-  const { showSuccess, showError } = useToast();
+  const { showSuccess } = useToast();
   const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

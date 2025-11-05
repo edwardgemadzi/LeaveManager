@@ -754,11 +754,6 @@ export const getMemberAnalytics = (
   // - If manualLeaveBalance is not set, use maxLeavePerYear
   const baseLeaveBalance = user.manualLeaveBalance !== undefined ? user.manualLeaveBalance : team.settings.maxLeavePerYear;
   
-  // Debug: Log if approvedRequests is empty but manualLeaveBalance is set
-  if (user.manualLeaveBalance !== undefined && approvedRequestsForCalculation.length === 0) {
-    console.log(`[DEBUG] User ${user.username}: manualLeaveBalance=${user.manualLeaveBalance}, but no approved requests found`);
-  }
-  
   const remainingLeaveBalance = calculateLeaveBalance(
     team.settings.maxLeavePerYear,
     approvedRequestsForCalculation,
@@ -766,19 +761,6 @@ export const getMemberAnalytics = (
     user.manualLeaveBalance,
     user.manualYearToDateUsed
   );
-  
-  // Debug: Log if remaining equals base (indicates no approved requests were counted)
-  if (user.manualLeaveBalance !== undefined && Math.round(remainingLeaveBalance) === Math.round(baseLeaveBalance) && approvedRequestsForCalculation.length > 0) {
-    console.log(`[DEBUG getMemberAnalytics] User ${user.username}: remainingBalance=${remainingLeaveBalance}, baseBalance=${baseLeaveBalance}, approvedRequests=${approvedRequestsForCalculation.length}`);
-    approvedRequestsForCalculation.forEach((req, idx) => {
-      console.log(`  [DEBUG] Request ${idx + 1}: ${req.startDate.toISOString()} to ${req.endDate.toISOString()}`);
-    });
-  }
-  
-  // Always log for specific users to debug
-  if (user.username === 'francisbentum' || user.username === 'edgemadzi') {
-    console.log(`[DEBUG getMemberAnalytics] ${user.username}: baseBalance=${baseLeaveBalance}, remainingBalance=${remainingLeaveBalance}, approvedRequests=${approvedRequestsForCalculation.length}`);
-  }
   
   // Calculate surplus balance
   const surplusBalance = calculateSurplusBalance(user.manualLeaveBalance, team.settings.maxLeavePerYear);
@@ -1095,27 +1077,6 @@ export const getGroupedTeamAnalytics = (
       const memberId = member._id ? String(member._id) : '';
       return reqUserId === memberId && req.status === 'approved';
     });
-    
-    // Debug logging for specific users
-    if (member.username === 'francisbentum' || member.username === 'edgemadzi') {
-      console.log(`[DEBUG getGroupedTeamAnalytics] ${member.username}:`);
-      console.log(`  member._id: ${member._id} (type: ${typeof member._id})`);
-      console.log(`  memberRequests.length=${memberRequests.length}, manualLeaveBalance=${member.manualLeaveBalance}`);
-      console.log(`  allRequests.length=${allRequests.length}`);
-      memberRequests.forEach((req, idx) => {
-        console.log(`  Request ${idx + 1}: userId=${req.userId} (type: ${typeof req.userId}), ${req.startDate} to ${req.endDate}, status=${req.status}`);
-      });
-      // Also check allRequests for this user
-      const allUserRequests = allRequests.filter(req => {
-        const reqUserId = req.userId ? String(req.userId) : '';
-        const memberId = member._id ? String(member._id) : '';
-        return reqUserId === memberId;
-      });
-      console.log(`  All requests for ${member.username}: ${allUserRequests.length}`);
-      allUserRequests.forEach((req, idx) => {
-        console.log(`    All Request ${idx + 1}: userId=${req.userId}, ${req.startDate} to ${req.endDate}, status=${req.status}`);
-      });
-    }
     
     const analytics = getMemberAnalytics(
       member,

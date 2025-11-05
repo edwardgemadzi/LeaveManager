@@ -141,7 +141,6 @@ export default function LeaderDashboard() {
     
     // Listen for settings updates to refresh analytics
     const handleSettingsUpdated = () => {
-      console.log('[Dashboard] Settings updated event received, refetching analytics...');
       // Add a small delay to ensure database write is fully committed before fetching
       setTimeout(() => {
         refetchData();

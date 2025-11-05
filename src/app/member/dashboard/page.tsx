@@ -57,7 +57,6 @@ export default function MemberDashboard() {
         }
 
         const data = await response.json();
-        console.log('Dashboard data received:', data);
         
         // Set team and user data
         setTeam(data.team);
@@ -73,7 +72,6 @@ export default function MemberDashboard() {
           if (previousRequestsRef.current.length === 0) {
             previousRequestsRef.current = myRequests;
           }
-          console.log('My requests filtered:', myRequests.length);
         } else {
           console.error('Expected array but got:', typeof data.requests, data.requests);
           setMyRequests([]);
@@ -81,13 +79,6 @@ export default function MemberDashboard() {
 
         // Set analytics (structure for members: { analytics: MemberAnalytics })
         if (data.analytics && data.analytics.analytics) {
-          console.log('Member Dashboard - Analytics data received:', data.analytics.analytics);
-          console.log('Member Dashboard - Fields:', {
-            usableDays: data.analytics.analytics.usableDays,
-            realisticUsableDays: data.analytics.analytics.realisticUsableDays,
-            theoreticalWorkingDays: data.analytics.analytics.theoreticalWorkingDays,
-            remainingLeaveBalance: data.analytics.analytics.remainingLeaveBalance
-          });
           setAnalytics(data.analytics.analytics);
         } else {
           console.error('No analytics data in response');
@@ -103,7 +94,6 @@ export default function MemberDashboard() {
     
     // Listen for settings updates to refresh analytics
     const handleSettingsUpdated = () => {
-      console.log('[Member Dashboard] Settings updated event received, refetching analytics...');
       // Add a small delay to ensure database write is fully committed before fetching
       setTimeout(() => {
         fetchData();
@@ -156,7 +146,7 @@ export default function MemberDashboard() {
           
           // Update state if requests changed
           if (currentRequests.length !== myRequests.length || 
-              currentRequests.some((req, idx) => req._id !== myRequests[idx]?._id || req.status !== myRequests[idx]?.status)) {
+              currentRequests.some((req: LeaveRequest, idx: number) => req._id !== myRequests[idx]?._id || req.status !== myRequests[idx]?.status)) {
             setMyRequests(currentRequests);
             setTeam(data.team);
             if (data.currentUser) {
@@ -241,7 +231,6 @@ export default function MemberDashboard() {
 
   const getLeaveBalance = () => {
     if (!team || !user) {
-      console.log('Leave balance calculation: Missing team or user data', { team: !!team, user: !!user });
       return { balance: 0, surplus: 0 };
     }
     
@@ -253,13 +242,6 @@ export default function MemberDashboard() {
         reason: req.reason
       }));
 
-    console.log('Leave balance calculation:', {
-      maxLeavePerYear: team.settings.maxLeavePerYear,
-      approvedRequests: approvedRequests.length,
-      shiftSchedule: user.shiftSchedule,
-      myRequests: myRequests.length
-    });
-
     const balance = calculateLeaveBalance(
       team.settings.maxLeavePerYear,
       approvedRequests,
@@ -270,7 +252,6 @@ export default function MemberDashboard() {
     
     const surplus = calculateSurplusBalance(user.manualLeaveBalance, team.settings.maxLeavePerYear);
     
-    console.log('Calculated leave balance:', balance, 'Surplus:', surplus);
     return { balance, surplus };
   };
 

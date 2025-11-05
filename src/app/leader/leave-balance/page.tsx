@@ -10,7 +10,7 @@ import { UsersIcon, CalendarIcon, ChartBarIcon, ArrowTrendingUpIcon } from '@her
 import { useNotification } from '@/hooks/useNotification';
 
 export default function LeaderLeaveBalancePage() {
-  const { showSuccess, showError, showInfo } = useNotification();
+  const { showError, showInfo } = useNotification();
   const [team, setTeam] = useState<Team | null>(null);
   const [members, setMembers] = useState<User[]>([]);
   const [allRequests, setAllRequests] = useState<LeaveRequest[]>([]);
@@ -64,7 +64,6 @@ export default function LeaderLeaveBalancePage() {
         console.error('Failed to fetch team data:', teamResponse.status);
       } else {
         const teamData = await teamResponse.json();
-        console.log('[Leave Balance] Team data fetched. Concurrent leave:', teamData.team?.settings?.concurrentLeave);
         setTeam(teamData.team);
         setMembers(teamData.members || []);
       }
@@ -80,10 +79,6 @@ export default function LeaderLeaveBalancePage() {
         const analyticsData = await analyticsResponse.json();
         const groupedData = analyticsData.analytics || analyticsData.grouped || null;
         if (groupedData) {
-          console.log('[Leave Balance] Analytics updated - Sample member usable days:', groupedData.groups?.[0]?.members?.[0]?.analytics?.usableDays);
-          console.log('[Leave Balance] Analytics updated - Total usable days:', groupedData.aggregate?.totalUsableDays);
-          console.log('[Leave Balance] Analytics updated - Total realistic usable days:', groupedData.aggregate?.totalRealisticUsableDays);
-          console.log('[Leave Balance] Team concurrent leave from team state:', team?.settings?.concurrentLeave);
           setAnalytics(groupedData);
         }
       } else {
@@ -117,7 +112,6 @@ export default function LeaderLeaveBalancePage() {
     const handleSettingsUpdated = () => {
       // Refetch data when settings are updated
       // Add a small delay to ensure database write is fully committed before fetching
-      console.log('[Leave Balance] Settings updated event received, refetching analytics...');
       setTimeout(() => {
         fetchData();
       }, 200);
@@ -155,21 +149,6 @@ export default function LeaderLeaveBalancePage() {
       req.status === 'approved' && (!req.reason || !isMaternityLeave(req.reason))
     );
     
-    // Debug logging for specific user
-    if (member.username === 'iguimbi') {
-      console.log('[DEBUG iguimbi] Member requests:', memberRequests.length);
-      console.log('[DEBUG iguimbi] Approved requests (non-maternity):', approvedRequests.length);
-      console.log('[DEBUG iguimbi] Manual leave balance:', member.manualLeaveBalance);
-      console.log('[DEBUG iguimbi] Manual year-to-date used:', member.manualYearToDateUsed);
-      approvedRequests.forEach((req, idx) => {
-        console.log(`[DEBUG iguimbi] Request ${idx + 1}:`, {
-          startDate: req.startDate,
-          endDate: req.endDate,
-          reason: req.reason,
-          status: req.status
-        });
-      });
-    }
     
     const shiftSchedule = member.shiftSchedule || {
       pattern: [true, true, true, true, true, false, false],

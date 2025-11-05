@@ -72,9 +72,6 @@ export default function LeaderAnalyticsPage() {
           const groupedData = analyticsData.analytics || analyticsData.grouped || null;
           
           if (groupedData) {
-            console.log('[Analytics Page] Analytics received - Sample usable days:', groupedData.groups?.[0]?.members?.[0]?.analytics?.usableDays);
-            console.log('[Analytics Page] Analytics received - Total usable days:', groupedData.aggregate?.totalUsableDays);
-            console.log('[Analytics Page] Analytics received - Total realistic usable days:', groupedData.aggregate?.totalRealisticUsableDays);
             setAnalytics(groupedData);
           } else {
             console.error('Analytics page - No analytics data found in response');
@@ -96,7 +93,6 @@ export default function LeaderAnalyticsPage() {
     
     // Listen for settings updates to refresh analytics
     const handleSettingsUpdated = () => {
-      console.log('[Analytics] Settings updated event received, refetching analytics...');
       // Add a small delay to ensure database write is fully committed before fetching
       setTimeout(() => {
         fetchData();
