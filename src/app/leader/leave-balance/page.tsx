@@ -94,7 +94,6 @@ export default function LeaderLeaveBalancePage() {
 
   useEffect(() => {
     fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-refresh on window focus to get updated data after deletions
@@ -125,7 +124,6 @@ export default function LeaderLeaveBalancePage() {
       window.removeEventListener('leaveRequestDeleted', handleRequestDeleted);
       window.removeEventListener('teamSettingsUpdated', handleSettingsUpdated);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Helper function to find member analytics data from grouped analytics
