@@ -317,7 +317,35 @@ export const schemas = {
         'number.min': 'Minimum notice period cannot be negative',
         'number.max': 'Minimum notice period cannot exceed 30 days',
         'any.required': 'Minimum notice period is required'
+      }),
+    bypassNoticePeriod: Joi.object({
+      enabled: Joi.boolean().optional(),
+      startDate: Joi.date().optional(),
+      endDate: Joi.date().when('startDate', {
+        is: Joi.exist(),
+        then: Joi.date().min(Joi.ref('startDate')).required(),
+        otherwise: Joi.date().optional()
       })
+    }).optional(),
+    maternityLeave: Joi.object({
+      maxDays: Joi.number()
+        .integer()
+        .min(1)
+        .max(365)
+        .optional()
+        .messages({
+          'number.base': 'Max maternity leave days must be a number',
+          'number.integer': 'Max maternity leave days must be a whole number',
+          'number.min': 'Max maternity leave days must be at least 1',
+          'number.max': 'Max maternity leave days cannot exceed 365'
+        }),
+      countingMethod: Joi.string()
+        .valid('calendar', 'working')
+        .optional()
+        .messages({
+          'any.only': 'Counting method must be either "calendar" or "working"'
+        })
+    }).optional()
   })
 };
 

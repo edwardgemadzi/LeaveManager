@@ -681,7 +681,7 @@ export default function LeaderMembersPage() {
                             
                             if (workingDaysTag && workingDaysTag !== 'no-schedule') {
                               return (
-                                <div className="flex items-center gap-2 mt-1">
+                            <div className="flex items-center gap-2 mt-1">
                                   <span className="text-xs text-gray-500 dark:text-gray-400">Working Days:</span>
                                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400">
                                     {getWorkingDaysGroupDisplayName(workingDaysTag, team?.settings)}
@@ -690,8 +690,8 @@ export default function LeaderMembersPage() {
                                         ({workingDaysTag.substring(0, 6)}{workingDaysTag.length > 6 ? '...' : ''})
                                       </span>
                                     )}
-                                  </span>
-                                </div>
+                              </span>
+                            </div>
                               );
                             }
                             return null;

@@ -3,16 +3,20 @@
 import { useState, useEffect } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
-import { Team } from '@/types';
-import { GroupedTeamAnalytics } from '@/lib/analyticsCalculations';
+import { Team, User, LeaveRequest } from '@/types';
+import { GroupedTeamAnalytics, getMaternityMemberAnalytics } from '@/lib/analyticsCalculations';
 import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
+import { calculateMaternityLeaveBalance, isMaternityLeave, countMaternityLeaveDays } from '@/lib/leaveCalculations';
 import { UsersIcon, CalendarIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 
 export default function LeaderAnalyticsPage() {
   const [team, setTeam] = useState<Team | null>(null);
+  const [members, setMembers] = useState<User[]>([]);
+  const [allRequests, setAllRequests] = useState<LeaveRequest[]>([]);
   const [analytics, setAnalytics] = useState<GroupedTeamAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedSubgroup, setSelectedSubgroup] = useState<string>('all');
+  const [showMaternityLeave, setShowMaternityLeave] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -39,6 +43,19 @@ export default function LeaderAnalyticsPage() {
         
         const teamData = await teamResponse.json();
         setTeam(teamData.team);
+        setMembers(teamData.members || []);
+
+        // Fetch leave requests
+        const requestsResponse = await fetch('/api/leave-requests', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (requestsResponse.ok) {
+          const requestsData = await requestsResponse.json();
+          setAllRequests(requestsData.requests || []);
+        }
 
         // Fetch analytics
         const analyticsResponse = await fetch('/api/analytics', {
@@ -153,6 +170,7 @@ export default function LeaderAnalyticsPage() {
   const totalRemainingBalance = analytics.aggregate.totalRemainingLeaveBalance || 0;
   const avgRemainingBalance = analytics.aggregate.averageRemainingBalance || 0;
   const totalRealisticUsableDays = analytics.aggregate.totalRealisticUsableDays || 0;
+  const totalRemainderDays = analytics.aggregate.totalRemainderDays || 0;
 
   // Calculate total surplus balance across all members
   const allMembers = analytics.groups.flatMap(group => group.members);
@@ -240,6 +258,11 @@ export default function LeaderAnalyticsPage() {
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Realistic Usable</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">{Math.round(totalRealisticUsableDays)}</p>
+                  {totalRemainderDays > 0 && (
+                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 font-medium">
+                      +{totalRemainderDays} day(s) need allocation
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -303,25 +326,46 @@ export default function LeaderAnalyticsPage() {
             </div>
           </div>
 
-          {/* Subgroup Filter */}
-          {team.settings.enableSubgrouping && subgroups.length > 0 && (
-            <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-4 mb-6 border border-gray-100 dark:border-gray-800">
-              <div className="flex items-center space-x-4">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Filter by Subgroup:</label>
-                <select
-                  value={selectedSubgroup}
-                  onChange={(e) => setSelectedSubgroup(e.target.value)}
-                  className="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
+          {/* Filters */}
+          <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-4 mb-6 border border-gray-100 dark:border-gray-800">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              {/* Subgroup Filter */}
+              {team.settings.enableSubgrouping && subgroups.length > 0 && (
+                <div className="flex items-center space-x-4">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Filter by Subgroup:</label>
+                  <select
+                    value={selectedSubgroup}
+                    onChange={(e) => setSelectedSubgroup(e.target.value)}
+                    className="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
+                  >
+                    <option value="all">All Subgroups</option>
+                    {subgroups.map(subgroup => (
+                      <option key={subgroup} value={subgroup}>{subgroup}</option>
+                    ))}
+                    <option value="Ungrouped">Ungrouped</option>
+                  </select>
+                </div>
+              )}
+              
+              {/* Maternity Leave Toggle */}
+              <div className="flex items-center space-x-3">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Show Maternity/Paternity Leave:</label>
+                <button
+                  type="button"
+                  onClick={() => setShowMaternityLeave(!showMaternityLeave)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${
+                    showMaternityLeave ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'
+                  }`}
                 >
-                  <option value="all">All Subgroups</option>
-                  {subgroups.map(subgroup => (
-                    <option key={subgroup} value={subgroup}>{subgroup}</option>
-                  ))}
-                  <option value="Ungrouped">Ungrouped</option>
-                </select>
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      showMaternityLeave ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
               </div>
             </div>
-          )}
+          </div>
 
           {/* Grouped Analytics */}
           <div className="space-y-6 mb-6">
@@ -381,7 +425,7 @@ export default function LeaderAnalyticsPage() {
                       const groupSurplus = groupMembers.reduce((sum, m) => sum + m.analytics.surplusBalance, 0);
                       const groupMembersWithSurplus = groupMembers.filter(m => m.analytics.surplusBalance > 0).length;
                       return (
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                           <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-800">
                             <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Remaining Balance</p>
                             <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">
@@ -399,9 +443,9 @@ export default function LeaderAnalyticsPage() {
                             {groupSurplus > 0 && (
                               <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                                 {groupMembersWithSurplus} member(s) with surplus
-                              </p>
+                        </p>
                             )}
-                          </div>
+                      </div>
 
                           <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-800">
                         <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Realistic Usable Days</p>
@@ -411,7 +455,12 @@ export default function LeaderAnalyticsPage() {
                             <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                               Avg: {Math.round(group.aggregate.groupAverageRealisticUsableDays)}
                             </p>
-                          </div>
+                            {group.aggregate.groupTotalRemainderDays > 0 && (
+                              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 font-medium">
+                                +{group.aggregate.groupTotalRemainderDays} day(s) need allocation
+                        </p>
+                            )}
+                      </div>
 
                           <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-800">
                         <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Usable Days</p>
@@ -420,21 +469,21 @@ export default function LeaderAnalyticsPage() {
                         </p>
                             <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                               Avg: {Math.round(group.aggregate.groupAverageUsableDays)}
-                            </p>
-                          </div>
+                        </p>
+                      </div>
 
                           <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-800">
                             <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Competition Level</p>
                             <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">
-                              {groupMembers.length} members
-                            </p>
+                          {groupMembers.length} members
+                        </p>
                             <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                              {groupMembers.length > 0 
+                          {groupMembers.length > 0 
                                 ? Math.round(group.aggregate.groupTotalRealisticUsableDays / groupMembers.length)
-                                : 0} days/member
-                            </p>
-                          </div>
-                        </div>
+                            : 0} days/member
+                        </p>
+                      </div>
+                    </div>
                       );
                     })()}
 
@@ -515,6 +564,141 @@ export default function LeaderAnalyticsPage() {
               })
             )}
           </div>
+
+          {/* Maternity Leave Analytics */}
+          {showMaternityLeave && team && members.length > 0 && (() => {
+            const maxMaternityLeaveDays = team.settings.maternityLeave?.maxDays || 90;
+            const countingMethod = team.settings.maternityLeave?.countingMethod || 'working';
+            
+            // Calculate maternity leave analytics for all members
+            const memberMaternityAnalytics = members
+              .filter(m => m.role === 'member')
+              .map(member => {
+                const memberRequests = allRequests.filter(req => 
+                  req.userId === member._id && req.status === 'approved'
+                );
+                
+                const maternityAnalytics = getMaternityMemberAnalytics(
+                  member,
+                  team,
+                  memberRequests
+                );
+                
+                return {
+                  member,
+                  analytics: maternityAnalytics
+                };
+              })
+              .filter(m => m.analytics.baseMaternityLeaveBalance > 0); // Only show members with maternity leave
+
+            const totalMaternityRemaining = memberMaternityAnalytics.reduce((sum, m) => sum + m.analytics.remainingMaternityLeaveBalance, 0);
+            const totalMaternityUsed = memberMaternityAnalytics.reduce((sum, m) => sum + m.analytics.maternityDaysUsed, 0);
+            const avgMaternityRemaining = memberMaternityAnalytics.length > 0 ? totalMaternityRemaining / memberMaternityAnalytics.length : 0;
+
+            return (
+              <div className="space-y-6 mb-6">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Maternity/Paternity Leave Analytics</h2>
+                
+                {/* Summary Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                  <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-6 border border-gray-100 dark:border-gray-800">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900/30 rounded-lg flex items-center justify-center">
+                          <CalendarIcon className="h-6 w-6 text-pink-700 dark:text-pink-400" />
+                        </div>
+                      </div>
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Remaining</p>
+                        <p className="text-2xl font-bold text-gray-900 dark:text-white">{Math.round(totalMaternityRemaining)}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-6 border border-gray-100 dark:border-gray-800">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900/30 rounded-lg flex items-center justify-center">
+                          <ChartBarIcon className="h-6 w-6 text-pink-700 dark:text-pink-400" />
+                        </div>
+                      </div>
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Used</p>
+                        <p className="text-2xl font-bold text-gray-900 dark:text-white">{Math.round(totalMaternityUsed)}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-6 border border-gray-100 dark:border-gray-800">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900/30 rounded-lg flex items-center justify-center">
+                          <UsersIcon className="h-6 w-6 text-pink-700 dark:text-pink-400" />
+                        </div>
+                      </div>
+                      <div className="ml-4">
+                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Avg Remaining</p>
+                        <p className="text-2xl font-bold text-gray-900 dark:text-white">{Math.round(avgMaternityRemaining)}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          {memberMaternityAnalytics.length} member(s) with maternity leave
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Member Maternity Leave Details */}
+                {memberMaternityAnalytics.length > 0 ? (
+                  <div className="bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-100 dark:border-gray-800">
+                    <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Member Maternity/Paternity Leave Details</h3>
+                    </div>
+                    <div className="divide-y divide-gray-200 dark:divide-gray-800">
+                      {memberMaternityAnalytics.map(({ member, analytics: maternityAnalytics }) => (
+                        <div key={member._id} className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-900">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                                {member.fullName || member.username}
+                              </h4>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{member.username}</p>
+                            </div>
+                            <div className="text-right mr-6">
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Balance</p>
+                              <p className="font-medium text-gray-900 dark:text-white">
+                                {Math.round(maternityAnalytics.remainingMaternityLeaveBalance)} / {maxMaternityLeaveDays}
+                              </p>
+                              {maternityAnalytics.surplusMaternityBalance > 0 && (
+                                <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">
+                                  +{Math.round(maternityAnalytics.surplusMaternityBalance)} surplus
+                                </p>
+                              )}
+                            </div>
+                            <div className="text-right mr-6">
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Used</p>
+                              <p className="font-medium text-gray-900 dark:text-white">
+                                {Math.round(maternityAnalytics.maternityDaysUsed)}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Base</p>
+                              <p className="font-medium text-gray-900 dark:text-white">
+                                {Math.round(maternityAnalytics.baseMaternityLeaveBalance)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-8 text-center border border-gray-100 dark:border-gray-800">
+                    <p className="text-gray-500 dark:text-gray-400">No maternity/paternity leave data available</p>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
     </ProtectedRoute>

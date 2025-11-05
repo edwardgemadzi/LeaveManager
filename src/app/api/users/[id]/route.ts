@@ -61,9 +61,9 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
-    const { fullName, shiftTag, subgroupTag, manualLeaveBalance, manualYearToDateUsed } = body;
+    const { fullName, shiftTag, subgroupTag, manualLeaveBalance, manualYearToDateUsed, manualMaternityLeaveBalance, manualMaternityYearToDateUsed } = body;
 
-    if (!fullName && shiftTag === undefined && subgroupTag === undefined && manualLeaveBalance === undefined && manualYearToDateUsed === undefined) {
+    if (!fullName && shiftTag === undefined && subgroupTag === undefined && manualLeaveBalance === undefined && manualYearToDateUsed === undefined && manualMaternityLeaveBalance === undefined && manualMaternityYearToDateUsed === undefined) {
       return NextResponse.json(
         { error: 'At least one field is required' },
         { status: 400 }
@@ -93,8 +93,8 @@ export async function PATCH(
     }
 
     // Build update object
-    const updateData: { fullName?: string; shiftTag?: string; subgroupTag?: string; manualLeaveBalance?: number; manualYearToDateUsed?: number } = {};
-    const unsetData: { manualLeaveBalance?: string; manualYearToDateUsed?: string } = {};
+    const updateData: { fullName?: string; shiftTag?: string; subgroupTag?: string; manualLeaveBalance?: number; manualYearToDateUsed?: number; manualMaternityLeaveBalance?: number; manualMaternityYearToDateUsed?: number } = {};
+    const unsetData: { manualLeaveBalance?: string; manualYearToDateUsed?: string; manualMaternityLeaveBalance?: string; manualMaternityYearToDateUsed?: string } = {};
     let shouldUnset = false;
     
     if (fullName) updateData.fullName = fullName;
@@ -153,6 +153,58 @@ export async function PATCH(
         }
         
         updateData.manualYearToDateUsed = manualYearToDateUsed;
+      }
+    }
+    if (manualMaternityLeaveBalance !== undefined) {
+      // If manualMaternityLeaveBalance is null, remove it (use calculated balance)
+      if (manualMaternityLeaveBalance === null) {
+        unsetData.manualMaternityLeaveBalance = '';
+        shouldUnset = true;
+      } else {
+        // Validate manualMaternityLeaveBalance is a number and not negative
+        if (typeof manualMaternityLeaveBalance !== 'number' || manualMaternityLeaveBalance < 0) {
+          return NextResponse.json(
+            { error: 'manualMaternityLeaveBalance must be a non-negative number' },
+            { status: 400 }
+          );
+        }
+        
+        // Validate maximum limit to prevent abuse (1000 days = ~2.7 years, more than enough)
+        const MAX_MANUAL_BALANCE = 1000;
+        if (manualMaternityLeaveBalance > MAX_MANUAL_BALANCE) {
+          return NextResponse.json(
+            { error: `manualMaternityLeaveBalance cannot exceed ${MAX_MANUAL_BALANCE} days` },
+            { status: 400 }
+          );
+        }
+        
+        updateData.manualMaternityLeaveBalance = manualMaternityLeaveBalance;
+      }
+    }
+    if (manualMaternityYearToDateUsed !== undefined) {
+      // If manualMaternityYearToDateUsed is null, remove it (use calculated value)
+      if (manualMaternityYearToDateUsed === null) {
+        unsetData.manualMaternityYearToDateUsed = '';
+        shouldUnset = true;
+      } else {
+        // Validate manualMaternityYearToDateUsed is a number and not negative
+        if (typeof manualMaternityYearToDateUsed !== 'number' || manualMaternityYearToDateUsed < 0) {
+          return NextResponse.json(
+            { error: 'manualMaternityYearToDateUsed must be a non-negative number' },
+            { status: 400 }
+          );
+        }
+        
+        // Validate maximum limit to prevent abuse (365 days should be sufficient for year-to-date)
+        const MAX_MANUAL_DAYS_TAKEN = 365;
+        if (manualMaternityYearToDateUsed > MAX_MANUAL_DAYS_TAKEN) {
+          return NextResponse.json(
+            { error: `manualMaternityYearToDateUsed cannot exceed ${MAX_MANUAL_DAYS_TAKEN} days` },
+            { status: 400 }
+          );
+        }
+        
+        updateData.manualMaternityYearToDateUsed = manualMaternityYearToDateUsed;
       }
     }
 

@@ -47,10 +47,49 @@ export const countWorkingDays = (startDate: Date, endDate: Date, shiftSchedule: 
   return getWorkingDays(startDate, endDate, shiftSchedule).length;
 };
 
+// Helper function to check if a leave request is maternity leave
+export const isMaternityLeave = (reason: string): boolean => {
+  if (!reason) return false;
+  const lowerReason = reason.toLowerCase();
+  return lowerReason === 'maternity' || lowerReason.includes('maternity') || lowerReason.includes('paternity');
+};
+
+// Function to count maternity leave days based on counting method
+export const countMaternityLeaveDays = (
+  startDate: Date,
+  endDate: Date,
+  countingMethod: 'calendar' | 'working',
+  shiftSchedule?: ShiftSchedule
+): number => {
+  if (countingMethod === 'calendar') {
+    // Count all calendar days (ignores working days)
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    const diffTime = end.getTime() - start.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    return diffDays;
+  } else {
+    // Count only working days (default)
+    if (!shiftSchedule) {
+      // If no shift schedule, count all days
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      const diffTime = end.getTime() - start.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      return diffDays;
+    }
+    return countWorkingDays(startDate, endDate, shiftSchedule);
+  }
+};
+
 // Function to calculate leave balance for a user
 export const calculateLeaveBalance = (
   maxLeavePerYear: number,
-  approvedRequests: Array<{ startDate: Date; endDate: Date }>,
+  approvedRequests: Array<{ startDate: Date; endDate: Date; reason?: string }>,
   shiftSchedule: ShiftSchedule,
   manualLeaveBalance?: number,
   manualYearToDateUsed?: number
@@ -61,9 +100,16 @@ export const calculateLeaveBalance = (
   const yearEnd = new Date(currentYear, 11, 31);
   yearEnd.setHours(23, 59, 59, 999);
   
+  // Filter out maternity leave requests from regular leave calculations
+  const nonMaternityRequests = approvedRequests.filter(req => {
+    if (!req.reason) return true;
+    return !isMaternityLeave(req.reason);
+  });
+  
   // Calculate approved working days for the current year only
-  // Include requests that overlap with the current year, but only count days within the year
-  const approvedWorkingDays = approvedRequests.reduce((total, req) => {
+  // Count all approved days in the year (including future approved dates)
+  // because approved requests are already committed/allocated
+  const approvedWorkingDays = nonMaternityRequests.reduce((total, req) => {
     const reqStart = new Date(req.startDate);
     const reqEnd = new Date(req.endDate);
     reqStart.setHours(0, 0, 0, 0);
@@ -76,13 +122,13 @@ export const calculateLeaveBalance = (
       const overlapStart = reqStart > yearStart ? reqStart : yearStart;
       const overlapEnd = reqEnd < yearEnd ? reqEnd : yearEnd;
       
-      // Count working days only for the overlap period
+      // Count working days only for the overlap period (includes future approved dates)
       const workingDays = countWorkingDays(overlapStart, overlapEnd, shiftSchedule);
       return total + workingDays;
     }
     
     return total;
-  }, 0);
+    }, 0);
 
   // Simplified base balance logic:
   // - If manualLeaveBalance is set, always use it as base (whether above or below maxLeavePerYear)
@@ -117,4 +163,72 @@ export const calculateSurplusBalance = (
   
   // Surplus is the amount by which manual balance exceeds team max
   return manualLeaveBalance > maxLeavePerYear ? manualLeaveBalance - maxLeavePerYear : 0;
+};
+
+// Function to calculate maternity leave balance for a user
+export const calculateMaternityLeaveBalance = (
+  maxMaternityLeaveDays: number,
+  approvedMaternityRequests: Array<{ startDate: Date; endDate: Date; reason?: string }>,
+  countingMethod: 'calendar' | 'working',
+  shiftSchedule?: ShiftSchedule,
+  manualMaternityLeaveBalance?: number,
+  manualMaternityYearToDateUsed?: number
+): number => {
+  const currentYear = new Date().getFullYear();
+  const yearStart = new Date(currentYear, 0, 1);
+  yearStart.setHours(0, 0, 0, 0);
+  const yearEnd = new Date(currentYear, 11, 31);
+  yearEnd.setHours(23, 59, 59, 999);
+  
+  // Filter to only maternity leave requests
+  const maternityRequests = approvedMaternityRequests.filter(req => {
+    if (!req.reason) return false;
+    return isMaternityLeave(req.reason);
+  });
+  
+  // Calculate approved days for the current year only
+  // Include requests that overlap with the current year, but only count days within the year
+  const approvedDays = maternityRequests.reduce((total, req) => {
+    const reqStart = new Date(req.startDate);
+    const reqEnd = new Date(req.endDate);
+    reqStart.setHours(0, 0, 0, 0);
+    reqEnd.setHours(23, 59, 59, 999);
+    
+    // Check if request overlaps with current year
+    if (reqStart <= yearEnd && reqEnd >= yearStart) {
+      // Calculate the overlap period within the current year
+      const overlapStart = reqStart > yearStart ? reqStart : yearStart;
+      const overlapEnd = reqEnd < yearEnd ? reqEnd : yearEnd;
+      
+      // Count days based on counting method
+      const days = countMaternityLeaveDays(overlapStart, overlapEnd, countingMethod, shiftSchedule);
+      return total + days;
+    }
+    
+    return total;
+  }, 0);
+
+  // Base balance logic:
+  // - If manualMaternityLeaveBalance is set, always use it as base
+  // - If manualMaternityLeaveBalance is not set, use maxMaternityLeaveDays
+  const baseBalance = manualMaternityLeaveBalance !== undefined ? manualMaternityLeaveBalance : maxMaternityLeaveDays;
+  
+  // If manualMaternityYearToDateUsed is set, use it instead of calculated days
+  const daysUsed = manualMaternityYearToDateUsed !== undefined ? manualMaternityYearToDateUsed : approvedDays;
+  const remainingBalance = baseBalance - daysUsed;
+  
+  return remainingBalance;
+};
+
+// Function to calculate surplus maternity leave balance (when manual balance exceeds team max)
+export const calculateMaternitySurplusBalance = (
+  manualMaternityLeaveBalance: number | undefined,
+  maxMaternityLeaveDays: number
+): number => {
+  if (manualMaternityLeaveBalance === undefined) {
+    return 0;
+  }
+  
+  // Surplus is the amount by which manual balance exceeds team max
+  return manualMaternityLeaveBalance > maxMaternityLeaveDays ? manualMaternityLeaveBalance - maxMaternityLeaveDays : 0;
 };

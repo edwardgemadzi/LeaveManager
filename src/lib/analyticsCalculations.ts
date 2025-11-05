@@ -1,5 +1,27 @@
 import { ShiftSchedule, User, Team, LeaveRequest } from '@/types';
-import { countWorkingDays, calculateLeaveBalance, isWorkingDay, getWorkingDays, calculateSurplusBalance } from './leaveCalculations';
+import { countWorkingDays, calculateLeaveBalance, isWorkingDay, getWorkingDays, calculateSurplusBalance, calculateMaternityLeaveBalance, calculateMaternitySurplusBalance, isMaternityLeave, countMaternityLeaveDays } from './leaveCalculations';
+
+// Check if bypass notice period is active for a given team and date
+export const isBypassNoticePeriodActive = (team: Team, date: Date = new Date()): boolean => {
+  if (!team.settings.bypassNoticePeriod?.enabled) {
+    return false;
+  }
+  
+  const bypass = team.settings.bypassNoticePeriod;
+  const checkDate = new Date(date);
+  checkDate.setHours(0, 0, 0, 0);
+  
+  if (bypass.startDate && bypass.endDate) {
+    const startDate = new Date(bypass.startDate);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(bypass.endDate);
+    endDate.setHours(23, 59, 59, 999);
+    
+    return checkDate >= startDate && checkDate <= endDate;
+  }
+  
+  return false;
+};
 
 // Generate a unique tag for working days pattern
 // Members with the same tag work on exactly the same days (100% overlap)
@@ -110,7 +132,13 @@ export const calculateDateAvailability = (
   }
   
   // Find all approved requests that overlap with this date
+  // Exclude maternity leave requests from concurrent leave calculations (maternity leave is isolated)
   const overlappingRequests = allApprovedRequests.filter(req => {
+    // Skip maternity leave requests
+    if (req.reason && (req.reason.toLowerCase() === 'maternity' || req.reason.toLowerCase().includes('maternity') || req.reason.toLowerCase().includes('paternity'))) {
+      return false;
+    }
+    
     const reqStart = new Date(req.startDate);
     const reqEnd = new Date(req.endDate);
     reqStart.setHours(0, 0, 0, 0);
@@ -195,6 +223,17 @@ export const calculateUsableDays = (
   const yearEnd = getYearEnd();
   yearEnd.setHours(23, 59, 59, 999);
   
+  // Check if bypass notice period is active
+  const bypassActive = isBypassNoticePeriodActive(team, today);
+  
+  // Calculate earliest requestable date based on notice period (unless bypass is active)
+  let earliestRequestableDate = today;
+  if (!bypassActive) {
+    earliestRequestableDate = new Date(today);
+    earliestRequestableDate.setDate(today.getDate() + team.settings.minimumNoticePeriod);
+    earliestRequestableDate.setHours(0, 0, 0, 0);
+  }
+  
   // Get user's tags for filtering
   // For rotating schedules, always regenerate (tags change daily)
   // For fixed schedules, use stored tag or generate if missing
@@ -204,8 +243,8 @@ export const calculateUsableDays = (
   const userShiftTag = user.shiftTag;
   const userSubgroupTag = user.subgroupTag;
   
-  // Get all remaining working days in the year
-  const remainingWorkingDays = getWorkingDays(today, yearEnd, shiftSchedule);
+  // Get all remaining working days in the year (starting from earliest requestable date)
+  const remainingWorkingDays = getWorkingDays(earliestRequestableDate, yearEnd, shiftSchedule);
   
   // Count days that have availability (slots > 0) among members with same tag
   let usableDays = 0;
@@ -325,6 +364,7 @@ export const calculateMembersSharingSameShift = (
 };
 
 // Calculate average days available per member (fair distribution estimate)
+// Returns whole days (floor division) - remainder is calculated separately
 export const calculateAverageDaysPerMember = (
   usableDays: number,
   membersSharingSameShift: number
@@ -333,10 +373,90 @@ export const calculateAverageDaysPerMember = (
     return 0;
   }
   
-  return Math.round((usableDays / membersSharingSameShift) * 10) / 10;
+  return Math.floor(usableDays / membersSharingSameShift);
 };
 
 // Calculate carryover vs lost days
+// Calculate remainder days for a group using iterative allocation
+// Allocates days one by one to members, removing them when they reach their max,
+// and returns days that can't be allocated evenly when remaining days < remaining members
+// Note: groupUsableDays already accounts for concurrent leave constraints (only counts days with availability > 0)
+// The allocation respects these constraints since we're allocating from the constrained pool
+export const calculateGroupRemainderDays = (
+  groupUsableDays: number,
+  groupMembers: Array<{ analytics: MemberAnalytics }>,
+  team: Team
+): number => {
+  // Create working copy of members with their remaining balance
+  let availableMembers = groupMembers
+    .map(m => ({ 
+      member: m, 
+      remainingBalance: m.analytics.remainingLeaveBalance,
+      allocated: 0
+    }))
+    .filter(m => m.remainingBalance > 0); // Only include members with balance > 0
+  
+  if (availableMembers.length === 0) {
+    return groupUsableDays; // All members have 0 balance, all days are remainder
+  }
+  
+  let pool = groupUsableDays; // Days available for allocation
+  
+  // Phase 1: Base allocation - give each member floor(pool / totalMembers)
+  const baseAllocation = Math.floor(pool / groupMembers.length);
+  
+  for (const memberData of availableMembers) {
+    const canAllocate = Math.min(baseAllocation, memberData.remainingBalance);
+    memberData.allocated += canAllocate;
+    memberData.remainingBalance -= canAllocate;
+    pool -= canAllocate;
+    
+    // Remove member if they've reached their max
+    if (memberData.remainingBalance === 0) {
+      availableMembers = availableMembers.filter(m => m !== memberData);
+    }
+  }
+  
+  // Phase 2: Continue allocating remaining days in rounds
+  // In each round, allocate evenly to all available members
+  // Stop when pool < number of available members (can't allocate evenly)
+  while (pool > 0 && availableMembers.length > 0) {
+    // If remaining pool < number of available members, we have remainder
+    if (pool < availableMembers.length) {
+      break; // These are the remainder days
+    }
+    
+    // Calculate how many days we can allocate in this round
+    // Allocate evenly: floor(pool / availableMembers.length) to each member
+    const allocationPerMember = Math.floor(pool / availableMembers.length);
+    
+    if (allocationPerMember === 0) {
+      break; // Can't allocate at least 1 to each, we have remainder
+    }
+    
+    // Allocate to each member, respecting their remaining balance
+    const membersToRemove: typeof availableMembers = [];
+    
+    for (const memberData of availableMembers) {
+      const canAllocate = Math.min(allocationPerMember, memberData.remainingBalance);
+      memberData.allocated += canAllocate;
+      memberData.remainingBalance -= canAllocate;
+      pool -= canAllocate;
+      
+      // Mark for removal if they've reached their max
+      if (memberData.remainingBalance === 0) {
+        membersToRemove.push(memberData);
+      }
+    }
+    
+    // Remove members who reached their max
+    availableMembers = availableMembers.filter(m => !membersToRemove.includes(m));
+  }
+  
+  // Pool now contains the remainder days that can't be allocated evenly
+  return pool;
+};
+
 export const calculateCarryoverDays = (
   remainingLeaveBalance: number,
   remainingWorkingDays: number,
@@ -365,7 +485,7 @@ export interface MemberAnalytics {
   remainingWorkingDays: number; // Theoretical working days remaining (kept for backward compatibility)
   theoreticalWorkingDays: number; // Total working days remaining from today to end of year - NOT adjusted for concurrent leave sharing (raw count)
   usableDays: number; // Days that can be used when shared among members who can use them - adjusted for concurrent leave limits
-  realisticUsableDays: number; // Realistic days factoring in members sharing same schedule who also need to use remaining leave days
+  realisticUsableDays: number; // Realistic days factoring in members sharing same schedule who also need to use remaining leave days (whole days per member)
   remainingLeaveBalance: number; // Remaining balance after subtracting approved requests
   baseLeaveBalance: number; // Base balance (manualLeaveBalance if set, otherwise maxLeavePerYear) - before subtracting approved requests
   workingDaysUsed: number;
@@ -374,8 +494,17 @@ export interface MemberAnalytics {
   willLose: number;
   allowCarryover: boolean;
   membersSharingSameShift: number; // Total members competing for same days
-  averageDaysPerMember: number; // Average realistic days per member in same shift
+  averageDaysPerMember: number; // Average realistic days per member in same shift (whole days)
   surplusBalance: number; // Surplus balance when manual balance exceeds team max
+  remainderDays: number; // Extra days that need allocation decisions (remainder from usableDays / membersSharingSameShift)
+}
+
+// Analytics data structure for maternity leave (simpler, no competition metrics)
+export interface MaternityMemberAnalytics {
+  remainingMaternityLeaveBalance: number; // Remaining maternity leave balance after subtracting approved maternity requests
+  baseMaternityLeaveBalance: number; // Base maternity leave balance (manualMaternityLeaveBalance if set, otherwise maxMaternityLeaveDays)
+  maternityDaysUsed: number; // Maternity leave days used year-to-date
+  surplusMaternityBalance: number; // Surplus maternity balance when manual balance exceeds team max
 }
 
 // Analytics data structure for team
@@ -385,6 +514,7 @@ export interface TeamAnalytics {
     totalTheoreticalWorkingDays: number; // Total theoretical working days remaining - NOT adjusted for concurrent leave sharing (raw count)
     totalUsableDays: number; // Total usable days when shared among members - adjusted for concurrent leave limits
     totalRealisticUsableDays: number; // Total realistic usable days factoring in members sharing same schedule
+    totalRemainderDays: number; // Total remainder days that need allocation decisions
     totalRemainingLeaveBalance: number;
     totalWillCarryover: number;
     totalWillLose: number;
@@ -407,6 +537,7 @@ export interface GroupedTeamAnalytics {
     totalTheoreticalWorkingDays: number;
     totalUsableDays: number;
     totalRealisticUsableDays: number;
+    totalRemainderDays: number;
     totalRemainingLeaveBalance: number;
     totalWillCarryover: number;
     totalWillLose: number;
@@ -424,6 +555,7 @@ export interface GroupedTeamAnalytics {
       groupAverageRealisticUsableDays: number;
       groupTotalUsableDays: number;
       groupTotalRealisticUsableDays: number;
+      groupTotalRemainderDays: number;
       groupAverageLeaveBalance: number;
       groupTotalLeaveBalance: number;
       groupAverageUsableDays: number;
@@ -502,11 +634,13 @@ export const getMemberAnalytics = (
   // Calculate remaining leave balance
   // Note: approvedRequests parameter should already be filtered to approved requests
   // But we filter again here for safety and consistency with leave balance page
+  // Include reason field so calculateLeaveBalance can filter out maternity leave
   const approvedRequestsForCalculation = approvedRequests
     .filter(req => req.status === 'approved')
     .map(req => ({
       startDate: new Date(req.startDate),
-      endDate: new Date(req.endDate)
+      endDate: new Date(req.endDate),
+      reason: req.reason
     }));
   
   // Calculate base balance (same simplified logic as calculateLeaveBalance):
@@ -549,12 +683,23 @@ export const getMemberAnalytics = (
   
   // Calculate realistic usable days - factors in members sharing same schedule
   // This divides usable days by members sharing the same shift, capped by remaining leave balance
+  // Use floor division to get whole days, remainder is calculated separately
   const realisticUsableDays = membersSharingSameShift > 0
     ? Math.min(
-        Math.round((usableDays / membersSharingSameShift) * 10) / 10,
+        Math.floor(usableDays / membersSharingSameShift),
         remainingLeaveBalance
       )
     : Math.min(usableDays, remainingLeaveBalance);
+  
+  // Calculate remainder days - extra days that need allocation decisions
+  // Remainder is the leftover days after dividing usableDays by membersSharingSameShift
+  // Example: 25 usable days, 10 members = 25 / 10 = 2 remainder 5
+  // Each gets 2 days, 5 days need allocation (can't be split equally among 10 people)
+  // Example: 20 usable days, 10 members = 20 / 10 = 2 remainder 0
+  // Each gets 2 days, 0 remainder (can be allocated equally)
+  const remainderDays = membersSharingSameShift > 0
+    ? usableDays % membersSharingSameShift
+    : 0;
   
   const averageDaysPerMember = calculateAverageDaysPerMember(usableDays, membersSharingSameShift);
   
@@ -580,7 +725,100 @@ export const getMemberAnalytics = (
     allowCarryover,
     membersSharingSameShift,
     averageDaysPerMember,
-    surplusBalance
+    surplusBalance,
+    remainderDays
+  };
+};
+
+// Get maternity leave analytics for a single member
+export const getMaternityMemberAnalytics = (
+  user: User,
+  team: Team,
+  approvedMaternityRequests: LeaveRequest[]
+): MaternityMemberAnalytics => {
+  // Get maternity leave settings (defaults if not set)
+  const maxMaternityLeaveDays = team.settings.maternityLeave?.maxDays || 90;
+  const countingMethod = team.settings.maternityLeave?.countingMethod || 'working';
+  
+  const shiftSchedule = user.shiftSchedule || {
+    pattern: [true, true, true, true, true, false, false],
+    startDate: new Date(),
+    type: 'fixed'
+  };
+
+  // Filter to only maternity leave requests
+  const maternityRequests = approvedMaternityRequests.filter(req => {
+    if (!req.reason) return false;
+    return isMaternityLeave(req.reason);
+  });
+
+  // Convert to format expected by calculateMaternityLeaveBalance
+  const maternityRequestsForCalculation = maternityRequests.map(req => ({
+    startDate: new Date(req.startDate),
+    endDate: new Date(req.endDate),
+    reason: req.reason
+  }));
+
+  // Calculate base maternity leave balance
+  const baseMaternityLeaveBalance = user.manualMaternityLeaveBalance !== undefined 
+    ? user.manualMaternityLeaveBalance 
+    : maxMaternityLeaveDays;
+
+  // Calculate remaining maternity leave balance
+  const remainingMaternityLeaveBalance = calculateMaternityLeaveBalance(
+    maxMaternityLeaveDays,
+    maternityRequestsForCalculation,
+    countingMethod,
+    shiftSchedule,
+    user.manualMaternityLeaveBalance,
+    user.manualMaternityYearToDateUsed
+  );
+
+  // Calculate maternity days used
+  const currentYear = new Date().getFullYear();
+  const yearStart = new Date(currentYear, 0, 1);
+  yearStart.setHours(0, 0, 0, 0);
+  const yearEnd = new Date(currentYear, 11, 31);
+  yearEnd.setHours(23, 59, 59, 999);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let maternityDaysUsed = 0;
+  if (user.manualMaternityYearToDateUsed !== undefined) {
+    maternityDaysUsed = user.manualMaternityYearToDateUsed;
+  } else {
+    maternityDaysUsed = maternityRequestsForCalculation.reduce((total, req) => {
+      const reqStart = new Date(req.startDate);
+      const reqEnd = new Date(req.endDate);
+      reqStart.setHours(0, 0, 0, 0);
+      reqEnd.setHours(23, 59, 59, 999);
+      
+      // Only count days within the current year and up to today
+      if (reqStart <= yearEnd && reqEnd >= yearStart) {
+        const overlapStart = reqStart > yearStart ? reqStart : yearStart;
+        const overlapEnd = reqEnd < yearEnd ? (reqEnd < today ? reqEnd : today) : (today < yearEnd ? today : yearEnd);
+        
+        if (overlapEnd >= overlapStart) {
+          const days = countMaternityLeaveDays(overlapStart, overlapEnd, countingMethod, shiftSchedule);
+          return total + days;
+        }
+      }
+      
+      return total;
+    }, 0);
+  }
+
+  // Calculate surplus maternity balance
+  const surplusMaternityBalance = calculateMaternitySurplusBalance(
+    user.manualMaternityLeaveBalance,
+    maxMaternityLeaveDays
+  );
+
+  return {
+    remainingMaternityLeaveBalance,
+    baseMaternityLeaveBalance,
+    maternityDaysUsed,
+    surplusMaternityBalance
   };
 };
 
@@ -617,8 +855,48 @@ export const getTeamAnalytics = (
   });
   
   // Calculate aggregates
-  const totalUsableDays = memberAnalytics.reduce((sum, m) => sum + m.analytics.usableDays, 0);
-  const totalRealisticUsableDays = memberAnalytics.reduce((sum, m) => sum + m.analytics.realisticUsableDays, 0);
+  // For totalUsableDays and totalRemainderDays, we need to group members first
+  // because members in the same group share the same pool of usableDays
+  // Group members by their tags (subgroupTag + shiftTag + workingDaysTag)
+  const groupsMap = new Map<string, typeof memberAnalytics>();
+  for (const memberAnalytic of memberAnalytics) {
+    const member = memberMembers.find(m => m._id === memberAnalytic.userId);
+    if (!member) continue;
+    
+    const subgroupTag = team.settings.enableSubgrouping 
+      ? (member.subgroupTag || 'Ungrouped')
+      : 'All';
+    const shiftTag = member.shiftTag || 'no-tag';
+    const workingDaysTag = member.shiftSchedule?.type === 'rotating'
+      ? generateWorkingDaysTag(member.shiftSchedule)
+      : (member.workingDaysTag || generateWorkingDaysTag(member.shiftSchedule) || 'no-schedule');
+    
+    const groupKey = `${subgroupTag}_${shiftTag}_${workingDaysTag}`;
+    if (!groupsMap.has(groupKey)) {
+      groupsMap.set(groupKey, []);
+    }
+    groupsMap.get(groupKey)!.push(memberAnalytic);
+  }
+  
+  // Calculate totalUsableDays, totalRemainderDays, and totalRealisticUsableDays from groups (not individual members)
+  let totalUsableDays = 0;
+  let totalRemainderDays = 0;
+  let totalRealisticUsableDays = 0;
+  for (const [groupKey, groupMembers] of groupsMap.entries()) {
+    // All members in the same group should see the same usableDays
+    const groupUsableDays = groupMembers.length > 0 ? groupMembers[0].analytics.usableDays : 0;
+    const groupTotalMembers = groupMembers.length;
+    totalUsableDays += groupUsableDays; // Add each group's pool once (not per member)
+    // Calculate remainder using iterative allocation that accounts for member constraints
+    // Note: groupUsableDays already accounts for concurrent leave constraints
+    totalRemainderDays += calculateGroupRemainderDays(groupUsableDays, groupMembers, team);
+    
+    // Calculate groupTotalRealisticUsableDays by summing individual member realisticUsableDays within the group
+    // This accounts for individual member constraints (remainingBalance) while correctly grouping
+    const groupTotalRealisticUsableDays = groupMembers.reduce((sum, m) => sum + m.analytics.realisticUsableDays, 0);
+    totalRealisticUsableDays += groupTotalRealisticUsableDays;
+  }
+  
   const memberCount = memberAnalytics.length;
   
   const aggregate = {
@@ -626,6 +904,7 @@ export const getTeamAnalytics = (
     totalTheoreticalWorkingDays: memberAnalytics.reduce((sum, m) => sum + m.analytics.theoreticalWorkingDays, 0),
     totalUsableDays,
     totalRealisticUsableDays,
+    totalRemainderDays,
     totalRemainingLeaveBalance: memberAnalytics.reduce((sum, m) => sum + m.analytics.remainingLeaveBalance, 0),
     totalWillCarryover: memberAnalytics.reduce((sum, m) => sum + m.analytics.willCarryover, 0),
     totalWillLose: memberAnalytics.reduce((sum, m) => sum + m.analytics.willLose, 0),
@@ -634,7 +913,7 @@ export const getTeamAnalytics = (
       : 0,
     membersCount: memberCount,
     averageDaysPerMemberAcrossTeam: memberCount > 0
-      ? Math.round((totalRealisticUsableDays / memberCount) * 10) / 10
+      ? Math.floor(totalRealisticUsableDays / memberCount)
       : 0
   };
   
@@ -799,8 +1078,17 @@ export const getGroupedTeamAnalytics = (
     }
     
     const groupTotalMembers = groupMembers.length;
-    const groupTotalUsableDays = groupMembers.reduce((sum, m) => sum + m.analytics.usableDays, 0);
+    // All members in the same group should see the same usableDays (same shift, same tags)
+    // So we should use the usableDays from one member, not sum them
+    // If we sum, we're multiplying the same value by number of members
+    const groupUsableDays = groupMembers.length > 0 ? groupMembers[0].analytics.usableDays : 0;
+    const groupTotalUsableDays = groupUsableDays; // This is the shared pool, not a sum
     const groupTotalRealisticUsableDays = groupMembers.reduce((sum, m) => sum + m.analytics.realisticUsableDays, 0);
+    // Calculate remainder using iterative allocation that accounts for member constraints
+    // This allocates days one by one, removing members when they reach their max,
+    // and returns days that can't be allocated evenly
+    // Note: groupUsableDays already accounts for concurrent leave constraints (only counts days with availability > 0)
+    const groupTotalRemainderDays = calculateGroupRemainderDays(groupUsableDays, groupMembers, team);
     const groupTotalLeaveBalance = groupMembers.reduce((sum, m) => sum + m.analytics.remainingLeaveBalance, 0);
     
     return {
@@ -811,10 +1099,11 @@ export const getGroupedTeamAnalytics = (
       aggregate: {
         groupTotalMembers,
         groupAverageRealisticUsableDays: groupTotalMembers > 0
-          ? Math.round((groupTotalRealisticUsableDays / groupTotalMembers) * 10) / 10
+          ? Math.floor(groupTotalRealisticUsableDays / groupTotalMembers)
           : 0,
         groupTotalUsableDays,
         groupTotalRealisticUsableDays,
+        groupTotalRemainderDays,
         groupAverageLeaveBalance: groupTotalMembers > 0
           ? Math.round(groupTotalLeaveBalance / groupTotalMembers)
           : 0,
@@ -833,8 +1122,14 @@ export const getGroupedTeamAnalytics = (
   });
   
   // Calculate overall aggregates (same as regular team analytics)
-  const totalUsableDays = memberAnalytics.reduce((sum, m) => sum + m.analytics.usableDays, 0);
-  const totalRealisticUsableDays = memberAnalytics.reduce((sum, m) => sum + m.analytics.realisticUsableDays, 0);
+  // For totalUsableDays, sum unique group usableDays (not individual members) - each group counted once
+  const totalUsableDays = groups.reduce((sum, group) => sum + group.aggregate.groupTotalUsableDays, 0);
+  // For totalRealisticUsableDays, sum groupTotalRealisticUsableDays from each group
+  // This correctly accounts for individual member constraints within each group's shared pool
+  const totalRealisticUsableDays = groups.reduce((sum, group) => sum + group.aggregate.groupTotalRealisticUsableDays, 0);
+  // For totalRemainderDays, sum remainders from each group (not individual members)
+  // Each group has its own pool and remainder, so we sum group remainders
+  const totalRemainderDays = groups.reduce((sum, group) => sum + group.aggregate.groupTotalRemainderDays, 0);
   const memberCount = memberAnalytics.length;
   
   const aggregate = {
@@ -842,6 +1137,7 @@ export const getGroupedTeamAnalytics = (
     totalTheoreticalWorkingDays: memberAnalytics.reduce((sum, m) => sum + m.analytics.theoreticalWorkingDays, 0),
     totalUsableDays,
     totalRealisticUsableDays,
+    totalRemainderDays,
     totalRemainingLeaveBalance: memberAnalytics.reduce((sum, m) => sum + m.analytics.remainingLeaveBalance, 0),
     totalWillCarryover: memberAnalytics.reduce((sum, m) => sum + m.analytics.willCarryover, 0),
     totalWillLose: memberAnalytics.reduce((sum, m) => sum + m.analytics.willLose, 0),
@@ -850,7 +1146,7 @@ export const getGroupedTeamAnalytics = (
       : 0,
     membersCount: memberCount,
     averageDaysPerMemberAcrossTeam: memberCount > 0
-      ? Math.round((totalRealisticUsableDays / memberCount) * 10) / 10
+      ? Math.floor(totalRealisticUsableDays / memberCount)
       : 0
   };
   

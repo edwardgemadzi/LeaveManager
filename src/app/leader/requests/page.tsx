@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Navbar from '@/components/shared/Navbar';
+import MigrationCalendar from '@/components/shared/MigrationCalendar';
 import { LeaveRequest, User } from '@/types';
+import { LEAVE_REASONS, EMERGENCY_REASONS, isEmergencyReason } from '@/lib/leaveReasons';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 export default function LeaderRequestsPage() {
@@ -21,6 +23,36 @@ export default function LeaderRequestsPage() {
     password: ''
   });
   const [submittingEmergency, setSubmittingEmergency] = useState(false);
+  
+  // Historical/Migration request state
+  const [showMigrationForm, setShowMigrationForm] = useState(false);
+  const [migrationForm, setMigrationForm] = useState({
+    memberId: '',
+    reason: '',
+    customReason: ''
+  });
+  const [selectedReasonType, setSelectedReasonType] = useState('');
+  const [selectedRanges, setSelectedRanges] = useState<Array<{ startDate: Date; endDate: Date }>>([]);
+  const [existingRanges, setExistingRanges] = useState<Array<{ startDate: Date; endDate: Date }>>([]);
+  const [submittingMigration, setSubmittingMigration] = useState(false);
+
+  const handleMigrationReasonChange = (reasonType: string) => {
+    setSelectedReasonType(reasonType);
+    if (reasonType === 'other') {
+      setMigrationForm({ ...migrationForm, reason: '', customReason: '' });
+    } else {
+      const selectedReason = LEAVE_REASONS.find(r => r.value === reasonType);
+      setMigrationForm({ ...migrationForm, reason: selectedReason?.label || '', customReason: '' });
+    }
+  };
+
+  const getMigrationFinalReason = () => {
+    if (selectedReasonType === 'other') {
+      return migrationForm.customReason || migrationForm.reason;
+    }
+    return migrationForm.reason;
+  };
+  
   const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
@@ -175,6 +207,136 @@ export default function LeaderRequestsPage() {
     }
   };
 
+  // Fetch existing leave dates for selected member
+  useEffect(() => {
+    if (!migrationForm.memberId || !showMigrationForm) {
+      setExistingRanges([]);
+      return;
+    }
+
+    const fetchExistingRanges = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/leave-requests', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        
+        if (response.ok) {
+          const allRequests: LeaveRequest[] = await response.json();
+          const memberRequests = allRequests.filter(
+            req => req.userId === migrationForm.memberId && req.status === 'approved'
+          );
+          
+          const ranges = memberRequests.map(req => ({
+            startDate: new Date(req.startDate),
+            endDate: new Date(req.endDate),
+          }));
+          
+          setExistingRanges(ranges);
+        }
+      } catch (error) {
+        console.error('Error fetching existing leave:', error);
+      }
+    };
+
+    fetchExistingRanges();
+  }, [migrationForm.memberId, showMigrationForm]);
+
+  const handleMigrationRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (selectedRanges.length === 0) {
+      alert('Please select at least one date range on the calendar');
+      return;
+    }
+
+    if (!migrationForm.memberId || !selectedReasonType) {
+      alert('Please select a member and choose a reason');
+      return;
+    }
+
+    if (selectedReasonType === 'other' && !migrationForm.customReason.trim()) {
+      alert('Please provide details for the leave reason');
+      return;
+    }
+
+    const finalReason = getMigrationFinalReason();
+
+    setSubmittingMigration(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Create leave requests for each selected range
+      const promises = selectedRanges.map(range => 
+        fetch('/api/leave-requests', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            startDate: range.startDate.toISOString().split('T')[0],
+            endDate: range.endDate.toISOString().split('T')[0],
+            reason: finalReason,
+            requestedFor: migrationForm.memberId,
+            isHistorical: true
+          }),
+        })
+      );
+
+      const results = await Promise.allSettled(promises);
+      
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled' && result.value.ok) {
+          successCount++;
+        } else {
+          errorCount++;
+        }
+      });
+
+      if (successCount > 0) {
+        // Refresh requests list
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        const requestsResponse = await fetch(`/api/leave-requests?teamId=${user.teamId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        if (requestsResponse.ok) {
+          const allRequests = await requestsResponse.json();
+          setRequests(allRequests);
+        }
+
+        if (errorCount === 0) {
+          alert(`Successfully created ${successCount} historical leave ${successCount === 1 ? 'entry' : 'entries'}!`);
+        } else {
+          alert(`Created ${successCount} entries. ${errorCount} failed.`);
+        }
+        
+        setMigrationForm({
+          memberId: '',
+          reason: '',
+          customReason: ''
+        });
+        setSelectedReasonType('');
+        setSelectedRanges([]);
+        setShowMigrationForm(false);
+      } else {
+        alert(`Failed to create historical requests. ${errorCount} error(s).`);
+      }
+    } catch (error) {
+      console.error('Error creating historical requests:', error);
+      alert('Network error. Please try again.');
+    } finally {
+      setSubmittingMigration(false);
+    }
+  };
+
   const filteredRequests = requests.filter(request => {
     if (filter === 'all') return true;
     return request.status === filter;
@@ -211,17 +373,133 @@ export default function LeaderRequestsPage() {
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Team Requests</h1>
               <p className="mt-2 text-gray-600 dark:text-gray-400">Manage leave requests from your team members.</p>
             </div>
-            <button
-              onClick={() => setShowEmergencyForm(!showEmergencyForm)}
-              className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
-            >
-              <span className="flex items-center gap-2">
-                <ExclamationTriangleIcon className="h-5 w-5" />
-                Emergency Request
-              </span>
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowMigrationForm(!showMigrationForm)}
+                className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+              >
+                Historical Entry
+              </button>
+              <button
+                onClick={() => setShowEmergencyForm(!showEmergencyForm)}
+                className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <ExclamationTriangleIcon className="h-5 w-5" />
+                  Emergency Request
+                </span>
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Historical/Migration Entry Form */}
+        {showMigrationForm && (
+          <div className="mb-6 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+            <h2 className="text-lg font-medium text-blue-900 dark:text-blue-300 mb-4">
+              Add Historical Leave Entries
+            </h2>
+            <p className="text-sm text-blue-700 dark:text-blue-400 mb-4">
+              Use this to record leave that has already been taken (for migration purposes). Select a member, then click dates on the calendar to select multiple leave periods. Historical entries are automatically approved and bypass notice period and concurrent leave restrictions.
+            </p>
+            
+            <form onSubmit={handleMigrationRequest} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="migrationMemberId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Select Member
+                  </label>
+                  <select
+                    id="migrationMemberId"
+                    required
+                    value={migrationForm.memberId}
+                    onChange={(e) => setMigrationForm({ ...migrationForm, memberId: e.target.value })}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
+                  >
+                    <option value="">Choose a member...</option>
+                    {members.filter(member => member.role !== 'leader').map((member) => (
+                      <option key={member._id} value={member._id}>
+                        {member.fullName || member.username}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="migrationReason" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Reason (applies to all selected periods)
+                  </label>
+                  <select
+                    id="migrationReason"
+                    required
+                    value={selectedReasonType}
+                    onChange={(e) => handleMigrationReasonChange(e.target.value)}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
+                  >
+                    <option value="">Select a reason...</option>
+                    {LEAVE_REASONS.map((reason) => (
+                      <option key={reason.value} value={reason.value}>
+                        {reason.label}
+                      </option>
+                    ))}
+                  </select>
+                  
+                  {selectedReasonType === 'other' && (
+                    <div className="mt-3">
+                      <label htmlFor="migrationCustomReason" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Please specify
+                      </label>
+                      <textarea
+                        id="migrationCustomReason"
+                        rows={3}
+                        required
+                        value={migrationForm.customReason}
+                        onChange={(e) => setMigrationForm({ ...migrationForm, customReason: e.target.value })}
+                        placeholder="Please provide details for the leave reason..."
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Calendar Component */}
+              <div className="mt-6">
+                <MigrationCalendar
+                  selectedMemberId={migrationForm.memberId}
+                  onRangesChange={setSelectedRanges}
+                  existingRanges={existingRanges}
+                />
+              </div>
+
+              <div className="flex justify-end space-x-3 mt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMigrationForm(false);
+                    setSelectedRanges([]);
+                    setExistingRanges([]);
+                    setMigrationForm({ memberId: '', reason: '', customReason: '' });
+                    setSelectedReasonType('');
+                  }}
+                  className="bg-gray-500 hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingMigration || selectedRanges.length === 0}
+                  className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submittingMigration 
+                    ? `Creating ${selectedRanges.length} entries...` 
+                    : `Add ${selectedRanges.length} Historical ${selectedRanges.length === 1 ? 'Entry' : 'Entries'}`
+                  }
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
 
         {/* Emergency Request Form */}
         {showEmergencyForm && (
@@ -268,10 +546,11 @@ export default function LeaderRequestsPage() {
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
                   >
                     <option value="">Select reason...</option>
-                    <option value="Medical Emergency">Medical Emergency</option>
-                    <option value="Family Emergency">Family Emergency</option>
-                    <option value="Personal Crisis">Personal Crisis</option>
-                    <option value="Other Emergency">Other Emergency</option>
+                    {EMERGENCY_REASONS.map((reason) => (
+                      <option key={reason.value} value={reason.value}>
+                        {reason.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -394,12 +673,33 @@ export default function LeaderRequestsPage() {
                             <p className="text-xs text-gray-500 dark:text-gray-400">
                               Requested on {new Date(request.createdAt).toLocaleDateString()}
                             </p>
-                            {request.requestedBy && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400">
-                                <ExclamationTriangleIcon className="h-3 w-3" />
-                                Emergency
-                              </span>
-                            )}
+                            {request.requestedBy && (() => {
+                              // Check if this is an emergency request (created through emergency endpoint)
+                              // Only mark as emergency if reason exactly matches EMERGENCY_REASONS values
+                              const isEmergency = request.reason && isEmergencyReason(request.reason);
+                              
+                              // Check if this is a historical entry (created by leader, approved, and start date is in the past)
+                              // Only if it's NOT an emergency request
+                              const isHistorical = !isEmergency && 
+                                request.status === 'approved' && 
+                                new Date(request.startDate) < new Date();
+                              
+                              if (isEmergency) {
+                                return (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400">
+                                    <ExclamationTriangleIcon className="h-3 w-3" />
+                                    Emergency
+                                  </span>
+                                );
+                              } else if (isHistorical) {
+                                return (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400">
+                                    Historical
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
                           </div>
                         </div>
                         <div className="flex space-x-2 ml-4">

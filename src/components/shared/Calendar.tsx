@@ -6,6 +6,7 @@ import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { LeaveRequest, User } from '@/types';
 import { getWorkingDays, isWorkingDay } from '@/lib/leaveCalculations';
+import { LEAVE_REASONS, isEmergencyReason } from '@/lib/leaveReasons';
 import { CheckCircleIcon, ClockIcon, XCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 const localizer = momentLocalizer(moment);
@@ -52,18 +53,7 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
   
   const isMember = currentUser?.role === 'member';
   
-  const leaveReasons = useMemo(() => [
-    { value: 'vacation', label: 'Vacation' },
-    { value: 'sick', label: 'Sick Leave' },
-    { value: 'personal', label: 'Personal' },
-    { value: 'family', label: 'Family Emergency' },
-    { value: 'medical', label: 'Medical Appointment' },
-    { value: 'bereavement', label: 'Bereavement' },
-    { value: 'maternity', label: 'Maternity/Paternity' },
-    { value: 'study', label: 'Study/Education' },
-    { value: 'religious', label: 'Religious Holiday' },
-    { value: 'other', label: 'Other (specify below)' },
-  ], []);
+  const leaveReasons = useMemo(() => LEAVE_REASONS, []);
 
   // Fetch team settings for validation
   useEffect(() => {
@@ -112,7 +102,8 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
           const member = members.find(m => m._id === request.userId);
           const memberName = member?.fullName || member?.username || 'Unknown';
           const shiftSchedule = member?.shiftSchedule;
-          const isEmergency = !!request.requestedBy; // Emergency if requestedBy is set
+          // Only mark as emergency if reason exactly matches emergency reason values
+          const isEmergency = request.reason ? isEmergencyReason(request.reason) : false;
           
           if (!shiftSchedule) {
             // If no shift schedule, create a single event for the entire period
@@ -381,7 +372,8 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
         const member = members.find(m => m._id === request.userId);
         const memberName = member?.fullName || member?.username || 'Unknown';
         const shiftSchedule = member?.shiftSchedule;
-        const isEmergency = !!request.requestedBy;
+        // Only mark as emergency if reason exactly matches emergency reason values
+        const isEmergency = request.reason ? isEmergencyReason(request.reason) : false;
         
         if (!shiftSchedule) {
           const eventTitle = isEmergency 
@@ -613,42 +605,44 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
         </div>
       )}
 
-      <Calendar
-        localizer={localizer}
-        events={events}
-        startAccessor="start"
-        endAccessor="end"
-        style={{ height: '600px' }}
-        eventPropGetter={eventStyleGetter}
-        dayPropGetter={dayPropGetter}
-        views={[Views.MONTH, Views.WEEK]}
-        view={currentView}
-        onView={handleView}
-        date={currentDate}
-        onNavigate={handleNavigate}
-        onSelectEvent={onSelectEvent}
-        onSelectSlot={onSelectSlot}
-        selectable={isMember}
-        popup
-        showMultiDayTimes
-        step={60}
-        timeslots={1}
-        min={new Date(2024, 0, 1, 8, 0)}
-        max={new Date(2024, 0, 1, 18, 0)}
-        messages={{
-          next: 'Next',
-          previous: 'Previous',
-          today: 'Today',
-          month: 'Month',
-          week: 'Week',
-          agenda: 'Agenda',
-          date: 'Date',
-          time: 'Time',
-          event: 'Event',
-          noEventsInRange: 'No leave requests in this range.',
-          showMore: (total: number) => `+${total} more`
-        }}
-      />
+      <div className="relative z-10">
+        <Calendar
+          localizer={localizer}
+          events={events}
+          startAccessor="start"
+          endAccessor="end"
+          style={{ height: '700px' }}
+          eventPropGetter={eventStyleGetter}
+          dayPropGetter={dayPropGetter}
+          views={[Views.MONTH, Views.WEEK]}
+          view={currentView}
+          onView={handleView}
+          date={currentDate}
+          onNavigate={handleNavigate}
+          onSelectEvent={onSelectEvent}
+          onSelectSlot={onSelectSlot}
+          selectable={isMember}
+          popup
+          showMultiDayTimes
+          step={60}
+          timeslots={1}
+          min={new Date(2024, 0, 1, 8, 0)}
+          max={new Date(2024, 0, 1, 18, 0)}
+          messages={{
+            next: 'Next',
+            previous: 'Previous',
+            today: 'Today',
+            month: 'Month',
+            week: 'Week',
+            agenda: 'Agenda',
+            date: 'Date',
+            time: 'Time',
+            event: 'Event',
+            noEventsInRange: 'No leave requests in this range.',
+            showMore: (total: number) => `+${total} more`
+          }}
+        />
+      </div>
       
       {/* Legend */}
       <div className="mt-6 space-y-4">

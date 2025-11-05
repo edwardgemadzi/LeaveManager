@@ -11,6 +11,8 @@ export interface User {
   subgroupTag?: string; // Custom subgroup name assigned by leader (only when enableSubgrouping is true)
   manualLeaveBalance?: number; // Manual leave balance override set by leader (for members joining mid-year)
   manualYearToDateUsed?: number; // Manual year-to-date used days override set by leader
+  manualMaternityLeaveBalance?: number; // Manual maternity leave balance override
+  manualMaternityYearToDateUsed?: number; // Manual maternity year-to-date used days override
   createdAt: Date;
 }
 
@@ -31,6 +33,15 @@ export interface TeamSettings {
   enableSubgrouping?: boolean; // Whether to enable subgroup organization within the team
   subgroups?: string[]; // List of predefined subgroup names (minimum 2 required if enableSubgrouping is true)
   workingDaysGroupNames?: Record<string, string>; // Custom names for working days pattern groups (e.g., {"MTWTF__": "Weekday Team"})
+  bypassNoticePeriod?: {
+    enabled: boolean;
+    startDate?: Date;
+    endDate?: Date;
+  };
+  maternityLeave?: {
+    maxDays?: number; // Maximum maternity leave days (configurable by leader, default: 90)
+    countingMethod?: 'calendar' | 'working'; // How to count days: 'calendar' = count all calendar days, 'working' = count only working days (default: 'working')
+  };
 }
 
 export interface LeaveRequest {
@@ -85,4 +96,5 @@ export interface CreateLeaveRequest {
   endDate: string;
   reason: string;
   requestedFor?: string; // For leaders making requests on behalf
+  isHistorical?: boolean; // For migration: allows past dates and auto-approves
 }

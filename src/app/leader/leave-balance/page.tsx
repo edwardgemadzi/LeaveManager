@@ -4,14 +4,15 @@ import { useState, useEffect } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { Team, User, LeaveRequest } from '@/types';
-import { calculateLeaveBalance, countWorkingDays, calculateSurplusBalance } from '@/lib/leaveCalculations';
-import { calculateUsableDays, calculateMembersSharingSameShift } from '@/lib/analyticsCalculations';
+import { calculateLeaveBalance, countWorkingDays, calculateSurplusBalance, calculateMaternityLeaveBalance, calculateMaternitySurplusBalance, isMaternityLeave, countMaternityLeaveDays } from '@/lib/leaveCalculations';
+import { calculateUsableDays, calculateMembersSharingSameShift, GroupedTeamAnalytics, MemberAnalytics } from '@/lib/analyticsCalculations';
 import { UsersIcon, CalendarIcon, ChartBarIcon, ArrowTrendingUpIcon } from '@heroicons/react/24/outline';
 
 export default function LeaderLeaveBalancePage() {
   const [team, setTeam] = useState<Team | null>(null);
   const [members, setMembers] = useState<User[]>([]);
   const [allRequests, setAllRequests] = useState<LeaveRequest[]>([]);
+  const [analytics, setAnalytics] = useState<GroupedTeamAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<'name' | 'balance' | 'used'>('name');
   const [filterBy, setFilterBy] = useState<'all' | 'low' | 'high'>('all');
@@ -19,6 +20,10 @@ export default function LeaderLeaveBalancePage() {
   const [tempBalance, setTempBalance] = useState<string>('');
   const [editingDaysTaken, setEditingDaysTaken] = useState<string | null>(null);
   const [tempDaysTaken, setTempDaysTaken] = useState<string>('');
+  const [editingMaternityBalance, setEditingMaternityBalance] = useState<string | null>(null);
+  const [tempMaternityBalance, setTempMaternityBalance] = useState<string>('');
+  const [editingMaternityDaysTaken, setEditingMaternityDaysTaken] = useState<string | null>(null);
+  const [tempMaternityDaysTaken, setTempMaternityDaysTaken] = useState<string>('');
   const [updating, setUpdating] = useState<string | null>(null);
 
   // Extract fetchData function to be reusable
@@ -59,6 +64,21 @@ export default function LeaderLeaveBalancePage() {
         const requests = await requestsResponse.json();
         setAllRequests(requests || []);
       }
+
+      // Fetch analytics
+      const analyticsResponse = await fetch('/api/analytics', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (analyticsResponse.ok) {
+        const analyticsData = await analyticsResponse.json();
+        const groupedData = analyticsData.analytics || analyticsData.grouped || null;
+        if (groupedData) {
+          setAnalytics(groupedData);
+        }
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -90,9 +110,42 @@ export default function LeaderLeaveBalancePage() {
     };
   }, []);
 
+  // Helper function to find member analytics data from grouped analytics
+  const getMemberAnalyticsData = (member: User): MemberAnalytics | null => {
+    if (!analytics || !analytics.groups) return null;
+    
+    const memberId = member._id?.toString() || '';
+    for (const group of analytics.groups) {
+      const memberAnalytics = group.members.find(m => m.userId === memberId);
+      if (memberAnalytics) {
+        return memberAnalytics.analytics;
+      }
+    }
+    return null;
+  };
+
   const getMemberLeaveData = (member: User) => {
     const memberRequests = allRequests.filter(req => req.userId === member._id);
-    const approvedRequests = memberRequests.filter(req => req.status === 'approved');
+    // Filter out maternity leave requests from regular leave calculations
+    const approvedRequests = memberRequests.filter(req => 
+      req.status === 'approved' && (!req.reason || !isMaternityLeave(req.reason))
+    );
+    
+    // Debug logging for specific user
+    if (member.username === 'iguimbi') {
+      console.log('[DEBUG iguimbi] Member requests:', memberRequests.length);
+      console.log('[DEBUG iguimbi] Approved requests (non-maternity):', approvedRequests.length);
+      console.log('[DEBUG iguimbi] Manual leave balance:', member.manualLeaveBalance);
+      console.log('[DEBUG iguimbi] Manual year-to-date used:', member.manualYearToDateUsed);
+      approvedRequests.forEach((req, idx) => {
+        console.log(`[DEBUG iguimbi] Request ${idx + 1}:`, {
+          startDate: req.startDate,
+          endDate: req.endDate,
+          reason: req.reason,
+          status: req.status
+        });
+      });
+    }
     
     const shiftSchedule = member.shiftSchedule || {
       pattern: [true, true, true, true, true, false, false],
@@ -111,41 +164,30 @@ export default function LeaderLeaveBalancePage() {
     const totalWorkingDaysInYear = countWorkingDays(yearStart, yearEnd, shiftSchedule);
     
     // Calculate working days used year-to-date
+    // Count all approved days in the current year (including future approved dates)
+    // because approved requests are already committed/allocated
     const yearToDateWorkingDays = approvedRequests.reduce((total, req) => {
       const start = new Date(req.startDate);
       const end = new Date(req.endDate);
       start.setHours(0, 0, 0, 0);
-      end.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
       
-      // Only count days up to today
-      const todayDate = new Date();
-      todayDate.setHours(0, 0, 0, 0);
-      const actualEnd = end > todayDate ? todayDate : end;
-      
-      if (actualEnd >= start) {
-        return total + countWorkingDays(start, actualEnd, shiftSchedule);
+      // Only count days within the current year
+      if (start <= yearEnd && end >= yearStart) {
+        const overlapStart = start > yearStart ? start : yearStart;
+        const overlapEnd = end < yearEnd ? end : yearEnd;
+        
+        if (overlapEnd >= overlapStart) {
+          return total + countWorkingDays(overlapStart, overlapEnd, shiftSchedule);
+        }
       }
       return total;
     }, 0);
 
-    // Calculate remaining balance
-    const approvedRequestsForCalculation = approvedRequests.map(req => ({
-      startDate: new Date(req.startDate),
-      endDate: new Date(req.endDate)
-    }));
-    
     // Use manualYearToDateUsed if set, otherwise use calculated value
     const yearToDateUsed = member.manualYearToDateUsed !== undefined 
       ? member.manualYearToDateUsed 
       : yearToDateWorkingDays;
-    
-    const remainingBalance = calculateLeaveBalance(
-      team?.settings.maxLeavePerYear || 20,
-      approvedRequestsForCalculation,
-      shiftSchedule,
-      member.manualLeaveBalance,
-      member.manualYearToDateUsed
-    );
 
     // Calculate total days used (all time, not just this year)
     // First, calculate total from all approved requests
@@ -169,40 +211,59 @@ export default function LeaderLeaveBalancePage() {
     // If base is 0, percentage should be null (display as "-")
     const percentageUsed = baseBalance > 0 ? (yearToDateUsed / baseBalance) * 100 : null;
 
-    // Calculate surplus balance
-    const surplusBalance = calculateSurplusBalance(member.manualLeaveBalance, maxLeave);
-
-    // Filter out members with 0 base balance from realistic calculations
-    // Members with 0 base balance should not affect competition/realistic calculations
-    const membersWithNonZeroBase = members.filter(m => {
-      const memberBaseBalance = m.manualLeaveBalance !== undefined 
-        ? m.manualLeaveBalance 
-        : (team?.settings.maxLeavePerYear || 20);
-      return memberBaseBalance > 0;
-    });
+    // Try to use analytics data first, fallback to calculation if not available
+    const analyticsData = getMemberAnalyticsData(member);
     
-    // Calculate realistic usable days (factors in members sharing same schedule)
-    const membersSharingSameShift = calculateMembersSharingSameShift(member, membersWithNonZeroBase);
-    const usableDays = team ? calculateUsableDays(
-      member,
-      team,
-      allRequests.filter(req => req.status === 'approved'),
-      membersWithNonZeroBase,
-      shiftSchedule
-    ) : 0;
+    // Calculate remaining balance (needed for fallback)
+    // Include reason field so calculateLeaveBalance can filter out maternity leave
+    const approvedRequestsForCalculation = approvedRequests.map(req => ({
+      startDate: new Date(req.startDate),
+      endDate: new Date(req.endDate),
+      reason: req.reason
+    }));
     
-    // Realistic usable days divides usable days by members sharing the same shift, capped by remaining leave balance
-    const realisticUsableDays = membersSharingSameShift > 0
-      ? Math.min(
-          Math.round((usableDays / membersSharingSameShift) * 10) / 10,
-          remainingBalance
-        )
-      : Math.min(usableDays, remainingBalance);
+    const remainingBalance = analyticsData?.remainingLeaveBalance ?? calculateLeaveBalance(
+      team?.settings.maxLeavePerYear || 20,
+      approvedRequestsForCalculation,
+      shiftSchedule,
+      member.manualLeaveBalance,
+      member.manualYearToDateUsed
+    );
 
-    // Calculate willLoseDays (days that will be lost if realisticUsableDays < remainingBalance)
-    const willLoseDays = realisticUsableDays < remainingBalance
+    // Use analytics data if available, otherwise calculate
+    const surplusBalance = analyticsData?.surplusBalance ?? calculateSurplusBalance(member.manualLeaveBalance, maxLeave);
+    const realisticUsableDays = analyticsData?.realisticUsableDays ?? (() => {
+      // Fallback calculation if analytics not available
+      const membersWithNonZeroBase = members.filter(m => {
+        const memberBaseBalance = m.manualLeaveBalance !== undefined 
+          ? m.manualLeaveBalance 
+          : (team?.settings.maxLeavePerYear || 20);
+        return memberBaseBalance > 0;
+      });
+      
+      const membersSharingSameShift = calculateMembersSharingSameShift(member, membersWithNonZeroBase);
+      const usableDays = team ? calculateUsableDays(
+        member,
+        team,
+        allRequests.filter(req => req.status === 'approved'),
+        membersWithNonZeroBase,
+        shiftSchedule
+      ) : 0;
+      
+      return membersSharingSameShift > 0
+        ? Math.min(
+            Math.floor(usableDays / membersSharingSameShift),
+            remainingBalance
+          )
+        : Math.min(usableDays, remainingBalance);
+    })();
+    
+    const willLoseDays = analyticsData?.willLose ?? (realisticUsableDays < remainingBalance
       ? remainingBalance - realisticUsableDays
-      : 0;
+      : 0);
+    
+    const remainderDays = analyticsData?.remainderDays ?? 0;
+    const membersSharingSameShift = analyticsData?.membersSharingSameShift ?? 0;
 
     return {
       remainingBalance,
@@ -216,7 +277,94 @@ export default function LeaderLeaveBalancePage() {
       approvedCount: approvedRequests.length,
       pendingCount: memberRequests.filter(req => req.status === 'pending').length,
       rejectedCount: memberRequests.filter(req => req.status === 'rejected').length,
-      baseBalance
+      baseBalance: analyticsData?.baseLeaveBalance ?? baseBalance,
+      remainderDays,
+      membersSharingSameShift
+    };
+  };
+
+  const getMemberMaternityLeaveData = (member: User) => {
+    const maxMaternityLeaveDays = team?.settings.maternityLeave?.maxDays || 90;
+    const countingMethod = team?.settings.maternityLeave?.countingMethod || 'working';
+    
+    const memberRequests = allRequests.filter(req => req.userId === member._id);
+    const approvedMaternityRequests = memberRequests.filter(req => 
+      req.status === 'approved' && req.reason && isMaternityLeave(req.reason)
+    );
+    
+    const shiftSchedule = member.shiftSchedule || {
+      pattern: [true, true, true, true, true, false, false],
+      startDate: new Date(),
+      type: 'fixed'
+    };
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const yearStart = new Date(today.getFullYear(), 0, 1);
+    yearStart.setHours(0, 0, 0, 0);
+    const yearEnd = new Date(today.getFullYear(), 11, 31);
+    yearEnd.setHours(23, 59, 59, 999);
+
+    // Calculate maternity days used year-to-date
+    let maternityDaysUsed = 0;
+    if (member.manualMaternityYearToDateUsed !== undefined) {
+      maternityDaysUsed = member.manualMaternityYearToDateUsed;
+    } else {
+      maternityDaysUsed = approvedMaternityRequests.reduce((total, req) => {
+        const start = new Date(req.startDate);
+        const end = new Date(req.endDate);
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+        
+        // Only count days within the current year and up to today
+        if (start <= yearEnd && end >= yearStart) {
+          const overlapStart = start > yearStart ? start : yearStart;
+          const overlapEnd = end < yearEnd ? (end < today ? end : today) : (today < yearEnd ? today : yearEnd);
+          
+          if (overlapEnd >= overlapStart) {
+            const days = countMaternityLeaveDays(overlapStart, overlapEnd, countingMethod, shiftSchedule);
+            return total + days;
+          }
+        }
+        return total;
+      }, 0);
+    }
+
+    // Calculate remaining maternity leave balance
+    const approvedMaternityRequestsForCalculation = approvedMaternityRequests.map(req => ({
+      startDate: new Date(req.startDate),
+      endDate: new Date(req.endDate),
+      reason: req.reason
+    }));
+
+    const remainingMaternityBalance = calculateMaternityLeaveBalance(
+      maxMaternityLeaveDays,
+      approvedMaternityRequestsForCalculation,
+      countingMethod,
+      shiftSchedule,
+      member.manualMaternityLeaveBalance,
+      member.manualMaternityYearToDateUsed
+    );
+
+    const baseMaternityBalance = member.manualMaternityLeaveBalance !== undefined 
+      ? member.manualMaternityLeaveBalance 
+      : maxMaternityLeaveDays;
+    
+    const surplusMaternityBalance = calculateMaternitySurplusBalance(
+      member.manualMaternityLeaveBalance,
+      maxMaternityLeaveDays
+    );
+
+    // Calculate percentage used - if base is 0, percentage should be null (display as "-")
+    const percentageUsed = baseMaternityBalance > 0 ? (maternityDaysUsed / baseMaternityBalance) * 100 : null;
+
+    return {
+      remainingBalance: remainingMaternityBalance,
+      daysUsed: maternityDaysUsed,
+      baseBalance: baseMaternityBalance,
+      percentageUsed,
+      surplusBalance: surplusMaternityBalance,
+      approvedCount: approvedMaternityRequests.length
     };
   };
 
@@ -446,6 +594,23 @@ export default function LeaderLeaveBalancePage() {
         ));
         setEditingDaysTaken(null);
         setTempDaysTaken('');
+        
+        // Refetch analytics to ensure remaining balance is updated
+        try {
+          const analyticsResponse = await fetch('/api/analytics', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+          if (analyticsResponse.ok) {
+            const analyticsData = await analyticsResponse.json();
+            const groupedData = analyticsData.analytics || analyticsData.grouped || null;
+            setAnalytics(groupedData);
+          }
+        } catch (error) {
+          console.error('Error refetching analytics:', error);
+          // Continue even if analytics refetch fails - local calculation will work
+        }
       } else {
         const error = await response.json();
         alert(error.error || 'Failed to update days taken');
@@ -461,6 +626,181 @@ export default function LeaderLeaveBalancePage() {
   const handleCancelEditDaysTaken = () => {
     setEditingDaysTaken(null);
     setTempDaysTaken('');
+  };
+
+  const handleEditMaternityBalance = (member: User) => {
+    setEditingMaternityBalance(member._id || null);
+    const maternityData = getMemberMaternityLeaveData(member);
+    setTempMaternityBalance(Math.round(maternityData.remainingBalance).toString());
+  };
+
+  const handleSaveMaternityBalance = async (memberId: string) => {
+    const member = members.find(m => m._id === memberId);
+    if (!member) return;
+
+    const balanceValue = Math.floor(parseFloat(tempMaternityBalance));
+    if (isNaN(balanceValue) || balanceValue < 0) {
+      alert('Please enter a valid non-negative whole number');
+      return;
+    }
+
+    setUpdating(memberId);
+    try {
+      const token = localStorage.getItem('token');
+      const maxMaternityLeaveDays = team?.settings.maternityLeave?.maxDays || 90;
+      
+      // Get days used - use manualMaternityYearToDateUsed if set, otherwise calculate from approved maternity requests
+      let daysUsed: number;
+      if (member.manualMaternityYearToDateUsed !== undefined) {
+        daysUsed = member.manualMaternityYearToDateUsed;
+      } else {
+        const memberRequests = allRequests.filter(req => req.userId === memberId);
+        const approvedMaternityRequests = memberRequests.filter(req => 
+          req.status === 'approved' && req.reason && isMaternityLeave(req.reason)
+        );
+        
+        const countingMethod = team?.settings.maternityLeave?.countingMethod || 'working';
+        const shiftSchedule = member.shiftSchedule || {
+          pattern: [true, true, true, true, true, false, false],
+          startDate: new Date(),
+          type: 'fixed'
+        };
+        
+        const currentYear = new Date().getFullYear();
+        const yearStart = new Date(currentYear, 0, 1);
+        yearStart.setHours(0, 0, 0, 0);
+        const yearEnd = new Date(currentYear, 11, 31);
+        yearEnd.setHours(23, 59, 59, 999);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        daysUsed = approvedMaternityRequests.reduce((total, req) => {
+          const reqStart = new Date(req.startDate);
+          const reqEnd = new Date(req.endDate);
+          reqStart.setHours(0, 0, 0, 0);
+          reqEnd.setHours(23, 59, 59, 999);
+          
+          if (reqStart <= yearEnd && reqEnd >= yearStart) {
+            const overlapStart = reqStart > yearStart ? reqStart : yearStart;
+            const overlapEnd = reqEnd < yearEnd ? (reqEnd < today ? reqEnd : today) : (today < yearEnd ? today : yearEnd);
+            
+            if (overlapEnd >= overlapStart) {
+              const days = countMaternityLeaveDays(overlapStart, overlapEnd, countingMethod, shiftSchedule);
+              return total + days;
+            }
+          }
+          return total;
+        }, 0);
+      }
+
+      // Calculate base balance (manual balance if set, otherwise max)
+      const baseBalance = member.manualMaternityLeaveBalance !== undefined 
+        ? member.manualMaternityLeaveBalance 
+        : maxMaternityLeaveDays;
+      
+      // If balance is less than base, set it as the new base
+      const newBaseBalance = balanceValue < baseBalance ? balanceValue : baseBalance;
+      
+      // Calculate new base balance
+      const newManualMaternityLeaveBalance = balanceValue + daysUsed;
+      
+      const response = await fetch(`/api/users/${memberId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          manualMaternityLeaveBalance: newManualMaternityLeaveBalance,
+          manualMaternityYearToDateUsed: daysUsed
+        }),
+      });
+
+      if (response.ok) {
+        // Update member in state
+        setMembers(members.map(m => 
+          m._id === memberId 
+            ? { 
+                ...m, 
+                manualMaternityLeaveBalance: newManualMaternityLeaveBalance,
+                manualMaternityYearToDateUsed: daysUsed
+              }
+            : m
+        ));
+        setEditingMaternityBalance(null);
+        setTempMaternityBalance('');
+        await fetchData(); // Refresh data
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to update maternity leave balance');
+      }
+    } catch (error) {
+      console.error('Error updating maternity leave balance:', error);
+      alert('Network error. Please try again.');
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const handleCancelEditMaternityBalance = () => {
+    setEditingMaternityBalance(null);
+    setTempMaternityBalance('');
+  };
+
+  const handleEditMaternityDaysTaken = (member: User) => {
+    setEditingMaternityDaysTaken(member._id || null);
+    const maternityData = getMemberMaternityLeaveData(member);
+    setTempMaternityDaysTaken(Math.round(maternityData.daysUsed).toString());
+  };
+
+  const handleSaveMaternityDaysTaken = async (memberId: string) => {
+    const member = members.find(m => m._id === memberId);
+    if (!member) return;
+
+    const daysTakenValue = Math.floor(parseFloat(tempMaternityDaysTaken));
+    if (isNaN(daysTakenValue) || daysTakenValue < 0) {
+      alert('Please enter a valid non-negative whole number');
+      return;
+    }
+
+    setUpdating(memberId);
+    try {
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch(`/api/users/${memberId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ manualMaternityYearToDateUsed: daysTakenValue }),
+      });
+
+      if (response.ok) {
+        // Update member in state
+        setMembers(members.map(m => 
+          m._id === memberId 
+            ? { ...m, manualMaternityYearToDateUsed: daysTakenValue }
+            : m
+        ));
+        setEditingMaternityDaysTaken(null);
+        setTempMaternityDaysTaken('');
+        await fetchData(); // Refresh data
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to update maternity days taken');
+      }
+    } catch (error) {
+      console.error('Error updating maternity days taken:', error);
+      alert('Network error. Please try again.');
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const handleCancelEditMaternityDaysTaken = () => {
+    setEditingMaternityDaysTaken(null);
+    setTempMaternityDaysTaken('');
   };
 
   const handleResetDaysTaken = async (memberId: string) => {
@@ -491,6 +831,23 @@ export default function LeaderLeaveBalancePage() {
           }
           return m;
         }));
+        
+        // Refetch analytics to ensure remaining balance is updated
+        try {
+          const analyticsResponse = await fetch('/api/analytics', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+          if (analyticsResponse.ok) {
+            const analyticsData = await analyticsResponse.json();
+            const groupedData = analyticsData.analytics || analyticsData.grouped || null;
+            setAnalytics(groupedData);
+          }
+        } catch (error) {
+          console.error('Error refetching analytics:', error);
+          // Continue even if analytics refetch fails - local calculation will work
+        }
       } else {
         const error = await response.json();
         alert(error.error || 'Failed to reset days taken');
@@ -523,18 +880,37 @@ export default function LeaderLeaveBalancePage() {
     leaveData: getMemberLeaveData(m),
   }));
 
-  // Filter out members with 0 base balance from aggregate calculations
-  const membersWithNonZeroBase = allMembersData.filter(m => {
-    const baseBalance = m.member.manualLeaveBalance !== undefined 
-      ? m.member.manualLeaveBalance 
-      : (team?.settings.maxLeavePerYear || 20);
-    return baseBalance > 0;
-  });
-  
-  const totalMembers = allMembersData.length;
-  const totalRemainingBalance = membersWithNonZeroBase.reduce((sum, m) => sum + m.leaveData.remainingBalance, 0);
-  const totalUsed = membersWithNonZeroBase.reduce((sum, m) => sum + m.leaveData.totalUsed, 0);
-  const averageBalance = membersWithNonZeroBase.length > 0 ? totalRemainingBalance / membersWithNonZeroBase.length : 0;
+  // Use analytics aggregate data if available, otherwise calculate from members
+  const totalMembers = analytics?.aggregate.membersCount ?? allMembersData.length;
+  const totalRemainingBalance = analytics?.aggregate.totalRemainingLeaveBalance ?? (() => {
+    // Filter out members with 0 base balance from aggregate calculations
+    const membersWithNonZeroBase = allMembersData.filter(m => {
+      const baseBalance = m.member.manualLeaveBalance !== undefined 
+        ? m.member.manualLeaveBalance 
+        : (team?.settings.maxLeavePerYear || 20);
+      return baseBalance > 0;
+    });
+    return membersWithNonZeroBase.reduce((sum, m) => sum + m.leaveData.remainingBalance, 0);
+  })();
+  const totalUsed = (() => {
+    // Calculate total used from member data (not in analytics aggregate)
+    const membersWithNonZeroBase = allMembersData.filter(m => {
+      const baseBalance = m.member.manualLeaveBalance !== undefined 
+        ? m.member.manualLeaveBalance 
+        : (team?.settings.maxLeavePerYear || 20);
+      return baseBalance > 0;
+    });
+    return membersWithNonZeroBase.reduce((sum, m) => sum + m.leaveData.totalUsed, 0);
+  })();
+  const averageBalance = analytics?.aggregate.averageRemainingBalance ?? (() => {
+    const membersWithNonZeroBase = allMembersData.filter(m => {
+      const baseBalance = m.member.manualLeaveBalance !== undefined 
+        ? m.member.manualLeaveBalance 
+        : (team?.settings.maxLeavePerYear || 20);
+      return baseBalance > 0;
+    });
+    return membersWithNonZeroBase.length > 0 ? totalRemainingBalance / membersWithNonZeroBase.length : 0;
+  })();
 
   return (
     <ProtectedRoute requiredRole="leader">
@@ -637,6 +1013,40 @@ export default function LeaderLeaveBalancePage() {
             </div>
           </div>
 
+          {/* Remainder Days Notice */}
+          {(() => {
+            // Use analytics aggregate remainder days if available
+            const totalRemainderDays = analytics?.aggregate.totalRemainderDays ?? 0;
+            
+            if (totalRemainderDays > 0) {
+              return (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3 flex-1">
+                      <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">
+                        Remainder Days Require Allocation
+                      </h3>
+                      <div className="mt-2 text-sm text-blue-700 dark:text-blue-400">
+                        <p>
+                          There are <strong>{totalRemainderDays}</strong> day(s) that cannot be evenly distributed among members sharing the same shift schedule. These remainder days will need to be allocated manually, and not everyone in the affected groups will receive them.
+                        </p>
+                        <p className="mt-2">
+                          See the <strong>Analytics</strong> page for group-level breakdown and detailed allocation information.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })()}
+
           {/* Members Table */}
           <div className="bg-white dark:bg-gray-900 shadow rounded-lg overflow-hidden border border-gray-100 dark:border-gray-800">
             <div className="overflow-x-auto">
@@ -661,12 +1071,21 @@ export default function LeaderLeaveBalancePage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Requests
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Maternity/Paternity Balance
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Maternity Used
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Maternity Usage %
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
                   {memberList.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                      <td colSpan={9} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                         No members found
                       </td>
                     </tr>
@@ -929,6 +1348,128 @@ export default function LeaderLeaveBalancePage() {
                               )}
                             </div>
                           </td>
+                          {/* Maternity Leave Columns */}
+                          {(() => {
+                            const maternityData = getMemberMaternityLeaveData(member);
+                            const maxMaternityDays = team?.settings.maternityLeave?.maxDays || 90;
+                            return (
+                              <>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  {editingMaternityBalance === member._id ? (
+                                    <div className="space-y-2">
+                                      <div className="flex items-center space-x-2">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          step="1"
+                                          value={tempMaternityBalance}
+                                          onChange={(e) => setTempMaternityBalance(e.target.value)}
+                                          disabled={updating === member._id}
+                                          className="w-24 px-2 py-1 text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 disabled:opacity-50"
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                              handleSaveMaternityBalance(member._id!);
+                                            } else if (e.key === 'Escape') {
+                                              handleCancelEditMaternityBalance();
+                                            }
+                                          }}
+                                          autoFocus
+                                        />
+                                        <span className="text-sm text-gray-500 dark:text-gray-400">/ {maxMaternityDays}</span>
+                                      </div>
+                                      <div className="flex items-center space-x-2">
+                                        <button
+                                          onClick={() => handleSaveMaternityBalance(member._id!)}
+                                          disabled={updating === member._id}
+                                          className="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded disabled:opacity-50"
+                                        >
+                                          {updating === member._id ? 'Saving...' : 'Save'}
+                                        </button>
+                                        <button
+                                          onClick={handleCancelEditMaternityBalance}
+                                          disabled={updating === member._id}
+                                          className="px-2 py-1 text-xs bg-gray-500 hover:bg-gray-600 text-white rounded disabled:opacity-50"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="group">
+                                      <div 
+                                        className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer hover:text-pink-600 dark:hover:text-pink-400"
+                                        onClick={() => handleEditMaternityBalance(member)}
+                                        title="Click to edit maternity leave balance"
+                                      >
+                                        {(() => {
+                                          if (maternityData.baseBalance === 0) {
+                                            return <>0 / 0</>;
+                                          }
+                                          return <>{Math.round(maternityData.remainingBalance)} / {maxMaternityDays}</>;
+                                        })()}
+                                        <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">(remaining)</span>
+                                        {maternityData.surplusBalance > 0 && (
+                                          <span className="ml-2 text-xs text-green-600 dark:text-green-400" title="Surplus balance">
+                                            (+{Math.round(maternityData.surplusBalance)} surplus)
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  {editingMaternityDaysTaken === member._id ? (
+                                    <div className="flex items-center space-x-2">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="1"
+                                        value={tempMaternityDaysTaken}
+                                        onChange={(e) => setTempMaternityDaysTaken(e.target.value)}
+                                        disabled={updating === member._id}
+                                        className="w-20 px-2 py-1 text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 disabled:opacity-50"
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            handleSaveMaternityDaysTaken(member._id!);
+                                          } else if (e.key === 'Escape') {
+                                            handleCancelEditMaternityDaysTaken();
+                                          }
+                                        }}
+                                        autoFocus
+                                      />
+                                      <button
+                                        onClick={() => handleSaveMaternityDaysTaken(member._id!)}
+                                        disabled={updating === member._id}
+                                        className="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded disabled:opacity-50"
+                                      >
+                                        {updating === member._id ? 'Saving...' : 'Save'}
+                                      </button>
+                                      <button
+                                        onClick={handleCancelEditMaternityDaysTaken}
+                                        disabled={updating === member._id}
+                                        className="px-2 py-1 text-xs bg-gray-500 hover:bg-gray-600 text-white rounded disabled:opacity-50"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div 
+                                      className="text-sm text-gray-900 dark:text-white cursor-pointer hover:text-pink-600 dark:hover:text-pink-400"
+                                      onClick={() => handleEditMaternityDaysTaken(member)}
+                                      title="Click to edit maternity days taken"
+                                    >
+                                      {Math.round(maternityData.daysUsed)}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                    {maternityData.percentageUsed !== null ? `${Math.round(maternityData.percentageUsed)}%` : '-'}
+                                  </span>
+                                </td>
+                              </>
+                            );
+                          })()}
                         </tr>
                       );
                     })

@@ -86,8 +86,8 @@ export default function MemberCalendarPage() {
           </p>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 shadow-xl rounded-xl border border-gray-200 dark:border-gray-800">
-          <div className="px-6 py-8">
+        <div className="bg-white dark:bg-gray-900 shadow-xl rounded-none border border-gray-200 dark:border-gray-800 relative z-10">
+          <div className="px-6 py-8 relative z-10">
             {team?._id ? (
               <TeamCalendar teamId={team._id} members={members} currentUser={user || undefined} />
             ) : (

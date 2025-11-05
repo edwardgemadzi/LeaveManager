@@ -17,6 +17,15 @@ export default function TeamSettingsPage() {
     enableSubgrouping: false,
     subgroups: [] as string[],
     workingDaysGroupNames: {} as Record<string, string>,
+    bypassNoticePeriod: {
+      enabled: false,
+      startDate: undefined as string | undefined,
+      endDate: undefined as string | undefined,
+    },
+    maternityLeave: {
+      maxDays: 90,
+      countingMethod: 'working' as 'calendar' | 'working',
+    },
   });
 
   useEffect(() => {
@@ -39,7 +48,37 @@ export default function TeamSettingsPage() {
         const data = await response.json();
         console.log('Settings - Team data received:', data);
         setTeam(data.team);
-        setSettings(data.team?.settings || { concurrentLeave: 2, maxLeavePerYear: 20, minimumNoticePeriod: 1, allowCarryover: false, enableSubgrouping: false, subgroups: [], workingDaysGroupNames: {} });
+        const defaultSettings = {
+          concurrentLeave: 2,
+          maxLeavePerYear: 20,
+          minimumNoticePeriod: 1,
+          allowCarryover: false,
+          enableSubgrouping: false,
+          subgroups: [] as string[],
+          workingDaysGroupNames: {} as Record<string, string>,
+          bypassNoticePeriod: {
+            enabled: false,
+            startDate: undefined as string | undefined,
+            endDate: undefined as string | undefined,
+          },
+          maternityLeave: {
+            maxDays: 90,
+            countingMethod: 'working' as 'calendar' | 'working',
+          },
+        };
+        const teamSettings = data.team?.settings || defaultSettings;
+        // Convert bypass dates from Date objects to ISO strings for input fields
+        if (teamSettings.bypassNoticePeriod?.startDate) {
+          teamSettings.bypassNoticePeriod.startDate = typeof teamSettings.bypassNoticePeriod.startDate === 'string' 
+            ? teamSettings.bypassNoticePeriod.startDate.split('T')[0]
+            : new Date(teamSettings.bypassNoticePeriod.startDate).toISOString().split('T')[0];
+        }
+        if (teamSettings.bypassNoticePeriod?.endDate) {
+          teamSettings.bypassNoticePeriod.endDate = typeof teamSettings.bypassNoticePeriod.endDate === 'string'
+            ? teamSettings.bypassNoticePeriod.endDate.split('T')[0]
+            : new Date(teamSettings.bypassNoticePeriod.endDate).toISOString().split('T')[0];
+        }
+        setSettings(teamSettings);
       } catch (error) {
         console.error('Error fetching team:', error);
       } finally {
@@ -60,6 +99,22 @@ export default function TeamSettingsPage() {
       const validSubgroups = (settings.subgroups || []).filter(name => name && name.trim().length > 0);
       if (validSubgroups.length < 2) {
         setError('At least 2 subgroups are required when subgrouping is enabled');
+        setSaving(false);
+        return;
+      }
+    }
+
+    // Validate bypass notice period dates
+    if (settings.bypassNoticePeriod?.enabled) {
+      if (!settings.bypassNoticePeriod.startDate || !settings.bypassNoticePeriod.endDate) {
+        setError('Both start date and end date are required when bypass notice period is enabled');
+        setSaving(false);
+        return;
+      }
+      const startDate = new Date(settings.bypassNoticePeriod.startDate);
+      const endDate = new Date(settings.bypassNoticePeriod.endDate);
+      if (endDate < startDate) {
+        setError('End date must be on or after start date');
         setSaving(false);
         return;
       }
@@ -87,7 +142,36 @@ export default function TeamSettingsPage() {
         if (teamResponse.ok) {
           const teamData = await teamResponse.json();
           setTeam(teamData.team);
-          setSettings(teamData.team?.settings || { concurrentLeave: 2, maxLeavePerYear: 20, minimumNoticePeriod: 1, allowCarryover: false, enableSubgrouping: false, subgroups: [] });
+          const defaultSettings = {
+            concurrentLeave: 2,
+            maxLeavePerYear: 20,
+            minimumNoticePeriod: 1,
+            allowCarryover: false,
+            enableSubgrouping: false,
+            subgroups: [] as string[],
+            bypassNoticePeriod: {
+              enabled: false,
+              startDate: undefined as string | undefined,
+              endDate: undefined as string | undefined,
+            },
+            maternityLeave: {
+              maxDays: 90,
+              countingMethod: 'working' as 'calendar' | 'working',
+            },
+          };
+          const teamSettings = teamData.team?.settings || defaultSettings;
+          // Convert bypass dates from Date objects to ISO strings for input fields
+          if (teamSettings.bypassNoticePeriod?.startDate) {
+            teamSettings.bypassNoticePeriod.startDate = typeof teamSettings.bypassNoticePeriod.startDate === 'string' 
+              ? teamSettings.bypassNoticePeriod.startDate.split('T')[0]
+              : new Date(teamSettings.bypassNoticePeriod.startDate).toISOString().split('T')[0];
+          }
+          if (teamSettings.bypassNoticePeriod?.endDate) {
+            teamSettings.bypassNoticePeriod.endDate = typeof teamSettings.bypassNoticePeriod.endDate === 'string'
+              ? teamSettings.bypassNoticePeriod.endDate.split('T')[0]
+              : new Date(teamSettings.bypassNoticePeriod.endDate).toISOString().split('T')[0];
+          }
+          setSettings(teamSettings);
         }
       } else {
         const errorData = await response.json();
@@ -198,6 +282,94 @@ export default function TeamSettingsPage() {
                     </p>
                   </div>
 
+                  <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="bypassNoticePeriodEnabled"
+                        checked={settings.bypassNoticePeriod?.enabled || false}
+                        onChange={(e) => setSettings({
+                          ...settings,
+                          bypassNoticePeriod: {
+                            ...settings.bypassNoticePeriod,
+                            enabled: e.target.checked,
+                            startDate: e.target.checked ? settings.bypassNoticePeriod?.startDate : undefined,
+                            endDate: e.target.checked ? settings.bypassNoticePeriod?.endDate : undefined,
+                          }
+                        })}
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900"
+                      />
+                      <label htmlFor="bypassNoticePeriodEnabled" className="ml-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Bypass Notice Period
+                      </label>
+                    </div>
+                    <p className="mt-1 ml-6 text-sm text-gray-500 dark:text-gray-400">
+                      Temporarily allow members to bypass the minimum notice period requirement during a specified date range. This is useful for emergency situations or end-of-year rush periods.
+                    </p>
+                    
+                    {settings.bypassNoticePeriod?.enabled && (
+                      <div className="mt-4 ml-6 space-y-4">
+                        <div>
+                          <label htmlFor="bypassStartDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Start Date
+                          </label>
+                          <div className="mt-1">
+                            <input
+                              type="date"
+                              id="bypassStartDate"
+                              value={settings.bypassNoticePeriod?.startDate || ''}
+                              onChange={(e) => setSettings({
+                                ...settings,
+                                bypassNoticePeriod: {
+                                  ...settings.bypassNoticePeriod,
+                                  startDate: e.target.value,
+                                }
+                              })}
+                              className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label htmlFor="bypassEndDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            End Date
+                          </label>
+                          <div className="mt-1">
+                            <input
+                              type="date"
+                              id="bypassEndDate"
+                              value={settings.bypassNoticePeriod?.endDate || ''}
+                              min={settings.bypassNoticePeriod?.startDate || ''}
+                              onChange={(e) => setSettings({
+                                ...settings,
+                                bypassNoticePeriod: {
+                                  ...settings.bypassNoticePeriod,
+                                  endDate: e.target.value,
+                                }
+                              })}
+                              className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
+                            />
+                          </div>
+                        </div>
+                        {settings.bypassNoticePeriod?.startDate && settings.bypassNoticePeriod?.endDate && (() => {
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          const startDate = new Date(settings.bypassNoticePeriod.startDate);
+                          startDate.setHours(0, 0, 0, 0);
+                          const endDate = new Date(settings.bypassNoticePeriod.endDate);
+                          endDate.setHours(23, 59, 59, 999);
+                          const isActive = today >= startDate && today <= endDate;
+                          return isActive && (
+                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                              <p className="text-sm text-blue-800 dark:text-blue-400 font-medium">
+                                Bypass is currently active from {new Date(settings.bypassNoticePeriod.startDate).toLocaleDateString()} to {new Date(settings.bypassNoticePeriod.endDate).toLocaleDateString()}
+                              </p>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="flex items-center">
                     <input
                       type="checkbox"
@@ -216,6 +388,93 @@ export default function TeamSettingsPage() {
                   <p className="mt-1 ml-6 text-sm text-gray-500 dark:text-gray-400">
                     If enabled, unused leave days will carry over to the next year. If disabled, unused days will be lost at year end.
                   </p>
+                  
+                  {/* Maternity Leave Settings */}
+                  <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
+                    <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">Maternity/Paternity Leave</h4>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <label htmlFor="maternityMaxDays" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Maximum Maternity Leave Days
+                        </label>
+                        <div className="mt-1">
+                          <input
+                            type="number"
+                            id="maternityMaxDays"
+                            min="1"
+                            max="365"
+                            value={settings.maternityLeave?.maxDays || 90}
+                            onChange={(e) => setSettings({
+                              ...settings,
+                              maternityLeave: {
+                                ...settings.maternityLeave,
+                                maxDays: parseInt(e.target.value) || 90,
+                                countingMethod: settings.maternityLeave?.countingMethod || 'working',
+                              }
+                            })}
+                            className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
+                          />
+                        </div>
+                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                          Maximum number of maternity/paternity leave days each team member can take per year.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Counting Method
+                        </label>
+                        <div className="space-y-2">
+                          <div className="flex items-center">
+                            <input
+                              type="radio"
+                              id="maternityCountingWorking"
+                              name="maternityCountingMethod"
+                              value="working"
+                              checked={settings.maternityLeave?.countingMethod === 'working'}
+                              onChange={(e) => setSettings({
+                                ...settings,
+                                maternityLeave: {
+                                  ...settings.maternityLeave,
+                                  maxDays: settings.maternityLeave?.maxDays || 90,
+                                  countingMethod: 'working',
+                                }
+                              })}
+                              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700"
+                            />
+                            <label htmlFor="maternityCountingWorking" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                              Working Days (count only working days based on shift schedule)
+                            </label>
+                          </div>
+                          <div className="flex items-center">
+                            <input
+                              type="radio"
+                              id="maternityCountingCalendar"
+                              name="maternityCountingMethod"
+                              value="calendar"
+                              checked={settings.maternityLeave?.countingMethod === 'calendar'}
+                              onChange={(e) => setSettings({
+                                ...settings,
+                                maternityLeave: {
+                                  ...settings.maternityLeave,
+                                  maxDays: settings.maternityLeave?.maxDays || 90,
+                                  countingMethod: 'calendar',
+                                }
+                              })}
+                              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700"
+                            />
+                            <label htmlFor="maternityCountingCalendar" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                              Calendar Days (count all days, ignores working days)
+                            </label>
+                          </div>
+                        </div>
+                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                          Choose how maternity/paternity leave days are counted. Working days counts only days when the member is scheduled to work. Calendar days counts all days in the leave period, including weekends and holidays.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                   
                   <div className="flex items-center mt-4">
                     <input

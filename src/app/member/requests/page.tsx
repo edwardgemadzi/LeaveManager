@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import { LeaveRequest } from '@/types';
+import { LEAVE_REASONS } from '@/lib/leaveReasons';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 export default function MemberRequestsPage() {
@@ -20,18 +21,7 @@ export default function MemberRequestsPage() {
   });
   const [selectedReasonType, setSelectedReasonType] = useState('');
 
-  const leaveReasons = [
-    { value: 'vacation', label: 'Vacation' },
-    { value: 'sick', label: 'Sick Leave' },
-    { value: 'personal', label: 'Personal' },
-    { value: 'family', label: 'Family Emergency' },
-    { value: 'medical', label: 'Medical Appointment' },
-    { value: 'bereavement', label: 'Bereavement' },
-    { value: 'maternity', label: 'Maternity/Paternity' },
-    { value: 'study', label: 'Study/Education' },
-    { value: 'religious', label: 'Religious Holiday' },
-    { value: 'other', label: 'Other (specify below)' },
-  ];
+  const leaveReasons = LEAVE_REASONS;
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
 

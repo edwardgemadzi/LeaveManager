@@ -50,6 +50,8 @@ export async function GET(request: NextRequest) {
         // Include manualLeaveBalance for current user (they can see their own)
         manualLeaveBalance: currentUser.manualLeaveBalance,
         manualYearToDateUsed: currentUser.manualYearToDateUsed,
+        manualMaternityLeaveBalance: currentUser.manualMaternityLeaveBalance,
+        manualMaternityYearToDateUsed: currentUser.manualMaternityYearToDateUsed,
       } : null,
       members: allMembers.map(member => {
         const baseMember = {
@@ -70,6 +72,8 @@ export async function GET(request: NextRequest) {
             ...baseMember,
             manualLeaveBalance: member.manualLeaveBalance,
             manualYearToDateUsed: member.manualYearToDateUsed,
+            manualMaternityLeaveBalance: member.manualMaternityLeaveBalance,
+            manualMaternityYearToDateUsed: member.manualMaternityYearToDateUsed,
           };
         }
         
@@ -149,6 +153,91 @@ export async function PATCH(request: NextRequest) {
           delete settings.workingDaysGroupNames[key];
         } else {
           settings.workingDaysGroupNames[key] = value.trim();
+        }
+      }
+    }
+
+    // Validate bypass notice period if provided
+    if (settings.bypassNoticePeriod !== undefined) {
+      if (typeof settings.bypassNoticePeriod !== 'object' || Array.isArray(settings.bypassNoticePeriod) || settings.bypassNoticePeriod === null) {
+        return NextResponse.json(
+          { error: 'bypassNoticePeriod must be an object' },
+          { status: 400 }
+        );
+      }
+      
+      // If enabled is false, clear dates
+      if (settings.bypassNoticePeriod.enabled === false) {
+        settings.bypassNoticePeriod = {
+          enabled: false,
+          startDate: undefined,
+          endDate: undefined,
+        };
+      } else if (settings.bypassNoticePeriod.enabled === true) {
+        // If enabled, validate dates are provided and valid
+        if (!settings.bypassNoticePeriod.startDate || !settings.bypassNoticePeriod.endDate) {
+          return NextResponse.json(
+            { error: 'Both start date and end date are required when bypass notice period is enabled' },
+            { status: 400 }
+          );
+        }
+        
+        // Convert string dates to Date objects
+        const startDate = new Date(settings.bypassNoticePeriod.startDate);
+        const endDate = new Date(settings.bypassNoticePeriod.endDate);
+        
+        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+          return NextResponse.json(
+            { error: 'Invalid date format for bypass notice period' },
+            { status: 400 }
+          );
+        }
+        
+        if (endDate < startDate) {
+          return NextResponse.json(
+            { error: 'End date must be on or after start date' },
+            { status: 400 }
+          );
+        }
+        
+        // Store dates as Date objects
+        settings.bypassNoticePeriod.startDate = startDate;
+        settings.bypassNoticePeriod.endDate = endDate;
+      }
+    }
+
+    // Validate maternity leave settings if provided
+    if (settings.maternityLeave !== undefined) {
+      if (typeof settings.maternityLeave !== 'object' || Array.isArray(settings.maternityLeave) || settings.maternityLeave === null) {
+        return NextResponse.json(
+          { error: 'maternityLeave must be an object' },
+          { status: 400 }
+        );
+      }
+      
+      // Validate maxDays if provided
+      if (settings.maternityLeave.maxDays !== undefined) {
+        if (typeof settings.maternityLeave.maxDays !== 'number' || !Number.isInteger(settings.maternityLeave.maxDays)) {
+          return NextResponse.json(
+            { error: 'maternityLeave.maxDays must be an integer' },
+            { status: 400 }
+          );
+        }
+        if (settings.maternityLeave.maxDays < 1 || settings.maternityLeave.maxDays > 365) {
+          return NextResponse.json(
+            { error: 'maternityLeave.maxDays must be between 1 and 365' },
+            { status: 400 }
+          );
+        }
+      }
+      
+      // Validate countingMethod if provided
+      if (settings.maternityLeave.countingMethod !== undefined) {
+        if (settings.maternityLeave.countingMethod !== 'calendar' && settings.maternityLeave.countingMethod !== 'working') {
+          return NextResponse.json(
+            { error: 'maternityLeave.countingMethod must be either "calendar" or "working"' },
+            { status: 400 }
+          );
         }
       }
     }

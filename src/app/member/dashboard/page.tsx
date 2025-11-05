@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { LeaveRequest, Team, User } from '@/types';
-import { calculateLeaveBalance, countWorkingDays, calculateSurplusBalance } from '@/lib/leaveCalculations';
-import { MemberAnalytics } from '@/lib/analyticsCalculations';
+import { calculateLeaveBalance, countWorkingDays, calculateSurplusBalance, calculateMaternityLeaveBalance, calculateMaternitySurplusBalance, isMaternityLeave, countMaternityLeaveDays } from '@/lib/leaveCalculations';
+import { MemberAnalytics, getMaternityMemberAnalytics } from '@/lib/analyticsCalculations';
 import { 
   ClockIcon, 
   CalendarIcon, 
@@ -124,7 +124,8 @@ export default function MemberDashboard() {
       .filter(req => req.status === 'approved')
       .map(req => ({
         startDate: new Date(req.startDate),
-        endDate: new Date(req.endDate)
+        endDate: new Date(req.endDate),
+        reason: req.reason
       }));
 
     console.log('Leave balance calculation:', {
@@ -146,6 +147,62 @@ export default function MemberDashboard() {
     
     console.log('Calculated leave balance:', balance, 'Surplus:', surplus);
     return { balance, surplus };
+  };
+
+  const getMaternityLeaveBalance = () => {
+    if (!team || !user) {
+      return { balance: 0, surplus: 0, daysUsed: 0 };
+    }
+    
+    const maxMaternityLeaveDays = team.settings.maternityLeave?.maxDays || 90;
+    const countingMethod = team.settings.maternityLeave?.countingMethod || 'working';
+    
+    const approvedMaternityRequests = myRequests
+      .filter(req => req.status === 'approved' && req.reason && isMaternityLeave(req.reason))
+      .map(req => ({
+        startDate: new Date(req.startDate),
+        endDate: new Date(req.endDate),
+        reason: req.reason
+      }));
+
+    const balance = calculateMaternityLeaveBalance(
+      maxMaternityLeaveDays,
+      approvedMaternityRequests,
+      countingMethod,
+      user.shiftSchedule || { pattern: [true, true, true, true, true, false, false], startDate: new Date(), type: 'rotating' },
+      user.manualMaternityLeaveBalance,
+      user.manualMaternityYearToDateUsed
+    );
+    
+    const surplus = calculateMaternitySurplusBalance(user.manualMaternityLeaveBalance, maxMaternityLeaveDays);
+    
+    // Calculate days used
+    const currentYear = new Date().getFullYear();
+    const yearStart = new Date(currentYear, 0, 1);
+    yearStart.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    let daysUsed = 0;
+    if (user.manualMaternityYearToDateUsed !== undefined) {
+      daysUsed = user.manualMaternityYearToDateUsed;
+    } else {
+      daysUsed = approvedMaternityRequests.reduce((total, req) => {
+        const reqStart = new Date(req.startDate);
+        const reqEnd = new Date(req.endDate);
+        reqStart.setHours(0, 0, 0, 0);
+        reqEnd.setHours(23, 59, 59, 999);
+        
+        const overlapEnd = reqEnd < today ? reqEnd : today;
+        if (overlapEnd >= reqStart) {
+          const days = countMaternityLeaveDays(reqStart, overlapEnd, countingMethod, user.shiftSchedule || { pattern: [true, true, true, true, true, false, false], startDate: new Date(), type: 'rotating' });
+          return total + days;
+        }
+        return total;
+      }, 0);
+    }
+    
+    return { balance, surplus, daysUsed };
   };
 
   const getTotalWorkingDaysTaken = () => {
@@ -202,7 +259,7 @@ export default function MemberDashboard() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <div className="card card-hover">
               <div className="p-6">
                 <div className="flex items-center">
@@ -357,6 +414,50 @@ export default function MemberDashboard() {
                       <dd className="text-2xl font-bold text-gray-900 dark:text-white">
                         {getTotalWorkingDaysTaken()}
                       </dd>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Maternity Leave Card */}
+            <div className="card card-hover">
+              <div className="p-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900/30 rounded-xl flex items-center justify-center">
+                      <CalendarIcon className="h-6 w-6 text-pink-700 dark:text-pink-400" />
+                    </div>
+                  </div>
+                  <div className="ml-5 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Maternity/Paternity Leave</dt>
+                      <dd className="text-2xl font-bold text-gray-900 dark:text-white">
+                        {(() => {
+                          const maternityBalance = getMaternityLeaveBalance();
+                          const maxMaternityDays = team?.settings.maternityLeave?.maxDays || 90;
+                          return (
+                            <>
+                              {Math.round(maternityBalance.balance)} / {maxMaternityDays}
+                              <span className="ml-1 text-sm text-gray-500 dark:text-gray-400">(remaining)</span>
+                              {maternityBalance.surplus > 0 && (
+                                <span className="ml-2 text-sm text-green-600 dark:text-green-400">(+{Math.round(maternityBalance.surplus)} surplus)</span>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </dd>
+                      {(() => {
+                        const maternityBalance = getMaternityLeaveBalance();
+                        if (maternityBalance.daysUsed > 0) {
+                          return (
+                            <dd className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                              {Math.round(maternityBalance.daysUsed)} days used this year
+                            </dd>
+                          );
+                        }
+                        return null;
+                      })()}
                     </dl>
                   </div>
                 </div>

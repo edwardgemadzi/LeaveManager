@@ -146,19 +146,34 @@ body {
 
 /* React Big Calendar Modern Styles */
 .rbc-calendar {
-  height: 600px;
+  height: 700px;
   background: white;
   backdrop-filter: blur(10px);
-  border-radius: 20px;
+  border-radius: 0;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
+  position: relative;
+  z-index: 10;
+}
+
+/* Ensure calendar popups and overlays are in front */
+.rbc-overlay,
+.rbc-popup,
+.rbc-popup-content {
+  z-index: 1000 !important;
+}
+
+/* Calendar container wrapper */
+.rbc-calendar-wrapper {
+  position: relative;
+  z-index: 10;
 }
 
 .rbc-toolbar {
   margin-bottom: 24px;
   padding: 20px;
   background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-  border-radius: 16px;
+  border-radius: 0;
   border: none;
   box-shadow: 0 8px 32px rgba(79, 70, 229, 0.3);
   display: flex;
@@ -187,7 +202,7 @@ body {
   border: 2px solid rgba(255, 255, 255, 0.3);
   background: rgba(255, 255, 255, 0.1);
   padding: 12px 20px;
-  border-radius: 12px;
+  border-radius: 0;
   transition: all 0.3s ease;
   font-size: 14px;
   min-width: 90px;
@@ -274,7 +289,7 @@ body {
 .rbc-month-view,
 .rbc-time-view {
   border: 2px solid var(--gray-200);
-  border-radius: 16px;
+  border-radius: 0;
   overflow: hidden;
   background: white;
 }
@@ -295,7 +310,7 @@ body {
   background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
   color: var(--primary-700);
   font-weight: 700;
-  border-radius: 8px;
+  border-radius: 0;
 }
 
 .rbc-today .rbc-date-cell {
@@ -324,7 +339,7 @@ body {
   padding: 6px 10px;
   font-size: 12px;
   font-weight: 600;
-  border-radius: 8px;
+  border-radius: 0;
   border: none;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   backdrop-filter: blur(10px);

@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { LeaveRequest, Team, User } from '@/types';
-import { calculateLeaveBalance, calculateSurplusBalance } from '@/lib/leaveCalculations';
-import { GroupedTeamAnalytics } from '@/lib/analyticsCalculations';
+import { calculateLeaveBalance, calculateSurplusBalance, calculateMaternityLeaveBalance, calculateMaternitySurplusBalance, isMaternityLeave, countMaternityLeaveDays } from '@/lib/leaveCalculations';
+import { GroupedTeamAnalytics, getMaternityMemberAnalytics } from '@/lib/analyticsCalculations';
 import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
 import { 
   UsersIcon, 
@@ -150,51 +150,143 @@ export default function LeaderDashboard() {
   const getLeaveBalanceSummary = () => {
     if (!team || !members.length) return { totalRemaining: 0, averageRemaining: 0, membersWithLowBalance: 0, totalSurplus: 0, membersWithSurplus: 0 };
 
-    let totalRemaining = 0;
+    // Use analytics aggregate data if available
+    const totalRemaining = analytics?.aggregate.totalRemainingLeaveBalance ?? 0;
+    const averageRemaining = analytics?.aggregate.averageRemainingBalance ?? 0;
+    
+    // Calculate membersWithLowBalance and surplus from analytics members data
     let membersWithLowBalance = 0;
     let totalSurplus = 0;
     let membersWithSurplus = 0;
     const maxLeavePerYear = team.settings.maxLeavePerYear;
+    
+    if (analytics && analytics.groups) {
+      // Get all members from analytics groups
+      const allMembers = analytics.groups.flatMap(g => g.members);
+      
+      // Calculate surplus from analytics members
+      totalSurplus = allMembers.reduce((sum, m) => sum + m.analytics.surplusBalance, 0);
+      membersWithSurplus = allMembers.filter(m => m.analytics.surplusBalance > 0).length;
+      
+      // Calculate low balance members
+      membersWithLowBalance = allMembers.filter(m => 
+        m.analytics.remainingLeaveBalance < maxLeavePerYear * 0.25
+      ).length;
+    } else {
+      // Fallback to calculation if analytics not available
+      members.forEach(member => {
+        if (member.role === 'member' && member.shiftSchedule) {
+          const memberRequests = allRequests.filter(req => 
+            req.userId === member._id && req.status === 'approved'
+          );
 
+          const approvedRequests = memberRequests.map(req => ({
+            startDate: new Date(req.startDate),
+            endDate: new Date(req.endDate)
+          }));
+
+          const remainingBalance = calculateLeaveBalance(
+            maxLeavePerYear,
+            approvedRequests,
+            member.shiftSchedule,
+            member.manualLeaveBalance,
+            member.manualYearToDateUsed
+          );
+
+          const surplus = calculateSurplusBalance(member.manualLeaveBalance, maxLeavePerYear);
+
+          totalSurplus += surplus;
+          
+          if (surplus > 0) {
+            membersWithSurplus++;
+          }
+          
+          // Consider low balance if less than 25% of max leave remaining
+          if (remainingBalance < maxLeavePerYear * 0.25) {
+            membersWithLowBalance++;
+          }
+        }
+      });
+    }
+
+    return { totalRemaining, averageRemaining, membersWithLowBalance, totalSurplus, membersWithSurplus };
+  };
+
+  const getMaternityLeaveSummary = () => {
+    if (!team || !members.length) return { totalRemaining: 0, averageRemaining: 0, totalUsed: 0, membersCount: 0 };
+
+    const maxMaternityLeaveDays = team.settings.maternityLeave?.maxDays || 90;
+    const countingMethod = team.settings.maternityLeave?.countingMethod || 'working';
+    
+    let totalRemaining = 0;
+    let totalUsed = 0;
+    let membersCount = 0;
+    
     members.forEach(member => {
-      if (member.role === 'member' && member.shiftSchedule) {
+      if (member.role === 'member') {
         const memberRequests = allRequests.filter(req => 
           req.userId === member._id && req.status === 'approved'
         );
-
-        const approvedRequests = memberRequests.map(req => ({
+        
+        const approvedMaternityRequests = memberRequests.filter(req => 
+          req.reason && isMaternityLeave(req.reason)
+        ).map(req => ({
           startDate: new Date(req.startDate),
-          endDate: new Date(req.endDate)
+          endDate: new Date(req.endDate),
+          reason: req.reason
         }));
 
-        const remainingBalance = calculateLeaveBalance(
-          maxLeavePerYear,
-          approvedRequests,
-          member.shiftSchedule,
-          member.manualLeaveBalance,
-          member.manualYearToDateUsed
+        const shiftSchedule = member.shiftSchedule || {
+          pattern: [true, true, true, true, true, false, false],
+          startDate: new Date(),
+          type: 'fixed'
+        };
+
+        const remainingBalance = calculateMaternityLeaveBalance(
+          maxMaternityLeaveDays,
+          approvedMaternityRequests,
+          countingMethod,
+          shiftSchedule,
+          member.manualMaternityLeaveBalance,
+          member.manualMaternityYearToDateUsed
         );
 
-        const surplus = calculateSurplusBalance(member.manualLeaveBalance, maxLeavePerYear);
+        // Calculate days used
+        const currentYear = new Date().getFullYear();
+        const yearStart = new Date(currentYear, 0, 1);
+        yearStart.setHours(0, 0, 0, 0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        let daysUsed = 0;
+        if (member.manualMaternityYearToDateUsed !== undefined) {
+          daysUsed = member.manualMaternityYearToDateUsed;
+        } else {
+          const approvedMaternityRequestsForCalc = approvedMaternityRequests;
+          daysUsed = approvedMaternityRequestsForCalc.reduce((total, req) => {
+            const reqStart = new Date(req.startDate);
+            const reqEnd = new Date(req.endDate);
+            reqStart.setHours(0, 0, 0, 0);
+            reqEnd.setHours(23, 59, 59, 999);
+            
+            const overlapEnd = reqEnd < today ? reqEnd : today;
+            if (overlapEnd >= reqStart) {
+              const days = countMaternityLeaveDays(reqStart, overlapEnd, countingMethod, shiftSchedule);
+              return total + days;
+            }
+            return total;
+          }, 0);
+        }
 
         totalRemaining += remainingBalance;
-        totalSurplus += surplus;
-        
-        if (surplus > 0) {
-          membersWithSurplus++;
-        }
-        
-        // Consider low balance if less than 25% of max leave remaining
-        if (remainingBalance < maxLeavePerYear * 0.25) {
-          membersWithLowBalance++;
-        }
+        totalUsed += daysUsed;
+        membersCount++;
       }
     });
 
-    const memberCount = members.filter(m => m.role === 'member').length;
-    const averageRemaining = memberCount > 0 ? Math.round(totalRemaining / memberCount) : 0;
+    const averageRemaining = membersCount > 0 ? totalRemaining / membersCount : 0;
 
-    return { totalRemaining, averageRemaining, membersWithLowBalance, totalSurplus, membersWithSurplus };
+    return { totalRemaining, averageRemaining, totalUsed, membersCount };
   };
 
   if (loading) {
@@ -223,7 +315,7 @@ export default function LeaderDashboard() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <div className="card card-hover">
               <div className="p-6">
                 <div className="flex items-center">
@@ -271,7 +363,7 @@ export default function LeaderDashboard() {
                   <div className="ml-5 flex-1">
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Avg Leave Balance</dt>
-                      <dd className="text-2xl font-bold text-gray-900 dark:text-white">{getLeaveBalanceSummary().averageRemaining}</dd>
+                      <dd className="text-2xl font-bold text-gray-900 dark:text-white">{Math.round(getLeaveBalanceSummary().averageRemaining)}</dd>
                       <dd className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                         {getLeaveBalanceSummary().membersWithLowBalance} member(s) with low balance
                       </dd>
@@ -280,6 +372,33 @@ export default function LeaderDashboard() {
                           +{Math.round(getLeaveBalanceSummary().totalSurplus)} total surplus ({getLeaveBalanceSummary().membersWithSurplus} member(s))
                         </dd>
                       )}
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Maternity Leave Summary Card */}
+            <div className="card card-hover">
+              <div className="p-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900/30 rounded-xl flex items-center justify-center">
+                      <CalendarIcon className="h-6 w-6 text-pink-700 dark:text-pink-400" />
+                    </div>
+                  </div>
+                  <div className="ml-5 flex-1">
+                    <dl>
+                      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Maternity/Paternity Leave</dt>
+                      <dd className="text-2xl font-bold text-gray-900 dark:text-white">
+                        {Math.round(getMaternityLeaveSummary().averageRemaining)}
+                      </dd>
+                      <dd className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                        {Math.round(getMaternityLeaveSummary().totalUsed)} days used this year
+                      </dd>
+                      <dd className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                        {getMaternityLeaveSummary().totalRemaining} total remaining
+                      </dd>
                     </dl>
                   </div>
                 </div>
@@ -485,6 +604,9 @@ export default function LeaderDashboard() {
                       <p className="text-sm text-blue-700 dark:text-blue-400 mb-2">
                         <strong>{analytics.aggregate.membersCount}</strong> team member{analytics.aggregate.membersCount !== 1 ? 's' : ''} 
                         {' '}need to coordinate use of <strong>{Math.round(analytics.aggregate.totalRealisticUsableDays)}</strong> realistic usable days.
+                        {analytics.aggregate.totalRemainderDays > 0 && (
+                          <> <strong className="text-blue-600 dark:text-blue-400">+{analytics.aggregate.totalRemainderDays}</strong> day(s) need allocation decisions</>
+                        )}
                       </p>
                       <p className="text-sm text-blue-700 dark:text-blue-400">
                         Average of <strong>{Math.round(analytics.aggregate.averageDaysPerMemberAcrossTeam)}</strong> days per member available across the team.
