@@ -15,6 +15,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    // Validate ObjectId format
+    if (!ObjectId.isValid(user.id)) {
+      return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 });
+    }
+    
     // Get fresh user data from database
     const db = await getDatabase();
     const users = db.collection('users');
@@ -60,6 +65,11 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    // Validate ObjectId format
+    if (!ObjectId.isValid(user.id)) {
+      return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 });
+    }
+    
     // Update user profile
     const db = await getDatabase();
     const users = db.collection('users');

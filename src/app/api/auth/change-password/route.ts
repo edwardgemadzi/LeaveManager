@@ -3,9 +3,17 @@ import { getTokenFromRequest, verifyToken } from '@/lib/auth';
 import { getDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
+import { validateRequest, schemas } from '@/lib/validation';
+import { apiRateLimit } from '@/lib/rateLimit';
 
 export async function POST(request: NextRequest) {
   try {
+    // Apply rate limiting
+    const rateLimitResponse = apiRateLimit(request);
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+    
     const token = getTokenFromRequest(request);
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -16,22 +24,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const { currentPassword, newPassword } = await request.json();
-
-    if (!currentPassword || !newPassword) {
+    const body = await request.json();
+    
+    // Validate input using schema
+    const validation = validateRequest(schemas.changePassword, body);
+    if (!validation.isValid) {
       return NextResponse.json(
-        { error: 'Current password and new password are required' },
+        { error: 'Validation failed', details: validation.errors },
         { status: 400 }
       );
     }
 
-    if (newPassword.length < 6) {
-      return NextResponse.json(
-        { error: 'New password must be at least 6 characters long' },
-        { status: 400 }
-      );
-    }
+    const { currentPassword, newPassword } = validation.data;
 
+    // Validate ObjectId format
+    if (!ObjectId.isValid(user.id)) {
+      return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 });
+    }
+    
     // Get user from database to verify current password
     const db = await getDatabase();
     const users = db.collection('users');

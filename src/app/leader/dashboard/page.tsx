@@ -400,6 +400,166 @@ export default function LeaderDashboard() {
             <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400">Welcome back! Here&apos;s what&apos;s happening with your team</p>
           </div>
 
+          {/* Leader Score Card - Hero Style */}
+          {analytics && (() => {
+            const aggregate = analytics.aggregate;
+            const totalMembers = aggregate.membersCount || members.filter(m => m.role === 'member').length;
+            const totalWillLose = aggregate.totalWillLose || 0;
+            const totalWillCarryover = aggregate.totalWillCarryover || 0;
+            const totalRemainingBalance = aggregate.totalRemainingLeaveBalance || 0;
+            const totalRealisticUsableDays = aggregate.totalRealisticUsableDays || 0;
+            const averageRemainingBalance = aggregate.averageRemainingBalance || 0;
+            const averageDaysPerMember = aggregate.averageDaysPerMemberAcrossTeam || 0;
+            const maxLeavePerYear = team?.settings.maxLeavePerYear || 20;
+            
+            // Calculate team health metrics
+            const membersAtRisk = analytics.groups 
+              ? analytics.groups.flatMap(g => g.members).filter(m => (m.analytics.willLose || 0) > 0).length
+              : 0;
+            const utilizationRate = totalMembers > 0 && maxLeavePerYear > 0
+              ? ((totalMembers * maxLeavePerYear - totalRemainingBalance) / (totalMembers * maxLeavePerYear)) * 100
+              : 0;
+            const efficiencyRate = totalRemainingBalance > 0
+              ? (totalRealisticUsableDays / totalRemainingBalance) * 100
+              : 0;
+            
+            // Determine score and status based on team health
+            let score = 'excellent';
+            let gradientColors = 'from-green-500 via-emerald-500 to-teal-500';
+            let bgGradient = 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20';
+            let borderColor = 'border-green-400 dark:border-green-600';
+            let textColor = 'text-green-700 dark:text-green-300';
+            let badgeColor = 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200';
+            let quote = '';
+            let message = '';
+            let scoreLabel = 'Excellent';
+            
+            // Score logic based on team leave situation
+            if (membersAtRisk === 0 && totalWillLose === 0 && efficiencyRate >= 80) {
+              // Excellent: No members at risk, good utilization
+              score = 'excellent';
+              gradientColors = 'from-green-500 via-emerald-500 to-teal-500';
+              bgGradient = 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20';
+              borderColor = 'border-green-400 dark:border-green-600';
+              textColor = 'text-green-700 dark:text-green-300';
+              badgeColor = 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200';
+              quote = 'A well-rested team is a productive team. Great leadership!';
+              message = 'Excellent! Your team has healthy leave utilization. No members are at risk of losing days, and the team has good access to usable leave days.';
+              scoreLabel = 'Excellent';
+            } else if (membersAtRisk <= totalMembers * 0.2 && efficiencyRate >= 60) {
+              // Good: Few members at risk, decent utilization
+              score = 'good';
+              gradientColors = 'from-blue-500 via-indigo-500 to-purple-500';
+              bgGradient = 'bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20';
+              borderColor = 'border-blue-400 dark:border-blue-600';
+              textColor = 'text-blue-700 dark:text-blue-300';
+              badgeColor = 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200';
+              quote = 'Proactive planning prevents leave conflicts. Keep it up!';
+              message = 'Good! Your team is managing leave well overall. A few members may need attention to ensure they can use their remaining days effectively.';
+              scoreLabel = 'Good';
+            } else if (membersAtRisk <= totalMembers * 0.4 && efficiencyRate >= 40) {
+              // Fair: Some members at risk, moderate utilization
+              score = 'fair';
+              gradientColors = 'from-yellow-500 via-amber-500 to-orange-500';
+              bgGradient = 'bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20';
+              borderColor = 'border-yellow-400 dark:border-yellow-600';
+              textColor = 'text-yellow-700 dark:text-yellow-300';
+              badgeColor = 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200';
+              quote = 'Team coordination is key to effective leave management.';
+              message = 'Fair. Some team members are at risk of losing leave days. Consider coordinating with members to help them plan their remaining time off effectively.';
+              scoreLabel = 'Fair';
+            } else if (membersAtRisk > 0 || totalWillLose > 0) {
+              // Needs attention: Members at risk or days will be lost
+              score = 'needs-attention';
+              gradientColors = 'from-orange-500 via-red-500 to-pink-500';
+              bgGradient = 'bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20';
+              borderColor = 'border-orange-400 dark:border-orange-600';
+              textColor = 'text-orange-700 dark:text-orange-300';
+              badgeColor = 'bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-200';
+              quote = 'Support your team by helping them use their entitled leave.';
+              message = `Needs attention. ${membersAtRisk} member${membersAtRisk !== 1 ? 's' : ''} ${membersAtRisk === 1 ? 'is' : 'are'} at risk of losing leave days. ${totalWillLose > 0 ? `Approximately ${Math.round(totalWillLose)} days will be lost at year end. ` : ''}Consider proactive planning to help members utilize their leave.`;
+              scoreLabel = 'Needs Attention';
+            } else {
+              // Critical: High risk situation
+              score = 'critical';
+              gradientColors = 'from-red-600 via-rose-600 to-pink-600';
+              bgGradient = 'bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20';
+              borderColor = 'border-red-400 dark:border-red-600';
+              textColor = 'text-red-700 dark:text-red-300';
+              badgeColor = 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200';
+              quote = 'Effective leave management supports team well-being and retention.';
+              message = 'Requires immediate attention. Many team members are at risk of losing leave days. Consider reviewing leave policies and coordinating with members to ensure they can take their entitled time off.';
+              scoreLabel = 'Requires Planning';
+            }
+            
+            // Add messages about carryover
+            if (totalWillCarryover > 0) {
+              message += ` Great news: ${Math.round(totalWillCarryover)} days will carry over to next year!`;
+            }
+            
+            return (
+              <div className={`relative overflow-hidden rounded-2xl ${bgGradient} border-2 ${borderColor} shadow-xl mb-12 fade-in`}>
+                {/* Decorative gradient background */}
+                <div className={`absolute inset-0 bg-gradient-to-br ${gradientColors} opacity-10 dark:opacity-5`}></div>
+                
+                {/* Content */}
+                <div className="relative p-8 sm:p-10 lg:p-12">
+                  <div className="flex flex-col lg:flex-row items-start lg:items-center gap-6 lg:gap-8">
+                    {/* Left side - Score badge and title */}
+                    <div className="flex-shrink-0">
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${gradientColors} flex items-center justify-center shadow-lg`}>
+                          <UsersIcon className="h-10 w-10 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Team Health Score</p>
+                          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">{scoreLabel}</h2>
+                        </div>
+                      </div>
+                      <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold ${badgeColor} shadow-md`}>
+                        {totalMembers} member{totalMembers !== 1 ? 's' : ''} • {Math.round(efficiencyRate)}% efficiency
+                      </span>
+                    </div>
+                    
+                    {/* Right side - Quote and message */}
+                    <div className="flex-1 min-w-0">
+                      <div className="mb-4">
+                        <p className={`text-xl sm:text-2xl font-medium ${textColor} italic mb-3 leading-relaxed`}>
+                          &ldquo;{quote}&rdquo;
+                        </p>
+                        <p className="text-base sm:text-lg text-gray-700 dark:text-gray-300 leading-relaxed">
+                          {message}
+                        </p>
+                      </div>
+                      
+                      {/* Quick stats */}
+                      <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                            {membersAtRisk} member{membersAtRisk !== 1 ? 's' : ''} at risk
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                            {Math.round(utilizationRate)}% leave utilized
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                            {Math.round(averageRemainingBalance)} days avg remaining
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Stats Cards - Enhanced with Gradients and Better Layout */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 mb-8">
             {/* Team Members Card */}

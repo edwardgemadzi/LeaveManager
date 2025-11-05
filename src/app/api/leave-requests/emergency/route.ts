@@ -5,6 +5,7 @@ import { UserModel } from '@/models/User';
 import bcrypt from 'bcrypt';
 import { emergencyRateLimit } from '@/lib/rateLimit';
 import { validateRequest, schemas } from '@/lib/validation';
+import { teamIdsMatch } from '@/lib/helpers';
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,11 +55,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Member not found' }, { status: 404 });
     }
 
-    // Handle both string and ObjectId teamId comparisons
-    const memberTeamId = member.teamId?.toString();
-    const userTeamId = user.teamId?.toString();
-    
-    if (memberTeamId !== userTeamId) {
+    // Compare teamIds using consistent helper
+    if (!teamIdsMatch(member.teamId, user.teamId)) {
       return NextResponse.json({ error: 'Member does not belong to your team' }, { status: 403 });
     }
 

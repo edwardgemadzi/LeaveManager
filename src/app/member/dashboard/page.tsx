@@ -65,15 +65,27 @@ export default function MemberDashboard() {
         }
         
         // Filter requests for current user
+        // Use ObjectId comparison to handle both string and ObjectId formats
+        // Prefer currentUser._id from API response as it's more reliable
         if (Array.isArray(data.requests)) {
-          const myRequests = data.requests.filter((req: LeaveRequest) => req.userId === userData._id);
-          setMyRequests(myRequests);
-          // Initialize previous requests ref for polling comparison
-          if (previousRequestsRef.current.length === 0) {
-            previousRequestsRef.current = myRequests;
+          const userIdToMatch = data.currentUser?._id || userData._id;
+          if (!userIdToMatch) {
+            console.error('[Member Dashboard] No user ID found for filtering requests');
+            setMyRequests([]);
+          } else {
+            const myRequests = data.requests.filter((req: LeaveRequest) => {
+              const reqUserId = String(req.userId).trim();
+              const currentUserId = String(userIdToMatch).trim();
+              return reqUserId === currentUserId;
+            });
+            setMyRequests(myRequests);
+            // Initialize previous requests ref for polling comparison
+            if (previousRequestsRef.current.length === 0) {
+              previousRequestsRef.current = myRequests;
+            }
           }
         } else {
-          console.error('Expected array but got:', typeof data.requests, data.requests);
+          console.error('[Member Dashboard] Expected array but got:', typeof data.requests, data.requests);
           setMyRequests([]);
         }
 
@@ -121,7 +133,14 @@ export default function MemberDashboard() {
       if (response.ok) {
         const data = await response.json();
         if (Array.isArray(data.requests)) {
-          const currentRequests = data.requests.filter((req: LeaveRequest) => req.userId === user._id);
+          // Use ObjectId comparison to handle both string and ObjectId formats
+          // Prefer currentUser._id from API response as it's more reliable
+          const userIdToMatch = data.currentUser?._id || user._id;
+          const currentRequests = userIdToMatch ? data.requests.filter((req: LeaveRequest) => {
+            const reqUserId = String(req.userId).trim();
+            const currentUserId = String(userIdToMatch).trim();
+            return reqUserId === currentUserId;
+          }) : [];
           
           // Check for status changes
           previousRequestsRef.current.forEach((prevRequest) => {
@@ -312,6 +331,12 @@ export default function MemberDashboard() {
   };
 
   const getTotalWorkingDaysTaken = () => {
+    // Use analytics data if available (includes manualYearToDateUsed handling)
+    if (analytics && analytics.workingDaysUsed !== undefined) {
+      return analytics.workingDaysUsed;
+    }
+    
+    // Fallback to local calculation if analytics not yet loaded
     if (!user) return 0;
     
     const currentYear = new Date().getFullYear();
@@ -351,7 +376,14 @@ export default function MemberDashboard() {
     );
   }
 
-  const leaveBalance = getLeaveBalance();
+  // Use analytics as the source of truth for leave balance if available
+  // Fallback to local calculation if analytics is not yet loaded
+  const leaveBalance = analytics 
+    ? { 
+        balance: analytics.remainingLeaveBalance, 
+        surplus: analytics.surplusBalance ?? 0 
+      }
+    : getLeaveBalance();
 
   return (
     <ProtectedRoute requiredRole="member">
@@ -374,7 +406,7 @@ export default function MemberDashboard() {
                   <div className="flex-1">
                     <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Pending Requests</p>
                     <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
-                      {myRequests.filter(req => req.status === 'pending').length}
+                      {Array.isArray(myRequests) ? myRequests.filter(req => req.status === 'pending').length : 0}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Awaiting approval</p>
                   </div>
@@ -404,8 +436,8 @@ export default function MemberDashboard() {
                       )}
                       {analytics && (() => {
                         const realisticUsableDays = analytics.realisticUsableDays ?? 0;
-                        const remainingBalance = leaveBalance.balance;
-                        const willLoseDays = realisticUsableDays < remainingBalance ? remainingBalance - realisticUsableDays : 0;
+                        const remainingBalance = analytics.remainingLeaveBalance ?? leaveBalance.balance;
+                        const willLoseDays = analytics.willLose ?? (realisticUsableDays < remainingBalance ? remainingBalance - realisticUsableDays : 0);
                         if (willLoseDays > 0) {
                           return (
                             <p className="text-xs text-red-600 dark:text-red-400 font-medium">
@@ -420,7 +452,7 @@ export default function MemberDashboard() {
                   <div className="flex-shrink-0 ml-4">
                     {(() => {
                       const realisticUsableDays = analytics?.realisticUsableDays ?? 0;
-                      const remainingBalance = leaveBalance.balance;
+                      const remainingBalance = analytics?.remainingLeaveBalance ?? leaveBalance.balance;
                       const iconBg = realisticUsableDays >= remainingBalance
                         ? 'bg-green-100 dark:bg-green-900/30'
                         : 'bg-orange-100 dark:bg-orange-900/30';
@@ -445,9 +477,12 @@ export default function MemberDashboard() {
                   <div className="flex-1">
                     <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Days Taken</p>
                     <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
-                      {getTotalWorkingDaysTaken()}
+                      {analytics?.workingDaysUsed !== undefined ? Math.round(analytics.workingDaysUsed) : getTotalWorkingDaysTaken()}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">This year</p>
+                    {user?.manualYearToDateUsed !== undefined && (
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Manual override</p>
+                    )}
                   </div>
                   <div className="flex-shrink-0 ml-4">
                     <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
@@ -505,6 +540,149 @@ export default function MemberDashboard() {
               </div>
             </div>
           </div>
+
+          {/* Member Score Card - Hero Style */}
+          {analytics && (() => {
+            const baseBalance = analytics.baseLeaveBalance ?? (team?.settings.maxLeavePerYear || 20);
+            const used = baseBalance - (analytics.remainingLeaveBalance ?? 0);
+            const usagePercentage = baseBalance > 0 ? (used / baseBalance) * 100 : 0;
+            const realisticUsableDays = analytics.realisticUsableDays ?? 0;
+            const remainingBalance = analytics.remainingLeaveBalance ?? 0;
+            const willLoseDays = analytics.willLose ?? 0;
+            const willCarryoverDays = analytics.willCarryover ?? 0;
+            
+            // Determine score and status
+            let score = 'excellent';
+            let gradientColors = 'from-green-500 via-emerald-500 to-teal-500';
+            let bgGradient = 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20';
+            let borderColor = 'border-green-400 dark:border-green-600';
+            let textColor = 'text-green-700 dark:text-green-300';
+            let badgeColor = 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200';
+            let quote = '';
+            let message = '';
+            let scoreLabel = 'Excellent';
+            
+            // Score logic based on leave situation
+            if (realisticUsableDays >= remainingBalance && remainingBalance > 0) {
+              // Excellent: Can use all remaining days
+              score = 'excellent';
+              gradientColors = 'from-green-500 via-emerald-500 to-teal-500';
+              bgGradient = 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20';
+              borderColor = 'border-green-400 dark:border-green-600';
+              textColor = 'text-green-700 dark:text-green-300';
+              badgeColor = 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200';
+              quote = 'Take time to recharge. Your well-being matters!';
+              message = 'Excellent! You have enough usable days to take all your remaining leave. Remember, taking time off is essential for your mental and physical health.';
+              scoreLabel = 'Excellent';
+            } else if (realisticUsableDays >= remainingBalance * 0.7) {
+              // Good: Can use most remaining days
+              score = 'good';
+              gradientColors = 'from-blue-500 via-indigo-500 to-purple-500';
+              bgGradient = 'bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20';
+              borderColor = 'border-blue-400 dark:border-blue-600';
+              textColor = 'text-blue-700 dark:text-blue-300';
+              badgeColor = 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200';
+              quote = 'Plan ahead to make the most of your leave days.';
+              message = 'Good! You can use most of your remaining leave days. Plan ahead and coordinate with your team to ensure you can take your well-deserved time off.';
+              scoreLabel = 'Good';
+            } else if (realisticUsableDays >= remainingBalance * 0.3) {
+              // Fair: Can use some remaining days
+              score = 'fair';
+              gradientColors = 'from-yellow-500 via-amber-500 to-orange-500';
+              bgGradient = 'bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20';
+              borderColor = 'border-yellow-400 dark:border-yellow-600';
+              textColor = 'text-yellow-700 dark:text-yellow-300';
+              badgeColor = 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200';
+              quote = 'Work-life balance is crucial. Use your leave wisely!';
+              message = 'Fair. You can use some of your remaining leave days. Coordinate early with your team to maximize your opportunities to take time off.';
+              scoreLabel = 'Fair';
+            } else if (realisticUsableDays > 0) {
+              // Needs attention: Limited days available
+              score = 'needs-attention';
+              gradientColors = 'from-orange-500 via-red-500 to-pink-500';
+              bgGradient = 'bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20';
+              borderColor = 'border-orange-400 dark:border-orange-600';
+              textColor = 'text-orange-700 dark:text-orange-300';
+              badgeColor = 'bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-200';
+              quote = 'Rest is not a reward for finishing everything. Rest is a vital part of the process.';
+              message = `Needs attention. You can realistically use ${Math.round(realisticUsableDays)} days out of ${Math.round(remainingBalance)} remaining. Plan carefully and communicate with your team early.`;
+              scoreLabel = 'Needs Attention';
+            } else {
+              // Critical: No days available
+              score = 'critical';
+              gradientColors = 'from-red-600 via-rose-600 to-pink-600';
+              bgGradient = 'bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20';
+              borderColor = 'border-red-400 dark:border-red-600';
+              textColor = 'text-red-700 dark:text-red-300';
+              badgeColor = 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200';
+              quote = 'Remember: Taking breaks is essential for productivity and well-being.';
+              message = 'Limited availability. All usable days are already booked. Consider discussing leave options with your team leader for better planning next year.';
+              scoreLabel = 'Requires Planning';
+            }
+            
+            // Add messages about carryover or loss
+            if (willCarryoverDays > 0) {
+              message += ` Great news: ${Math.round(willCarryoverDays)} days will carry over to next year!`;
+            } else if (willLoseDays > 0) {
+              message += ` Note: ${Math.round(willLoseDays)} days will be lost at year end if not used.`;
+            }
+            
+            return (
+              <div className={`relative overflow-hidden rounded-2xl ${bgGradient} border-2 ${borderColor} shadow-xl mb-12 fade-in`}>
+                {/* Decorative gradient background */}
+                <div className={`absolute inset-0 bg-gradient-to-br ${gradientColors} opacity-10 dark:opacity-5`}></div>
+                
+                {/* Content */}
+                <div className="relative p-8 sm:p-10 lg:p-12">
+                  <div className="flex flex-col lg:flex-row items-start lg:items-center gap-6 lg:gap-8">
+                    {/* Left side - Score badge and title */}
+                    <div className="flex-shrink-0">
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${gradientColors} flex items-center justify-center shadow-lg`}>
+                          <CheckCircleIcon className="h-10 w-10 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Leave Health Score</p>
+                          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">{scoreLabel}</h2>
+                        </div>
+                      </div>
+                      <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold ${badgeColor} shadow-md`}>
+                        {Math.round(realisticUsableDays)} / {Math.round(remainingBalance)} days usable
+                      </span>
+                    </div>
+                    
+                    {/* Right side - Quote and message */}
+                    <div className="flex-1 min-w-0">
+                      <div className="mb-4">
+                        <p className={`text-xl sm:text-2xl font-medium ${textColor} italic mb-3 leading-relaxed`}>
+                          &ldquo;{quote}&rdquo;
+                        </p>
+                        <p className="text-base sm:text-lg text-gray-700 dark:text-gray-300 leading-relaxed">
+                          {message}
+                        </p>
+                      </div>
+                      
+                      {/* Quick stats */}
+                      <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                            {Math.round(usagePercentage)}% leave used
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                            {Math.round(remainingBalance)} days remaining
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Analytics Section - Enhanced */}
           {analytics && (
@@ -577,26 +755,26 @@ export default function MemberDashboard() {
                   <div className="p-5 sm:p-6">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-1">Remaining Balance</p>
-                        <div className="mb-2">
-                          <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
-                            {Math.round(analytics.remainingLeaveBalance)} / {team?.settings.maxLeavePerYear || 20}
+                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-1">Team Competition</p>
+                        <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
+                          {analytics.membersSharingSameShift ?? 0}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-500">Same shift members</p>
+                        {analytics.averageDaysPerMember !== undefined && analytics.averageDaysPerMember > 0 && (
+                          <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium mt-1">
+                            ~{Math.round(analytics.averageDaysPerMember)} days avg per member
                           </p>
-                          {analytics.surplusBalance > 0 && (
-                            <p className="text-xs text-green-600 dark:text-green-400 font-medium">
-                              +{Math.round(analytics.surplusBalance)} surplus
-                            </p>
-                          )}
-                        </div>
+                        )}
                       </div>
                       <div className="flex-shrink-0 ml-3">
-                        <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center">
-                          <CalendarIcon className="h-6 w-6 text-green-700 dark:text-green-400" />
+                        <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center">
+                          <UsersIcon className="h-6 w-6 text-indigo-700 dark:text-indigo-400" />
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
+
               </div>
 
               {/* Competition Context Card - Enhanced */}
@@ -729,17 +907,35 @@ export default function MemberDashboard() {
                   {/* Progress Bar */}
                   <div className="mt-6">
                     <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mb-2">
-                      <span>Leave Usage</span>
-                      <span>{analytics.workingDaysUsed} / {analytics.workingDaysInYear} working days</span>
+                      <span>Leave Balance Usage</span>
+                      {(() => {
+                        const baseBalance = analytics.baseLeaveBalance ?? (team?.settings.maxLeavePerYear || 20);
+                        const used = baseBalance - (analytics.remainingLeaveBalance ?? 0);
+                        return (
+                          <span>{Math.round(used)} / {Math.round(baseBalance)} leave days</span>
+                        );
+                      })()}
                     </div>
                     <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-3">
-                      <div
-                        className="bg-blue-600 dark:bg-blue-500 h-3 rounded-full transition-all duration-300"
-                        style={{ width: `${Math.min(100, (analytics.workingDaysUsed / analytics.workingDaysInYear) * 100)}%` }}
-                      ></div>
+                      {(() => {
+                        const baseBalance = analytics.baseLeaveBalance ?? (team?.settings.maxLeavePerYear || 20);
+                        const used = baseBalance - (analytics.remainingLeaveBalance ?? 0);
+                        const percentage = baseBalance > 0 ? Math.min(100, (used / baseBalance) * 100) : 0;
+                        return (
+                          <div
+                            className="bg-blue-600 dark:bg-blue-500 h-3 rounded-full transition-all duration-300"
+                            style={{ width: `${percentage}%` }}
+                          ></div>
+                        );
+                      })()}
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                      {Math.round((analytics.workingDaysUsed / analytics.workingDaysInYear) * 100)}% of working days used this year
+                      {(() => {
+                        const baseBalance = analytics.baseLeaveBalance ?? (team?.settings.maxLeavePerYear || 20);
+                        const used = baseBalance - (analytics.remainingLeaveBalance ?? 0);
+                        const percentage = baseBalance > 0 ? Math.round((used / baseBalance) * 100) : 0;
+                        return `${percentage}% of leave balance used this year`;
+                      })()}
                     </p>
                   </div>
                 </div>

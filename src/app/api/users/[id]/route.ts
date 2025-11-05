@@ -3,6 +3,8 @@ import { getTokenFromRequest, verifyToken } from '@/lib/auth';
 import { getDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { UserModel } from '@/models/User';
+import { teamIdsMatch } from '@/lib/helpers';
+import { apiRateLimit } from '@/lib/rateLimit';
 
 export async function GET(
   request: NextRequest,
@@ -20,6 +22,12 @@ export async function GET(
     }
 
     const { id } = await params;
+    
+    // Validate ObjectId format
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 });
+    }
+    
     const db = await getDatabase();
     const users = db.collection('users');
     
@@ -49,6 +57,12 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Apply rate limiting
+    const rateLimitResponse = apiRateLimit(request);
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+    
     const token = getTokenFromRequest(request);
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -60,6 +74,12 @@ export async function PATCH(
     }
 
     const { id } = await params;
+    
+    // Validate ObjectId format
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 });
+    }
+    
     const body = await request.json();
     const { fullName, shiftTag, subgroupTag, manualLeaveBalance, manualYearToDateUsed, manualMaternityLeaveBalance, manualMaternityYearToDateUsed } = body;
 
@@ -68,6 +88,61 @@ export async function PATCH(
         { error: 'At least one field is required' },
         { status: 400 }
       );
+    }
+
+    // Validate fullName if provided
+    if (fullName !== undefined) {
+      if (typeof fullName !== 'string' || fullName.trim().length === 0) {
+        return NextResponse.json(
+          { error: 'Full name must be a non-empty string' },
+          { status: 400 }
+        );
+      }
+      if (fullName.length > 100) {
+        return NextResponse.json(
+          { error: 'Full name must be no more than 100 characters long' },
+          { status: 400 }
+        );
+      }
+      // Validate pattern (letters, spaces, hyphens, apostrophes)
+      if (!/^[a-zA-Z\s'-]+$/.test(fullName)) {
+        return NextResponse.json(
+          { error: 'Full name can only contain letters, spaces, hyphens, and apostrophes' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Validate shiftTag if provided
+    if (shiftTag !== undefined && shiftTag !== null) {
+      if (typeof shiftTag !== 'string') {
+        return NextResponse.json(
+          { error: 'Shift tag must be a string' },
+          { status: 400 }
+        );
+      }
+      if (shiftTag.trim().length > 50) {
+        return NextResponse.json(
+          { error: 'Shift tag must be no more than 50 characters long' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Validate subgroupTag if provided
+    if (subgroupTag !== undefined && subgroupTag !== null) {
+      if (typeof subgroupTag !== 'string') {
+        return NextResponse.json(
+          { error: 'Subgroup tag must be a string' },
+          { status: 400 }
+        );
+      }
+      if (subgroupTag.trim().length > 50) {
+        return NextResponse.json(
+          { error: 'Subgroup tag must be no more than 50 characters long' },
+          { status: 400 }
+        );
+      }
     }
 
     // Check if the target user exists
@@ -81,11 +156,8 @@ export async function PATCH(
       return NextResponse.json({ error: 'User has no team' }, { status: 400 });
     }
 
-    // Compare teamIds as strings to handle ObjectId/string mismatches
-    const userTeamIdStr = user.teamId?.toString().trim() || '';
-    const targetTeamIdStr = targetUser.teamId.toString().trim();
-    
-    if (userTeamIdStr !== targetTeamIdStr) {
+    // Compare teamIds using consistent helper
+    if (!teamIdsMatch(user.teamId, targetUser.teamId)) {
       return NextResponse.json(
         { error: 'Access denied - users must be in the same team' },
         { status: 403 }
@@ -245,6 +317,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Apply rate limiting
+    const rateLimitResponse = apiRateLimit(request);
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+    
     const token = getTokenFromRequest(request);
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -256,6 +334,12 @@ export async function DELETE(
     }
 
     const { id } = await params;
+    
+    // Validate ObjectId format
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 });
+    }
+    
     const db = await getDatabase();
     const users = db.collection('users');
 

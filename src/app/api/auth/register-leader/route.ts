@@ -68,6 +68,14 @@ export async function POST(request: NextRequest) {
       teamId: team._id,
     });
 
+    // Validate ObjectId format before updating team
+    if (!team._id || !ObjectId.isValid(team._id)) {
+      return NextResponse.json(
+        { error: 'Invalid team ID format' },
+        { status: 500 }
+      );
+    }
+    
     // Update team with leader ID
     const db = await getDatabase();
     const teams = db.collection('teams');

@@ -51,6 +51,19 @@ export function getWorkingDaysGroupDisplayNameWithTag(
 }
 
 /**
+ * Compare two team IDs consistently, handling ObjectId and string formats.
+ * Normalizes both IDs to strings and trims whitespace before comparison.
+ * 
+ * @param id1 - First team ID (can be string or ObjectId)
+ * @param id2 - Second team ID (can be string or ObjectId)
+ * @returns true if both IDs match after normalization, false otherwise
+ */
+export function teamIdsMatch(id1: string | undefined, id2: string | undefined): boolean {
+  if (!id1 || !id2) return false;
+  return id1.toString().trim() === id2.toString().trim();
+}
+
+/**
  * Convert a fixed working days tag back to a pattern array.
  * Only works for fixed schedules (tags like "MTWTF__").
  * 

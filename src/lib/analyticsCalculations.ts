@@ -1,5 +1,6 @@
 import { ShiftSchedule, User, Team, LeaveRequest } from '@/types';
 import { countWorkingDays, calculateLeaveBalance, isWorkingDay, getWorkingDays, calculateSurplusBalance, calculateMaternityLeaveBalance, calculateMaternitySurplusBalance, isMaternityLeave, countMaternityLeaveDays } from './leaveCalculations';
+import { debug } from './logger';
 
 // Check if bypass notice period is active for a given team and date
 export const isBypassNoticePeriodActive = (team: Team, date: Date = new Date()): boolean => {
@@ -338,11 +339,11 @@ export const calculateUsableDays = (
         return reqStart >= today && reqStart <= yearEnd;
       });
       
-      console.log(`[calculateUsableDays] ${user.username} - Concurrent leave: ${team.settings.concurrentLeave}, Usable: ${usableDays}, Blocked: ${blockedDays}`);
-      console.log(`[calculateUsableDays] ${user.username} - Availability distribution:`, availabilityCounts);
-      console.log(`[calculateUsableDays] ${user.username} - Sample dates:`, sampleDates);
-      console.log(`[calculateUsableDays] ${user.username} - Future approved requests: ${futureRequests.length}, Total approved requests: ${allApprovedRequests.length}`);
-      console.log(`[calculateUsableDays] ${user.username} - Members in same group: ${allMembers.length}, User subgroup: ${userSubgroupTag || 'none'}, User shift: ${userShiftTag || 'none'}`);
+      debug(`[calculateUsableDays] ${user.username} - Concurrent leave: ${team.settings.concurrentLeave}, Usable: ${usableDays}, Blocked: ${blockedDays}`);
+      debug(`[calculateUsableDays] ${user.username} - Availability distribution:`, availabilityCounts);
+      debug(`[calculateUsableDays] ${user.username} - Sample dates:`, sampleDates);
+      debug(`[calculateUsableDays] ${user.username} - Future approved requests: ${futureRequests.length}, Total approved requests: ${allApprovedRequests.length}`);
+      debug(`[calculateUsableDays] ${user.username} - Members in same group: ${allMembers.length}, User subgroup: ${userSubgroupTag || 'none'}, User shift: ${userShiftTag || 'none'}`);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (global as any)[logKey] = now;
     }
@@ -714,7 +715,7 @@ export const getMemberAnalytics = (
     const lastLog = (global as any)[logKey] || 0;
     const now = Date.now();
     if (now - lastLog > 2000) { // Log at most once per 2 seconds per team/user
-      console.log('[Analytics] getMemberAnalytics - team.settings.concurrentLeave:', team.settings?.concurrentLeave, 'for user:', user.username);
+      debug('[Analytics] getMemberAnalytics - team.settings.concurrentLeave:', { concurrentLeave: team.settings?.concurrentLeave, username: user.username });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (global as any)[logKey] = now;
     }
@@ -734,8 +735,35 @@ export const getMemberAnalytics = (
   yearEnd.setHours(23, 59, 59, 999);
   const workingDaysInYear = countWorkingDays(yearStart, yearEnd, shiftSchedule);
   
-  // Calculate working days used year-to-date
-  const workingDaysUsed = calculateYearToDateWorkingDays(shiftSchedule);
+  // Calculate working days used year-to-date from approved requests
+  // Filter out maternity leave requests from regular leave calculations
+  const approvedRegularRequests = approvedRequests.filter(req => 
+    !req.reason || !isMaternityLeave(req.reason)
+  );
+  
+  // Calculate working days used from approved requests in the current year
+  const yearToDateWorkingDays = approvedRegularRequests.reduce((total, req) => {
+    const start = new Date(req.startDate);
+    const end = new Date(req.endDate);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    
+    // Only count days within the current year
+    if (start <= yearEnd && end >= yearStart) {
+      const overlapStart = start > yearStart ? start : yearStart;
+      const overlapEnd = end < yearEnd ? end : yearEnd;
+      
+      if (overlapEnd >= overlapStart) {
+        return total + countWorkingDays(overlapStart, overlapEnd, shiftSchedule);
+      }
+    }
+    return total;
+  }, 0);
+  
+  // Use manualYearToDateUsed if set, otherwise use calculated value
+  const workingDaysUsed = user.manualYearToDateUsed !== undefined 
+    ? user.manualYearToDateUsed 
+    : yearToDateWorkingDays;
   
   // Calculate remaining leave balance
   // Note: approvedRequests parameter should already be filtered to approved requests

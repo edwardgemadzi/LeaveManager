@@ -4,6 +4,7 @@ import { LeaveRequestModel } from '@/models/LeaveRequest';
 import { AuditLogModel } from '@/models/AuditLog';
 import { emailService } from '@/lib/email';
 import { UserModel } from '@/models/User';
+import { teamIdsMatch } from '@/lib/helpers';
 
 interface BulkActionRequest {
   action: 'approve' | 'reject';
@@ -55,7 +56,7 @@ export async function PATCH(request: NextRequest) {
           continue;
         }
 
-        if (leaveRequest.teamId !== user.teamId) {
+        if (!teamIdsMatch(leaveRequest.teamId, user.teamId)) {
           results.failed.push({ id: requestId, error: 'Forbidden' });
           continue;
         }

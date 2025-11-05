@@ -4,6 +4,8 @@ import { LeaveRequestModel } from '@/models/LeaveRequest';
 import { AuditLogModel } from '@/models/AuditLog';
 import { emailService } from '@/lib/email';
 import { UserModel } from '@/models/User';
+import { teamIdsMatch } from '@/lib/helpers';
+import { ObjectId } from 'mongodb';
 
 export async function PATCH(
   request: NextRequest,
@@ -34,7 +36,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Request not found' }, { status: 404 });
     }
 
-    if (leaveRequest.teamId !== user.teamId) {
+    if (!teamIdsMatch(leaveRequest.teamId, user.teamId)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -108,13 +110,19 @@ export async function DELETE(
     }
 
     const { id } = await params;
+    
+    // Validate ObjectId format
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json({ error: 'Invalid request ID format' }, { status: 400 });
+    }
+    
     const leaveRequest = await LeaveRequestModel.findById(id);
     if (!leaveRequest) {
       return NextResponse.json({ error: 'Request not found' }, { status: 404 });
     }
 
     // Verify team access
-    if (leaveRequest.teamId !== user.teamId) {
+    if (!teamIdsMatch(leaveRequest.teamId, user.teamId)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

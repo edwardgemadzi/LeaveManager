@@ -5,6 +5,7 @@ import { TeamModel } from '@/models/Team';
 import { UserModel } from '@/models/User';
 import { CreateLeaveRequest } from '@/types';
 import { isBypassNoticePeriodActive } from '@/lib/analyticsCalculations';
+import { validateRequest, schemas } from '@/lib/validation';
 
 export async function GET(request: NextRequest) {
   try {
@@ -85,11 +86,23 @@ export async function POST(request: NextRequest) {
     const body: CreateLeaveRequest = await request.json();
     const { startDate, endDate, reason, requestedFor, isHistorical } = body;
 
-    if (!startDate || !endDate || !reason) {
-      return NextResponse.json(
-        { error: 'Start date, end date, and reason are required' },
-        { status: 400 }
-      );
+    // Validate input using schema (skip for historical requests)
+    if (!isHistorical) {
+      const validation = validateRequest(schemas.leaveRequest, { startDate, endDate, reason });
+      if (!validation.isValid) {
+        return NextResponse.json(
+          { error: 'Validation failed', details: validation.errors },
+          { status: 400 }
+        );
+      }
+    } else {
+      // Basic validation for historical requests
+      if (!startDate || !endDate || !reason) {
+        return NextResponse.json(
+          { error: 'Start date, end date, and reason are required' },
+          { status: 400 }
+        );
+      }
     }
 
     // Only leaders can create historical requests (for migration)
