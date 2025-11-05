@@ -9,6 +9,7 @@ import { getWorkingDays, isWorkingDay } from '@/lib/leaveCalculations';
 import { LEAVE_REASONS, isEmergencyReason } from '@/lib/leaveReasons';
 import { CheckCircleIcon, ClockIcon, XCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useNotification } from '@/hooks/useNotification';
+import { useBrowserNotification } from '@/hooks/useBrowserNotification';
 
 const localizer = momentLocalizer(moment);
 
@@ -37,6 +38,7 @@ interface CalendarProps {
 
 export default function TeamCalendar({ teamId, members, currentUser, teamSettings: providedTeamSettings, initialRequests }: CalendarProps) {
   const { showSuccess, showError, showInfo } = useNotification();
+  const { showNotification: showBrowserNotification } = useBrowserNotification();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [currentView, setCurrentView] = useState<View>(Views.MONTH);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -531,6 +533,12 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
           // Refresh calendar and show success
           await refreshCalendar();
           showSuccess('Leave request submitted successfully!');
+          const startDate = new Date(sortedDates[0]).toLocaleDateString();
+          const endDate = new Date(sortedDates[sortedDates.length - 1]).toLocaleDateString();
+          showBrowserNotification(
+            'Leave Request Submitted',
+            `Your leave request for ${startDate} to ${endDate} has been submitted successfully!`
+          );
           clearSelectionMode();
           setShowRequestModal(false);
           setSelectedReasonType('');
@@ -571,6 +579,14 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
 
         if (failureCount === 0) {
           showSuccess(`Leave request submitted successfully! (${successCount} date${successCount !== 1 ? 's' : ''})`);
+          const firstDate = sortedDates[0];
+          const lastDate = sortedDates[sortedDates.length - 1];
+          const startDate = new Date(firstDate).toLocaleDateString();
+          const endDate = new Date(lastDate).toLocaleDateString();
+          showBrowserNotification(
+            'Leave Request Submitted',
+            `Your leave request for ${successCount} date${successCount !== 1 ? 's' : ''} (${startDate} to ${endDate}) has been submitted successfully!`
+          );
           clearSelectionMode();
           setShowRequestModal(false);
           setSelectedReasonType('');
@@ -586,7 +602,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
     } finally {
       setSubmitting(false);
     }
-  }, [selectedDates, selectedReasonType, customReason, teamSettings, getFinalReason, requestAsRange, clearSelectionMode, refreshCalendar, currentUser, showSuccess, showError, showInfo]);
+  }, [selectedDates, selectedReasonType, customReason, teamSettings, getFinalReason, requestAsRange, clearSelectionMode, refreshCalendar, currentUser, showSuccess, showError, showInfo, showBrowserNotification]);
 
   const closeRequestModal = useCallback(() => {
     setShowRequestModal(false);

@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { LeaveRequest, Team, User } from '@/types';
 import { calculateLeaveBalance, countWorkingDays, calculateSurplusBalance, calculateMaternityLeaveBalance, calculateMaternitySurplusBalance, isMaternityLeave, countMaternityLeaveDays } from '@/lib/leaveCalculations';
 import { MemberAnalytics } from '@/lib/analyticsCalculations';
+import { useBrowserNotification } from '@/hooks/useBrowserNotification';
+import { usePolling } from '@/hooks/usePolling';
 import { 
   ClockIcon, 
   CalendarIcon, 
@@ -18,11 +20,18 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function MemberDashboard() {
+  const { showNotification } = useBrowserNotification();
   const [team, setTeam] = useState<Team | null>(null);
   const [myRequests, setMyRequests] = useState<LeaveRequest[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState<MemberAnalytics | null>(null);
+  
+  // Refs to track notification state and prevent duplicates
+  const previousRequestsRef = useRef<LeaveRequest[]>([]);
+  const highCompetitionNotifiedRef = useRef(false);
+  const losingDaysNotifiedRef = useRef(false);
+  const leaveReminderNotifiedRef = useRef(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -58,8 +67,12 @@ export default function MemberDashboard() {
         
         // Filter requests for current user
         if (Array.isArray(data.requests)) {
-          const myRequests = data.requests.filter((req: LeaveRequest) => req.userId === userData.id);
+          const myRequests = data.requests.filter((req: LeaveRequest) => req.userId === userData._id);
           setMyRequests(myRequests);
+          // Initialize previous requests ref for polling comparison
+          if (previousRequestsRef.current.length === 0) {
+            previousRequestsRef.current = myRequests;
+          }
           console.log('My requests filtered:', myRequests.length);
         } else {
           console.error('Expected array but got:', typeof data.requests, data.requests);
@@ -101,7 +114,117 @@ export default function MemberDashboard() {
     return () => {
       window.removeEventListener('teamSettingsUpdated', handleSettingsUpdated);
     };
-  }, []);
+  }, [showNotification]);
+
+  // Polling for request status changes
+  usePolling(async () => {
+    if (!user) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/dashboard', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data.requests)) {
+          const currentRequests = data.requests.filter((req: LeaveRequest) => req.userId === user._id);
+          
+          // Check for status changes
+          previousRequestsRef.current.forEach((prevRequest) => {
+            const currentRequest = currentRequests.find((r: LeaveRequest) => r._id === prevRequest._id);
+            if (currentRequest && prevRequest.status === 'pending' && currentRequest.status !== 'pending') {
+              const startDate = new Date(currentRequest.startDate).toLocaleDateString();
+              const endDate = new Date(currentRequest.endDate).toLocaleDateString();
+              
+              if (currentRequest.status === 'approved') {
+                showNotification(
+                  'Leave Request Approved',
+                  `Your leave request for ${startDate} to ${endDate} has been approved!`
+                );
+              } else if (currentRequest.status === 'rejected') {
+                showNotification(
+                  'Leave Request Rejected',
+                  `Your leave request for ${startDate} to ${endDate} has been rejected.`
+                );
+              }
+            }
+          });
+          
+          previousRequestsRef.current = currentRequests;
+        }
+      }
+    } catch (error) {
+      console.error('Error polling for request status:', error);
+    }
+  }, { interval: 30000, enabled: !loading && !!user });
+
+  // Check for high competition warning
+  useEffect(() => {
+    if (!analytics || highCompetitionNotifiedRef.current) return;
+    
+    if (analytics.averageDaysPerMember < analytics.remainingLeaveBalance * 0.5) {
+      highCompetitionNotifiedRef.current = true;
+      showNotification(
+        'High Competition Alert',
+        `Only ${Math.round(analytics.averageDaysPerMember)} days per member available. Consider coordinating with your team.`
+      );
+    }
+  }, [analytics, showNotification]);
+
+  // Check for losing days warning
+  useEffect(() => {
+    if (!analytics || losingDaysNotifiedRef.current) return;
+    
+    if (analytics.willLose > 0) {
+      losingDaysNotifiedRef.current = true;
+      showNotification(
+        'Warning: Days Will Be Lost',
+        `You will lose ${Math.round(analytics.willLose)} day(s) at year end if not used. Plan your leave accordingly.`
+      );
+    }
+  }, [analytics, showNotification]);
+
+  // Check for take leave reminder (3+ months, 5+ days)
+  useEffect(() => {
+    if (!analytics || !myRequests || leaveReminderNotifiedRef.current) return;
+    
+    // Check if member has 5+ days remaining
+    if (analytics.remainingLeaveBalance < 5) return;
+    
+    // Check if member hasn't taken leave in 3+ months
+    const approvedRequests = myRequests.filter(req => req.status === 'approved');
+    if (approvedRequests.length === 0) {
+      // Never taken leave, check if account is older than 3 months
+      // For now, we'll check if they have requests but none approved recently
+      leaveReminderNotifiedRef.current = true;
+      showNotification(
+        'Take Leave Reminder',
+        `You haven't taken leave recently and have ${Math.round(analytics.remainingLeaveBalance)} days remaining. Consider planning your leave.`
+      );
+      return;
+    }
+    
+    // Find most recent approved request
+    const mostRecent = approvedRequests.reduce((latest, req) => {
+      const reqDate = new Date(req.endDate);
+      const latestDate = new Date(latest.endDate);
+      return reqDate > latestDate ? req : latest;
+    });
+    
+    const monthsSinceLastLeave = (Date.now() - new Date(mostRecent.endDate).getTime()) / (1000 * 60 * 60 * 24 * 30);
+    
+    if (monthsSinceLastLeave >= 3) {
+      leaveReminderNotifiedRef.current = true;
+      showNotification(
+        'Take Leave Reminder',
+        `You haven't taken leave in ${Math.round(monthsSinceLastLeave)} months and have ${Math.round(analytics.remainingLeaveBalance)} days remaining. Consider planning your leave.`
+      );
+    }
+  }, [analytics, myRequests, showNotification]);
 
   const getLeaveBalance = () => {
     if (!team || !user) {

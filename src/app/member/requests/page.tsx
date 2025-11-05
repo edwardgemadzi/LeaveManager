@@ -6,9 +6,11 @@ import { LeaveRequest } from '@/types';
 import { LEAVE_REASONS } from '@/lib/leaveReasons';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useNotification } from '@/hooks/useNotification';
+import { useBrowserNotification } from '@/hooks/useBrowserNotification';
 
 export default function MemberRequestsPage() {
   const { showSuccess, showError, showInfo } = useNotification();
+  const { showNotification: showBrowserNotification } = useBrowserNotification();
   const [myRequests, setMyRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -134,6 +136,12 @@ export default function MemberRequestsPage() {
         setSelectedReasonType('');
         setShowForm(false);
         showSuccess('Leave request submitted successfully!');
+        const startDate = new Date(formData.startDate).toLocaleDateString();
+        const endDate = new Date(formData.endDate).toLocaleDateString();
+        showBrowserNotification(
+          'Leave Request Submitted',
+          `Your leave request for ${startDate} to ${endDate} has been submitted successfully!`
+        );
       } else {
         const error = await response.json();
         showError(error.error || 'Failed to submit request');

@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { LeaveRequest, Team, User } from '@/types';
 import { calculateLeaveBalance, calculateSurplusBalance, calculateMaternityLeaveBalance, isMaternityLeave, countMaternityLeaveDays } from '@/lib/leaveCalculations';
 import { GroupedTeamAnalytics } from '@/lib/analyticsCalculations';
 import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
+import { useBrowserNotification } from '@/hooks/useBrowserNotification';
+import { usePolling } from '@/hooks/usePolling';
 import { 
   UsersIcon, 
   ClockIcon, 
@@ -21,6 +23,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function LeaderDashboard() {
+  const { showNotification } = useBrowserNotification();
   const [team, setTeam] = useState<Team | null>(null);
   const [members, setMembers] = useState<User[]>([]);
   const [pendingRequests, setPendingRequests] = useState<LeaveRequest[]>([]);
@@ -28,6 +31,10 @@ export default function LeaderDashboard() {
   const [loading, setLoading] = useState(true);
   const [processingRequest, setProcessingRequest] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<GroupedTeamAnalytics | null>(null);
+  
+  // Refs to track notification state and prevent duplicates
+  const previousPendingRequestsRef = useRef<LeaveRequest[]>([]);
+  const membersAtRiskNotifiedRef = useRef(false);
 
   const handleApprove = async (requestId: string) => {
     setProcessingRequest(requestId);
@@ -105,7 +112,12 @@ export default function LeaderDashboard() {
       setTeam(data.team);
       setMembers(data.members || []);
       setAllRequests(data.requests || []);
-      setPendingRequests((data.requests || []).filter((req: LeaveRequest) => req.status === 'pending'));
+      const pending = (data.requests || []).filter((req: LeaveRequest) => req.status === 'pending');
+      setPendingRequests(pending);
+      // Initialize previous pending requests ref for polling comparison
+      if (previousPendingRequestsRef.current.length === 0) {
+        previousPendingRequestsRef.current = pending;
+      }
       
       // Analytics structure for leaders: { analytics: GroupedTeamAnalytics }
       if (data.analytics) {
@@ -141,6 +153,76 @@ export default function LeaderDashboard() {
       window.removeEventListener('teamSettingsUpdated', handleSettingsUpdated);
     };
   }, []);
+
+  // Polling for new pending requests
+  usePolling(async () => {
+    if (!team) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/dashboard', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const currentPending = (data.requests || []).filter((req: LeaveRequest) => req.status === 'pending');
+        
+        // Check for new requests
+        const previousIds = new Set(previousPendingRequestsRef.current.map(r => r._id));
+        const newRequests = currentPending.filter((req: LeaveRequest) => !previousIds.has(req._id));
+        
+        if (newRequests.length > 0) {
+          // Find member names for new requests
+          newRequests.forEach((req: LeaveRequest) => {
+            const member = members.find(m => m._id === req.userId);
+            const memberName = member?.fullName || member?.username || 'A team member';
+            const startDate = new Date(req.startDate).toLocaleDateString();
+            const endDate = new Date(req.endDate).toLocaleDateString();
+            
+            showNotification(
+              'New Leave Request',
+              `${memberName} has submitted a leave request for ${startDate} to ${endDate}`
+            );
+          });
+        }
+        
+        previousPendingRequestsRef.current = currentPending;
+      }
+    } catch (error) {
+      console.error('Error polling for new requests:', error);
+    }
+  }, { interval: 30000, enabled: !loading && !!team });
+
+  // Check for members at risk
+  useEffect(() => {
+    if (!analytics || !members.length || membersAtRiskNotifiedRef.current) return;
+    
+    // Calculate members at risk (losing days or low balance)
+    let membersAtRisk = 0;
+    
+    if (analytics.groups) {
+      const allMembers = analytics.groups.flatMap(g => g.members);
+      membersAtRisk = allMembers.filter(m => {
+        const willLose = m.analytics.willLose || 0;
+        const remainingBalance = m.analytics.remainingLeaveBalance || 0;
+        const maxLeavePerYear = team?.settings.maxLeavePerYear || 20;
+        const isLowBalance = remainingBalance < maxLeavePerYear * 0.25;
+        
+        return willLose > 0 || isLowBalance;
+      }).length;
+    }
+    
+    if (membersAtRisk > 0) {
+      membersAtRiskNotifiedRef.current = true;
+      showNotification(
+        'Members at Risk Alert',
+        `${membersAtRisk} member(s) are at risk of losing leave days or have low balance.`
+      );
+    }
+  }, [analytics, members, team, showNotification]);
 
   const getLeaveBalanceSummary = () => {
     if (!team || !members.length) return { totalRemaining: 0, averageRemaining: 0, membersWithLowBalance: 0, totalSurplus: 0, membersWithSurplus: 0 };
