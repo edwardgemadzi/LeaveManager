@@ -163,8 +163,8 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
   }, [members]);
 
   useEffect(() => {
-    // Use provided initialRequests if available, otherwise fetch
-    if (initialRequests && initialRequests.length > 0) {
+    // Use provided initialRequests if available (including empty array for filtered results)
+    if (initialRequests !== undefined) {
       processRequestsIntoEvents(initialRequests);
       return;
     }

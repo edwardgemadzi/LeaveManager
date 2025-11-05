@@ -322,9 +322,6 @@ export default function LeaderMembersPage() {
     try {
       const token = localStorage.getItem('token');
       
-      // Build the update object with only changed names
-      const groupNamesUpdate: Record<string, string> = {};
-      
       // Start with existing group names from team settings
       const existingNames = team?.settings.workingDaysGroupNames || {};
       const updatedNames = { ...existingNames };

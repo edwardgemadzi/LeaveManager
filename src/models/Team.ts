@@ -39,11 +39,32 @@ export class TeamModel {
     const db = await getDatabase();
     const teams = db.collection<Team>('teams');
     const objectId = new ObjectId(teamId);
-    await teams.updateOne(
+    const result = await teams.updateOne(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       { _id: objectId } as any,
       { $set: { settings } }
     );
+    
+    // Verify the update was successful
+    if (result.matchedCount === 0) {
+      throw new Error(`Team with id ${teamId} not found`);
+    }
+    
+    if (result.modifiedCount === 0) {
+      console.warn(`[TeamModel] updateSettings: Team ${teamId} was matched but not modified (settings may be the same)`);
+    }
+    
+    // Verify the write by reading it back immediately
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const updatedTeam = await teams.findOne({ _id: objectId } as any);
+    if (updatedTeam && updatedTeam.settings) {
+      console.log('[TeamModel] updateSettings - Verification read:', {
+        teamId,
+        concurrentLeave: updatedTeam.settings.concurrentLeave,
+        maxLeavePerYear: updatedTeam.settings.maxLeavePerYear,
+        settingsKeys: Object.keys(updatedTeam.settings)
+      });
+    }
   }
 
   static async createIndexes(): Promise<void> {

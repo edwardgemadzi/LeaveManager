@@ -49,10 +49,11 @@ export default function LeaderLeaveBalancePage() {
             'Authorization': `Bearer ${token}`,
           },
         }),
-        fetch('/api/analytics', {
+        fetch(`/api/analytics?t=${Date.now()}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
+          cache: 'no-store',
         }),
       ]);
       
@@ -61,6 +62,7 @@ export default function LeaderLeaveBalancePage() {
         console.error('Failed to fetch team data:', teamResponse.status);
       } else {
         const teamData = await teamResponse.json();
+        console.log('[Leave Balance] Team data fetched. Concurrent leave:', teamData.team?.settings?.concurrentLeave);
         setTeam(teamData.team);
         setMembers(teamData.members || []);
       }
@@ -76,8 +78,15 @@ export default function LeaderLeaveBalancePage() {
         const analyticsData = await analyticsResponse.json();
         const groupedData = analyticsData.analytics || analyticsData.grouped || null;
         if (groupedData) {
+          console.log('[Leave Balance] Analytics updated - Sample member usable days:', groupedData.groups?.[0]?.members?.[0]?.analytics?.usableDays);
+          console.log('[Leave Balance] Analytics updated - Total usable days:', groupedData.aggregate?.totalUsableDays);
+          console.log('[Leave Balance] Analytics updated - Total realistic usable days:', groupedData.aggregate?.totalRealisticUsableDays);
+          console.log('[Leave Balance] Team concurrent leave from team state:', team?.settings?.concurrentLeave);
           setAnalytics(groupedData);
         }
+      } else {
+        const errorText = await analyticsResponse.text();
+        console.error('[Leave Balance] Analytics API error:', analyticsResponse.status, errorText);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -88,6 +97,7 @@ export default function LeaderLeaveBalancePage() {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-refresh on window focus to get updated data after deletions
@@ -101,13 +111,25 @@ export default function LeaderLeaveBalancePage() {
       // Refetch data immediately when a request is deleted
       fetchData();
     };
+    
+    const handleSettingsUpdated = () => {
+      // Refetch data when settings are updated
+      // Add a small delay to ensure database write is fully committed before fetching
+      console.log('[Leave Balance] Settings updated event received, refetching analytics...');
+      setTimeout(() => {
+        fetchData();
+      }, 200);
+    };
 
     window.addEventListener('focus', handleFocus);
     window.addEventListener('leaveRequestDeleted', handleRequestDeleted);
+    window.addEventListener('teamSettingsUpdated', handleSettingsUpdated);
     return () => {
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('leaveRequestDeleted', handleRequestDeleted);
+      window.removeEventListener('teamSettingsUpdated', handleSettingsUpdated);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Helper function to find member analytics data from grouped analytics
@@ -693,14 +715,6 @@ export default function LeaderLeaveBalancePage() {
         }, 0);
       }
 
-      // Calculate base balance (manual balance if set, otherwise max)
-      const baseBalance = member.manualMaternityLeaveBalance !== undefined 
-        ? member.manualMaternityLeaveBalance 
-        : maxMaternityLeaveDays;
-      
-      // If balance is less than base, set it as the new base
-      // const newBaseBalance = balanceValue < baseBalance ? balanceValue : baseBalance;
-      
       // Calculate new base balance
       const newManualMaternityLeaveBalance = balanceValue + daysUsed;
       

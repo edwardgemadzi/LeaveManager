@@ -182,7 +182,7 @@ export default function Navbar() {
               </div>
             </div>
 
-            <div className="flex items-center space-x-3 ml-4">
+            <div className="hidden lg:flex items-center space-x-3 ml-4">
               <button
                 onClick={toggleTheme}
                 className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors duration-200"
@@ -195,19 +195,17 @@ export default function Navbar() {
                   <SunIcon className="h-5 w-5" />
                 )}
               </button>
-              <div className="hidden sm:block bg-gray-100 dark:bg-gray-900 px-3 py-1.5 rounded-full border border-gray-200 dark:border-gray-800">
+              <div className="bg-gray-100 dark:bg-gray-900 px-3 py-1.5 rounded-full border border-gray-200 dark:border-gray-800">
                 <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
                   {user.username} ({user.role})
                 </span>
               </div>
-              <div className="hidden lg:block">
-                <button
-                  onClick={handleLogout}
-                  className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 text-white px-3 py-1.5 rounded-xl text-xs font-medium transition-colors duration-200"
-                >
-                  Logout
-                </button>
-              </div>
+              <button
+                onClick={handleLogout}
+                className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 text-white px-3 py-1.5 rounded-xl text-xs font-medium transition-colors duration-200"
+              >
+                Logout
+              </button>
             </div>
 
             <div className="lg:hidden ml-2 flex items-center gap-2">
@@ -282,29 +280,15 @@ export default function Navbar() {
                 </>
               )}
               
-              {/* Theme toggle and user info section */}
+              {/* User info and logout section */}
               <div className="border-t border-gray-200 dark:border-gray-800 mt-2 pt-2">
-                <div className="px-4 py-2 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                      Logged in as: <span className="font-medium text-gray-700 dark:text-gray-300">{user.username}</span>
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Role: <span className="font-medium text-gray-700 dark:text-gray-300 capitalize">{user.role}</span>
-                    </p>
-                  </div>
-                  <button
-                    onClick={toggleTheme}
-                    className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors duration-200"
-                    aria-label="Toggle dark mode"
-                    title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-                  >
-                    {theme === 'light' ? (
-                      <MoonIcon className="h-5 w-5" />
-                    ) : (
-                      <SunIcon className="h-5 w-5" />
-                    )}
-                  </button>
+                <div className="px-4 py-2">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    Logged in as: <span className="font-medium text-gray-700 dark:text-gray-300">{user.username}</span>
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Role: <span className="font-medium text-gray-700 dark:text-gray-300 capitalize">{user.role}</span>
+                  </p>
                 </div>
                 <button
                   onClick={() => {

@@ -108,6 +108,11 @@ export const calculateYearToDateWorkingDays = (shiftSchedule: ShiftSchedule): nu
 
 // Calculate availability for a specific date (how many slots are available)
 // Only counts requests from members with the same workingDaysTag, shiftTag, and subgroupTag
+// 
+// IMPORTANT: This is the ONLY function that directly uses team.settings.concurrentLeave
+// All other calculations (usableDays, realisticUsableDays, remainderDays) depend on this function
+// through the calculation chain: calculateDateAvailability → calculateUsableDays → getMemberAnalytics
+// Therefore, the team object must be the same instance throughout the chain to ensure consistency
 export const calculateDateAvailability = (
   team: Team,
   allApprovedRequests: LeaveRequest[],
@@ -119,7 +124,38 @@ export const calculateDateAvailability = (
   userShiftTag?: string,
   userSubgroupTag?: string
 ): number => {
+  // Explicit validation: Ensure team.settings exists and concurrentLeave is a valid number
+  if (!team || !team.settings) {
+    console.error('[Analytics] calculateDateAvailability - ERROR: team.settings is missing!', {
+      hasTeam: !!team,
+      hasSettings: !!team?.settings
+    });
+    return 0; // Return 0 if team settings are missing
+  }
+  
+  if (typeof team.settings.concurrentLeave !== 'number' || team.settings.concurrentLeave < 1) {
+    console.error('[Analytics] calculateDateAvailability - ERROR: team.settings.concurrentLeave is invalid!', {
+      value: team.settings.concurrentLeave,
+      type: typeof team.settings.concurrentLeave
+    });
+    return 0; // Return 0 if concurrentLeave is invalid
+  }
+  
   const concurrentLeave = team.settings.concurrentLeave;
+  
+  // Debug: Log concurrent leave setting (only log occasionally to avoid spam)
+  if (typeof window === 'undefined') {
+    // Server-side only - log occasionally to verify it's being used
+    const logKey = `calcAvail_${team._id || 'unknown'}`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lastLog = (global as any)[logKey] || 0;
+    const now = Date.now();
+    if (now - lastLog > 2000) { // Log at most once per 2 seconds per team
+      console.log('[Analytics] calculateDateAvailability - team.settings.concurrentLeave:', team.settings.concurrentLeave, 'Using:', concurrentLeave);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (global as any)[logKey] = now;
+    }
+  }
   
   // Create a normalized copy of the date for comparison (don't mutate original)
   const checkDate = new Date(date);
@@ -211,6 +247,10 @@ export const calculateDateAvailability = (
 // Calculate usable days - shows how many days can be used when shared among members who can use them
 // This accounts for concurrent leave constraints and shows actual availability
 // Only considers members with the same workingDaysTag and shiftTag
+// 
+// IMPORTANT: This function calls calculateDateAvailability which uses team.settings.concurrentLeave
+// The team object must be the same instance used throughout the calculation chain to ensure
+// concurrent leave settings are consistently applied
 export const calculateUsableDays = (
   user: User,
   team: Team,
@@ -248,6 +288,10 @@ export const calculateUsableDays = (
   
   // Count days that have availability (slots > 0) among members with same tag
   let usableDays = 0;
+  let blockedDays = 0;
+  
+  // Debug: Count days with different availability levels
+  const availabilityCounts: Record<number, number> = {};
   
   for (const workingDay of remainingWorkingDays) {
     const availability = calculateDateAvailability(
@@ -262,9 +306,45 @@ export const calculateUsableDays = (
       userSubgroupTag
     );
     
+    // Track availability distribution
+    availabilityCounts[availability] = (availabilityCounts[availability] || 0) + 1;
+    
     // If there's at least one available slot, this day is usable
     if (availability > 0) {
       usableDays++;
+    } else {
+      blockedDays++;
+    }
+  }
+  
+  // Debug: Log availability distribution and sample dates for first user calculation (to avoid spam)
+  if (typeof window === 'undefined') {
+    const logKey = `usableDays_${team._id || 'unknown'}_${user.username || 'unknown'}`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lastLog = (global as any)[logKey] || 0;
+    const now = Date.now();
+    if (now - lastLog > 5000) { // Log at most once per 5 seconds per user
+      // Sample a few dates to see what's happening
+      const sampleDates = remainingWorkingDays.slice(0, 5).map(d => d.toISOString().split('T')[0]);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const yearEnd = getYearEnd();
+      yearEnd.setHours(23, 59, 59, 999);
+      
+      // Count approved requests that could affect these dates
+      const futureRequests = allApprovedRequests.filter(req => {
+        const reqStart = new Date(req.startDate);
+        reqStart.setHours(0, 0, 0, 0);
+        return reqStart >= today && reqStart <= yearEnd;
+      });
+      
+      console.log(`[calculateUsableDays] ${user.username} - Concurrent leave: ${team.settings.concurrentLeave}, Usable: ${usableDays}, Blocked: ${blockedDays}`);
+      console.log(`[calculateUsableDays] ${user.username} - Availability distribution:`, availabilityCounts);
+      console.log(`[calculateUsableDays] ${user.username} - Sample dates:`, sampleDates);
+      console.log(`[calculateUsableDays] ${user.username} - Future approved requests: ${futureRequests.length}, Total approved requests: ${allApprovedRequests.length}`);
+      console.log(`[calculateUsableDays] ${user.username} - Members in same group: ${allMembers.length}, User subgroup: ${userSubgroupTag || 'none'}, User shift: ${userShiftTag || 'none'}`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (global as any)[logKey] = now;
     }
   }
   
@@ -569,6 +649,10 @@ export interface GroupedTeamAnalytics {
 }
 
 // Get complete analytics for a single member
+// 
+// IMPORTANT: This function calls calculateUsableDays which uses team.settings.concurrentLeave
+// The team object must be the same instance fetched from the API to ensure concurrent leave
+// settings are consistently applied across all member calculations
 export const getMemberAnalytics = (
   user: User,
   team: Team,
@@ -612,6 +696,29 @@ export const getMemberAnalytics = (
   // Calculate usable days - adjusted for concurrent leave constraints
   // This shows how many days can be used when shared among members who can use them
   // Only include members with non-zero base balance in calculations
+  
+  // Validate team.settings before calculation
+  if (!team || !team.settings || typeof team.settings.concurrentLeave !== 'number') {
+    console.error('[Analytics] getMemberAnalytics - ERROR: Invalid team.settings for user:', user.username, {
+      hasTeam: !!team,
+      hasSettings: !!team?.settings,
+      concurrentLeave: team?.settings?.concurrentLeave,
+      concurrentLeaveType: typeof team?.settings?.concurrentLeave
+    });
+    // This will cause calculateUsableDays to fail, but it's better to fail explicitly
+  }
+  
+  if (typeof window === 'undefined') {
+    const logKey = `getMember_${team._id || 'unknown'}_${user.username || 'unknown'}`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lastLog = (global as any)[logKey] || 0;
+    const now = Date.now();
+    if (now - lastLog > 2000) { // Log at most once per 2 seconds per team/user
+      console.log('[Analytics] getMemberAnalytics - team.settings.concurrentLeave:', team.settings?.concurrentLeave, 'for user:', user.username);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (global as any)[logKey] = now;
+    }
+  }
   const usableDays = calculateUsableDays(
     user,
     team,
@@ -822,6 +929,14 @@ export const getMaternityMemberAnalytics = (
 };
 
 // Get aggregate team analytics
+// Get team analytics with aggregation
+// 
+// IMPORTANT: Aggregation logic must match getGroupedTeamAnalytics for consistency:
+// - totalUsableDays: Sum unique groupUsableDays per group (not per member)
+// - totalRealisticUsableDays: Sum individual realisticUsableDays within each group, then sum group totals
+// - totalRemainderDays: Sum group remainders (not individual remainders)
+// 
+// The team object must be the same instance used for all member calculations
 export const getTeamAnalytics = (
   members: User[],
   team: Team,
@@ -878,11 +993,18 @@ export const getTeamAnalytics = (
   }
   
   // Calculate totalUsableDays, totalRemainderDays, and totalRealisticUsableDays from groups (not individual members)
+  // 
+  // AGGREGATION LOGIC (must match getGroupedTeamAnalytics):
+  // - totalUsableDays: Sum unique groupUsableDays per group (shared pool, counted once per group)
+  // - totalRealisticUsableDays: Sum individual realisticUsableDays within each group, then sum all group totals
+  // - totalRemainderDays: Sum group remainders (each group has its own remainder calculation)
+  // 
+  // Note: groupUsableDays already accounts for concurrent leave constraints via calculateDateAvailability
   let totalUsableDays = 0;
   let totalRemainderDays = 0;
   let totalRealisticUsableDays = 0;
   for (const [, groupMembers] of groupsMap.entries()) {
-    // All members in the same group should see the same usableDays
+    // All members in the same group should see the same usableDays (same shift, same tags)
     const groupUsableDays = groupMembers.length > 0 ? groupMembers[0].analytics.usableDays : 0;
     totalUsableDays += groupUsableDays; // Add each group's pool once (not per member)
     // Calculate remainder using iterative allocation that accounts for member constraints
@@ -924,11 +1046,41 @@ export const getTeamAnalytics = (
 // Get grouped team analytics for leaders
 // If subgrouping is enabled: Groups members by subgroupTag first, then by workingDaysTag + shiftTag within subgroup
 // If subgrouping is disabled: Groups members by workingDaysTag + shiftTag combinations
+// 
+// IMPORTANT: Aggregation logic must match getTeamAnalytics for consistency:
+// - totalUsableDays: Sum unique groupTotalUsableDays per group (not per member)
+// - totalRealisticUsableDays: Sum groupTotalRealisticUsableDays from each group
+// - totalRemainderDays: Sum groupTotalRemainderDays from each group
+// 
+// The team object must be the same instance used for all member calculations to ensure
+// concurrent leave settings are consistently applied
 export const getGroupedTeamAnalytics = (
   members: User[],
   team: Team,
   allRequests: LeaveRequest[]
 ): GroupedTeamAnalytics => {
+  // Validate team.settings before calculation
+  if (!team || !team.settings) {
+    console.error('[Analytics] getGroupedTeamAnalytics - ERROR: team.settings is missing!', {
+      hasTeam: !!team,
+      hasSettings: !!team?.settings
+    });
+    throw new Error('Team settings are missing');
+  }
+  
+  if (typeof team.settings.concurrentLeave !== 'number' || team.settings.concurrentLeave < 1) {
+    console.error('[Analytics] getGroupedTeamAnalytics - ERROR: team.settings.concurrentLeave is invalid!', {
+      value: team.settings.concurrentLeave,
+      type: typeof team.settings.concurrentLeave
+    });
+    throw new Error('Invalid concurrent leave setting');
+  }
+  
+  // Debug: Log the concurrent leave value at the start of calculation
+  if (typeof window === 'undefined') {
+    console.log('[Analytics] getGroupedTeamAnalytics - team.settings.concurrentLeave:', team.settings.concurrentLeave);
+  }
+  
   const memberMembers = members.filter(m => m.role === 'member');
   
   // Get all approved requests for the team (needed for realistic calculations)
@@ -1119,8 +1271,14 @@ export const getGroupedTeamAnalytics = (
     };
   });
   
-  // Calculate overall aggregates (same as regular team analytics)
-  // For totalUsableDays, sum unique group usableDays (not individual members) - each group counted once
+  // Calculate overall aggregates (must match getTeamAnalytics aggregation logic)
+  // 
+  // AGGREGATION LOGIC (must match getTeamAnalytics):
+  // - totalUsableDays: Sum unique groupTotalUsableDays per group (shared pool, counted once per group)
+  // - totalRealisticUsableDays: Sum groupTotalRealisticUsableDays from each group
+  // - totalRemainderDays: Sum groupTotalRemainderDays from each group
+  // 
+  // This ensures consistent results between getTeamAnalytics and getGroupedTeamAnalytics
   const totalUsableDays = groups.reduce((sum, group) => sum + group.aggregate.groupTotalUsableDays, 0);
   // For totalRealisticUsableDays, sum groupTotalRealisticUsableDays from each group
   // This correctly accounts for individual member constraints within each group's shared pool

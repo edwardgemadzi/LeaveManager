@@ -132,15 +132,35 @@ export default function TeamSettingsPage() {
       });
 
       if (response.ok) {
+        const responseData = await response.json();
+        console.log('[Settings] Save response:', responseData);
+        
+        // Verify the settings were saved correctly from the response
+        const savedSettings = responseData.settings;
+        if (savedSettings) {
+          console.log('[Settings] Settings saved to database:', {
+            concurrentLeave: savedSettings.concurrentLeave,
+            maxLeavePerYear: savedSettings.maxLeavePerYear,
+            minimumNoticePeriod: savedSettings.minimumNoticePeriod
+          });
+        }
+        
         alert('Settings saved successfully!');
+        
+        // Wait a moment to ensure database write completes and is committed
+        // Increased delay to ensure MongoDB write is fully committed before other pages refetch
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         // Refresh team data to get updated settings
-        const teamResponse = await fetch('/api/team', {
+        const teamResponse = await fetch(`/api/team?t=${Date.now()}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
+          cache: 'no-store',
         });
         if (teamResponse.ok) {
           const teamData = await teamResponse.json();
+          console.log('[Settings] Team data fetched after save. Concurrent leave:', teamData.team?.settings?.concurrentLeave);
           setTeam(teamData.team);
           const defaultSettings = {
             concurrentLeave: 2,
@@ -172,6 +192,12 @@ export default function TeamSettingsPage() {
               : new Date(teamSettings.bypassNoticePeriod.endDate).toISOString().split('T')[0];
           }
           setSettings(teamSettings);
+          
+          // Dispatch event to notify other pages that settings have been updated
+          // Include the actual concurrent leave value in the event for debugging
+          const eventDetail = { concurrentLeave: teamSettings.concurrentLeave };
+          console.log('[Settings] Dispatching teamSettingsUpdated event with concurrentLeave:', teamSettings.concurrentLeave);
+          window.dispatchEvent(new CustomEvent('teamSettingsUpdated', { detail: eventDetail }));
         }
       } else {
         const errorData = await response.json();
@@ -223,11 +249,14 @@ export default function TeamSettingsPage() {
                         id="concurrentLeave"
                         min="1"
                         max="10"
-                        value={settings.concurrentLeave}
-                        onChange={(e) => setSettings({
-                          ...settings,
-                          concurrentLeave: parseInt(e.target.value)
-                        })}
+                        value={settings.concurrentLeave ?? 2}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value, 10);
+                          setSettings({
+                            ...settings,
+                            concurrentLeave: isNaN(value) ? 2 : value
+                          });
+                        }}
                         className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
                       />
                     </div>
@@ -246,11 +275,14 @@ export default function TeamSettingsPage() {
                         id="maxLeavePerYear"
                         min="1"
                         max="50"
-                        value={settings.maxLeavePerYear}
-                        onChange={(e) => setSettings({
-                          ...settings,
-                          maxLeavePerYear: parseInt(e.target.value)
-                        })}
+                        value={settings.maxLeavePerYear ?? 20}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value, 10);
+                          setSettings({
+                            ...settings,
+                            maxLeavePerYear: isNaN(value) ? 20 : value
+                          });
+                        }}
                         className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
                       />
                     </div>
@@ -269,11 +301,14 @@ export default function TeamSettingsPage() {
                         id="minimumNoticePeriod"
                         min="0"
                         max="30"
-                        value={settings.minimumNoticePeriod}
-                        onChange={(e) => setSettings({
-                          ...settings,
-                          minimumNoticePeriod: parseInt(e.target.value)
-                        })}
+                        value={settings.minimumNoticePeriod ?? 1}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value, 10);
+                          setSettings({
+                            ...settings,
+                            minimumNoticePeriod: isNaN(value) ? 1 : value
+                          });
+                        }}
                         className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
                       />
                     </div>
@@ -404,15 +439,18 @@ export default function TeamSettingsPage() {
                             id="maternityMaxDays"
                             min="1"
                             max="365"
-                            value={settings.maternityLeave?.maxDays || 90}
-                            onChange={(e) => setSettings({
-                              ...settings,
-                              maternityLeave: {
-                                ...settings.maternityLeave,
-                                maxDays: parseInt(e.target.value) || 90,
-                                countingMethod: settings.maternityLeave?.countingMethod || 'working',
-                              }
-                            })}
+                            value={settings.maternityLeave?.maxDays ?? 90}
+                            onChange={(e) => {
+                              const value = parseInt(e.target.value, 10);
+                              setSettings({
+                                ...settings,
+                                maternityLeave: {
+                                  ...settings.maternityLeave,
+                                  maxDays: isNaN(value) ? 90 : value,
+                                  countingMethod: settings.maternityLeave?.countingMethod || 'working',
+                                }
+                              });
+                            }}
                             className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
                           />
                         </div>

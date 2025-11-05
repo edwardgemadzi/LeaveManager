@@ -298,7 +298,22 @@ export async function PATCH(request: NextRequest) {
 
     await TeamModel.updateSettings(user.teamId, settings);
     
-    return NextResponse.json({ success: true });
+    // Verify the update by fetching the updated team
+    const updatedTeam = await TeamModel.findById(user.teamId);
+    if (!updatedTeam) {
+      return NextResponse.json({ error: 'Team not found after update' }, { status: 500 });
+    }
+    
+    console.log('[Team API] Settings updated successfully:', {
+      concurrentLeave: updatedTeam.settings.concurrentLeave,
+      maxLeavePerYear: updatedTeam.settings.maxLeavePerYear,
+      minimumNoticePeriod: updatedTeam.settings.minimumNoticePeriod
+    });
+    
+    return NextResponse.json({ 
+      success: true,
+      settings: updatedTeam.settings // Return updated settings for verification
+    });
   } catch (error) {
     console.error('Update team settings error:', error);
     return NextResponse.json(

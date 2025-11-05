@@ -87,6 +87,20 @@ export default function MemberDashboard() {
     };
 
     fetchData();
+    
+    // Listen for settings updates to refresh analytics
+    const handleSettingsUpdated = () => {
+      console.log('[Member Dashboard] Settings updated event received, refetching analytics...');
+      // Add a small delay to ensure database write is fully committed before fetching
+      setTimeout(() => {
+        fetchData();
+      }, 200);
+    };
+    
+    window.addEventListener('teamSettingsUpdated', handleSettingsUpdated);
+    return () => {
+      window.removeEventListener('teamSettingsUpdated', handleSettingsUpdated);
+    };
   }, []);
 
   const getLeaveBalance = () => {
