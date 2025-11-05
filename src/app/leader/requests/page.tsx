@@ -61,21 +61,25 @@ export default function LeaderRequestsPage() {
         const token = localStorage.getItem('token');
         const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-        // Fetch team data
-        const teamResponse = await fetch('/api/team', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
+        // Fetch team and requests in parallel
+        const [teamResponse, requestsResponse] = await Promise.all([
+          fetch('/api/team', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          }),
+          fetch(`/api/leave-requests?teamId=${user.teamId}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          }),
+        ]);
+
+        // Process team response
         const teamData = await teamResponse.json();
         setMembers(teamData.members);
 
-        // Fetch all requests
-        const requestsResponse = await fetch(`/api/leave-requests?teamId=${user.teamId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
+        // Process requests response
         const allRequests = await requestsResponse.json();
         setRequests(allRequests);
       } catch (error) {

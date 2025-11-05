@@ -37,41 +37,41 @@ export default function LeaderLeaveBalancePage() {
         return;
       }
 
-      // Fetch team data
-      const teamResponse = await fetch('/api/team', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      // Fetch all data in parallel
+      const [teamResponse, requestsResponse, analyticsResponse] = await Promise.all([
+        fetch('/api/team', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }),
+        fetch('/api/leave-requests', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }),
+        fetch('/api/analytics', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        }),
+      ]);
       
+      // Process team response
       if (!teamResponse.ok) {
         console.error('Failed to fetch team data:', teamResponse.status);
-        return;
+      } else {
+        const teamData = await teamResponse.json();
+        setTeam(teamData.team);
+        setMembers(teamData.members || []);
       }
-      
-      const teamData = await teamResponse.json();
-      setTeam(teamData.team);
-      setMembers(teamData.members || []);
 
-      // Fetch all requests
-      const requestsResponse = await fetch('/api/leave-requests', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      
+      // Process requests response
       if (requestsResponse.ok) {
         const requests = await requestsResponse.json();
         setAllRequests(requests || []);
       }
 
-      // Fetch analytics
-      const analyticsResponse = await fetch('/api/analytics', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      
+      // Process analytics response
       if (analyticsResponse.ok) {
         const analyticsData = await analyticsResponse.json();
         const groupedData = analyticsData.analytics || analyticsData.grouped || null;

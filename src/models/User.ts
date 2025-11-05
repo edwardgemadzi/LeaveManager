@@ -39,25 +39,72 @@ export class UserModel {
   static async findByTeamId(teamId: string): Promise<User[]> {
     const db = await getDatabase();
     const users = db.collection<User>('users');
-    console.log('UserModel.findByTeamId - searching for teamId:', teamId);
     
-    // Get all members first, then filter by teamId in JavaScript
-    // This approach is more flexible and handles all formats (string, ObjectId, etc.)
-    const allMembers = await users.find({
-      role: 'member'
-    }).toArray();
-    
-    // Filter members by teamId
-    const teamIdStr = teamId.toString().trim();
-    const filteredResults = allMembers.filter(u => {
-      if (!u.teamId) return false;
-      // Convert both to strings and compare
-      const memberTeamIdStr = String(u.teamId).trim();
-      return memberTeamIdStr === teamIdStr;
-    });
-    
-    console.log('UserModel.findByTeamId - found users:', filteredResults.length, 'members');
-    return filteredResults;
+    try {
+      // Build query that handles both ObjectId and string formats
+      const teamIdStr = teamId.toString().trim();
+      
+      // Try to create ObjectId if teamId is a valid ObjectId string
+      let query: any;
+      
+      try {
+        const objectId = new ObjectId(teamId);
+        // Use $or to query both ObjectId and string formats
+        // This ensures we match regardless of how teamId is stored
+        query = {
+          role: 'member',
+          $or: [
+            { teamId: objectId },
+            { teamId: teamIdStr }
+          ]
+        };
+      } catch {
+        // Not a valid ObjectId, just query as string
+        query = {
+          role: 'member',
+          teamId: teamIdStr
+        };
+      }
+      
+      // Try the database query first
+      const results = await users.find(query).toArray();
+      
+      // If we got results, return them
+      if (results && results.length > 0) {
+        console.log(`UserModel.findByTeamId - found ${results.length} members with direct query`);
+        return results;
+      }
+      
+      // Fallback: fetch all members and filter in JavaScript
+      // This handles edge cases where teamId might be stored in unexpected formats
+      console.log(`UserModel.findByTeamId - direct query returned 0 results, using fallback for teamId: ${teamIdStr}`);
+      const allMembers = await users.find({ role: 'member' }).toArray();
+      const filteredResults = allMembers.filter(u => {
+        if (!u.teamId) return false;
+        const memberTeamIdStr = String(u.teamId).trim();
+        return memberTeamIdStr === teamIdStr;
+      });
+      
+      console.log(`UserModel.findByTeamId - fallback found ${filteredResults.length} members`);
+      return filteredResults;
+    } catch (error) {
+      console.error('UserModel.findByTeamId error:', error);
+      // If query fails, fall back to fetching all and filtering
+      try {
+        const allMembers = await users.find({ role: 'member' }).toArray();
+        const teamIdStr = teamId.toString().trim();
+        const filteredResults = allMembers.filter(u => {
+          if (!u.teamId) return false;
+          const memberTeamIdStr = String(u.teamId).trim();
+          return memberTeamIdStr === teamIdStr;
+        });
+        console.log(`UserModel.findByTeamId - error fallback found ${filteredResults.length} members`);
+        return filteredResults;
+      } catch (fallbackError) {
+        console.error('UserModel.findByTeamId fallback error:', fallbackError);
+        return [];
+      }
+    }
   }
 
 
@@ -117,6 +164,22 @@ export class UserModel {
         { _id: objectId } as any,
         { $unset: { workingDaysTag: '' } }
       );
+    }
+  }
+
+  static async createIndexes(): Promise<void> {
+    const db = await getDatabase();
+    const users = db.collection<User>('users');
+    
+    try {
+      // Create indexes for common query patterns
+      await users.createIndex({ teamId: 1 });
+      await users.createIndex({ teamId: 1, role: 1 }); // Compound index for team+role queries
+      await users.createIndex({ username: 1 }, { unique: true }); // Unique index for username lookups
+      console.log('User indexes created successfully');
+    } catch (error) {
+      console.error('Error creating User indexes:', error);
+      // Don't throw - indexes may already exist
     }
   }
 }

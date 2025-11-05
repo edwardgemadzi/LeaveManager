@@ -30,9 +30,11 @@ interface CalendarProps {
   teamId: string;
   members: User[];
   currentUser?: User; // Current logged-in user (for highlighting working days)
+  teamSettings?: { minimumNoticePeriod: number }; // Optional: team settings (if provided, skip fetching)
+  initialRequests?: LeaveRequest[]; // Optional: initial requests (if provided, skip fetching)
 }
 
-export default function TeamCalendar({ teamId, members, currentUser }: CalendarProps) {
+export default function TeamCalendar({ teamId, members, currentUser, teamSettings: providedTeamSettings, initialRequests }: CalendarProps) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [currentView, setCurrentView] = useState<View>(Views.MONTH);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -55,9 +57,15 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
   
   const leaveReasons = useMemo(() => LEAVE_REASONS, []);
 
-  // Fetch team settings for validation
+  // Fetch team settings for validation (only if not provided as prop)
   useEffect(() => {
     if (!isMember) return;
+    
+    // Use provided teamSettings prop if available, otherwise fetch
+    if (providedTeamSettings) {
+      setTeamSettings(providedTeamSettings);
+      return;
+    }
     
     const fetchTeamSettings = async () => {
       try {
@@ -79,91 +87,108 @@ export default function TeamCalendar({ teamId, members, currentUser }: CalendarP
     };
 
     fetchTeamSettings();
-  }, [isMember, teamId]);
+  }, [isMember, teamId, providedTeamSettings]);
 
-  useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`/api/leave-requests?teamId=${teamId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
+  // Process requests into calendar events
+  const processRequestsIntoEvents = useCallback((requests: LeaveRequest[]) => {
+    const calendarEvents: CalendarEvent[] = [];
+    
+    requests.forEach(request => {
+      // Skip rejected requests - they shouldn't show on the calendar
+      if (request.status === 'rejected') {
+        return;
+      }
+
+      const member = members.find(m => m._id === request.userId);
+      // If member not found in members array, still create event with basic info
+      // This handles cases where requests exist but member data isn't in the filtered array
+      const memberName = member?.fullName || member?.username || 'Unknown Member';
+      const shiftSchedule = member?.shiftSchedule;
+      
+      // Only mark as emergency if reason exactly matches emergency reason values
+      const isEmergency = request.reason ? isEmergencyReason(request.reason) : false;
+      
+      if (!shiftSchedule) {
+        // If no shift schedule, create a single event for the entire period
+        const eventTitle = isEmergency 
+          ? `[EMERGENCY] ${memberName} - ${request.reason}` 
+          : `${memberName} - ${request.reason}`;
+          
+        calendarEvents.push({
+          id: request._id!,
+          title: eventTitle,
+          start: new Date(request.startDate),
+          end: new Date(request.endDate),
+          resource: {
+            status: request.status,
+            userId: request.userId,
+            username: member?.username || 'Unknown',
+            fullName: member?.fullName,
+            isEmergency,
+            requestedBy: request.requestedBy,
           },
         });
-        const requests: LeaveRequest[] = await response.json();
-        const calendarEvents: CalendarEvent[] = [];
+      } else {
+        // Create separate events for each working day
+        const workingDays = getWorkingDays(
+          new Date(request.startDate),
+          new Date(request.endDate),
+          shiftSchedule
+        );
         
-        requests.forEach(request => {
-          // Skip rejected requests - they shouldn't show on the calendar
-          if (request.status === 'rejected') {
-            return;
-          }
-
-          const member = members.find(m => m._id === request.userId);
-          const memberName = member?.fullName || member?.username || 'Unknown';
-          const shiftSchedule = member?.shiftSchedule;
-          // Only mark as emergency if reason exactly matches emergency reason values
-          const isEmergency = request.reason ? isEmergencyReason(request.reason) : false;
-          
-          if (!shiftSchedule) {
-            // If no shift schedule, create a single event for the entire period
-            const eventTitle = isEmergency 
-              ? `[EMERGENCY] ${memberName} - ${request.reason}` 
-              : `${memberName} - ${request.reason}`;
-              
-            calendarEvents.push({
-              id: request._id!,
-              title: eventTitle,
-              start: new Date(request.startDate),
-              end: new Date(request.endDate),
-              resource: {
-                status: request.status,
-                userId: request.userId,
-                username: member?.username || 'Unknown',
-                fullName: member?.fullName,
-                isEmergency,
-                requestedBy: request.requestedBy,
-              },
-            });
-          } else {
-            // Create separate events for each working day
-            const workingDays = getWorkingDays(
-              new Date(request.startDate),
-              new Date(request.endDate),
-              shiftSchedule
-            );
+        workingDays.forEach((workingDay, index) => {
+          const eventTitle = isEmergency 
+            ? `[EMERGENCY] ${memberName} - ${request.reason}` 
+            : `${memberName} - ${request.reason}`;
             
-            workingDays.forEach((workingDay, index) => {
-              const eventTitle = isEmergency 
-                ? `[EMERGENCY] ${memberName} - ${request.reason}` 
-                : `${memberName} - ${request.reason}`;
-                
-              calendarEvents.push({
-                id: `${request._id!}-${index}`,
-                title: eventTitle,
-                start: new Date(workingDay),
-                end: new Date(workingDay),
-                resource: {
-                  status: request.status,
-                  userId: request.userId,
-                  username: member?.username || 'Unknown',
-                  fullName: member?.fullName,
-                  isEmergency,
-                  requestedBy: request.requestedBy,
-                },
-              });
-            });
-          }
+          calendarEvents.push({
+            id: `${request._id!}-${index}`,
+            title: eventTitle,
+            start: new Date(workingDay),
+            end: new Date(workingDay),
+            resource: {
+              status: request.status,
+              userId: request.userId,
+              username: member?.username || 'Unknown',
+              fullName: member?.fullName,
+              isEmergency,
+              requestedBy: request.requestedBy,
+            },
+          });
         });
-
-        setEvents(calendarEvents);
-      } catch (error) {
-        console.error('Error fetching calendar events:', error);
       }
-    };
+    });
 
-    fetchEvents();
-  }, [teamId, members]);
+    setEvents(calendarEvents);
+  }, [members]);
+
+  useEffect(() => {
+    // Use provided initialRequests if available, otherwise fetch
+    if (initialRequests && initialRequests.length > 0) {
+      processRequestsIntoEvents(initialRequests);
+      return;
+    }
+
+    // If no initialRequests but we have teamId, fetch
+    if (teamId) {
+      const fetchEvents = async () => {
+        try {
+          const token = localStorage.getItem('token');
+          const response = await fetch(`/api/leave-requests?teamId=${teamId}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+          const requests: LeaveRequest[] = await response.json();
+          processRequestsIntoEvents(requests);
+        } catch (error) {
+          console.error('Error fetching calendar events:', error);
+        }
+      };
+
+      fetchEvents();
+    }
+  }, [teamId, members, initialRequests, processRequestsIntoEvents]);
 
   const eventStyleGetter = useCallback((event: CalendarEvent) => {
     // Extract reason from title (format: "Name - Reason" or "[EMERGENCY] Name - Reason")

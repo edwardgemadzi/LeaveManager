@@ -36,17 +36,26 @@ export async function GET(request: NextRequest) {
       const currentUser = await UserModel.findById(user.id);
       const userSubgroup = currentUser?.subgroupTag || 'Ungrouped';
       
-      // Filter requests to only include those from members in the same subgroup
-      const filteredRequests = [];
-      for (const req of requests) {
-        const reqUser = await UserModel.findById(req.userId);
-        if (!reqUser) continue;
-        
-        const reqUserSubgroup = reqUser.subgroupTag || 'Ungrouped';
-        if (reqUserSubgroup === userSubgroup) {
-          filteredRequests.push(req);
+      // Fetch all users in the team ONCE instead of N queries
+      const teamMembers = await UserModel.findByTeamId(user.teamId);
+      
+      // Create a map of userId -> subgroupTag for O(1) lookup
+      // Normalize IDs to strings to ensure matching
+      const userSubgroupMap = new Map<string, string>();
+      teamMembers.forEach(member => {
+        if (member._id) {
+          const memberId = String(member._id).trim();
+          const memberSubgroup = member.subgroupTag || 'Ungrouped';
+          userSubgroupMap.set(memberId, memberSubgroup);
         }
-      }
+      });
+      
+      // Filter requests using the map (no database queries)
+      const filteredRequests = requests.filter(req => {
+        const reqUserId = String(req.userId).trim();
+        const reqUserSubgroup = userSubgroupMap.get(reqUserId) || 'Ungrouped';
+        return reqUserSubgroup === userSubgroup;
+      });
       requests = filteredRequests;
     }
     // Leaders see all requests (no filtering needed)
@@ -151,30 +160,46 @@ export async function POST(request: NextRequest) {
       const requestingUserShiftTag = requestingUser?.shiftTag;
       const requestingUserSubgroupTag = requestingUser?.subgroupTag;
 
+      // Fetch all team members ONCE to avoid N+1 queries
+      const teamMembers = await UserModel.findByTeamId(user.teamId);
+      
+      // Create maps for O(1) lookups
+      const userSubgroupMap = new Map<string, string>();
+      const userShiftTagMap = new Map<string, string | undefined>();
+      teamMembers.forEach(member => {
+        if (member._id) {
+          userSubgroupMap.set(member._id, member.subgroupTag || 'Ungrouped');
+          userShiftTagMap.set(member._id, member.shiftTag);
+        }
+      });
+      
+      // Ensure requesting user is in the maps (in case they're not a member)
+      if (requestingUser?._id) {
+        userSubgroupMap.set(requestingUser._id, requestingUserSubgroupTag || 'Ungrouped');
+        userShiftTagMap.set(requestingUser._id, requestingUserShiftTag);
+      }
+
       // If subgrouping is enabled, filter by subgroup first
       // Each subgroup gets its own concurrent leave limit
       let relevantOverlappingCount = 0;
       
       if (team.settings.enableSubgrouping) {
         // Filter overlapping requests to only count those from the same subgroup
+        const requestingSubgroup = requestingUserSubgroupTag || 'Ungrouped';
+        
         for (const req of overlappingRequests) {
-          const reqUser = await UserModel.findById(req.userId);
-          if (!reqUser) continue;
-          
-          // Get requesting user's subgroup (or "Ungrouped")
-          const requestingSubgroup = requestingUserSubgroupTag || 'Ungrouped';
-          // Get request user's subgroup (or "Ungrouped")
-          const reqUserSubgroup = reqUser.subgroupTag || 'Ungrouped';
+          const reqUserSubgroup = userSubgroupMap.get(req.userId) || 'Ungrouped';
+          const reqUserShiftTag = userShiftTagMap.get(req.userId);
           
           // Only count if they're in the same subgroup
           if (requestingSubgroup !== reqUserSubgroup) continue;
           
           // Also check shift tag if applicable (existing logic)
           if (requestingUserShiftTag !== undefined) {
-            if (reqUser.shiftTag !== requestingUserShiftTag) continue;
+            if (reqUserShiftTag !== requestingUserShiftTag) continue;
           } else {
             // Requesting user has no shift tag - only count members with no shift tag
-            if (reqUser.shiftTag !== undefined) continue;
+            if (reqUserShiftTag !== undefined) continue;
           }
           
           relevantOverlappingCount++;
@@ -184,8 +209,8 @@ export async function POST(request: NextRequest) {
         if (requestingUserShiftTag !== undefined) {
           // Count overlapping requests from users with the same shift tag
           for (const req of overlappingRequests) {
-            const reqUser = await UserModel.findById(req.userId);
-            if (reqUser?.shiftTag === requestingUserShiftTag) {
+            const reqUserShiftTag = userShiftTagMap.get(req.userId);
+            if (reqUserShiftTag === requestingUserShiftTag) {
               relevantOverlappingCount++;
             }
           }

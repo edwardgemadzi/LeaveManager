@@ -101,4 +101,22 @@ export class LeaveRequestModel {
       return false;
     }
   }
+
+  static async createIndexes(): Promise<void> {
+    const db = await getDatabase();
+    const requests = db.collection<LeaveRequest>('leaveRequests');
+    
+    try {
+      // Create indexes for common query patterns
+      await requests.createIndex({ teamId: 1 });
+      await requests.createIndex({ userId: 1 });
+      await requests.createIndex({ status: 1 });
+      await requests.createIndex({ teamId: 1, status: 1 }); // Compound index for team+status queries
+      await requests.createIndex({ startDate: 1, endDate: 1 }); // For date range queries
+      console.log('LeaveRequest indexes created successfully');
+    } catch (error) {
+      console.error('Error creating LeaveRequest indexes:', error);
+      // Don't throw - indexes may already exist
+    }
+  }
 }

@@ -45,4 +45,18 @@ export class TeamModel {
       { $set: { settings } }
     );
   }
+
+  static async createIndexes(): Promise<void> {
+    const db = await getDatabase();
+    const teams = db.collection<Team>('teams');
+    
+    try {
+      // Create index for team username lookups
+      await teams.createIndex({ teamUsername: 1 }, { unique: true });
+      console.log('Team indexes created successfully');
+    } catch (error) {
+      console.error('Error creating Team indexes:', error);
+      // Don't throw - indexes may already exist
+    }
+  }
 }

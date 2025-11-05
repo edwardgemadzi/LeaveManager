@@ -87,48 +87,29 @@ export default function LeaderDashboard() {
         return;
       }
 
-      // Fetch team data
-      const teamResponse = await fetch('/api/team', {
+      // Fetch all dashboard data in a single API call
+      const response = await fetch('/api/dashboard', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
-      
-      if (!teamResponse.ok) {
-        console.error('Failed to fetch team data:', teamResponse.status);
+
+      if (!response.ok) {
+        console.error('Failed to fetch dashboard data:', response.status);
         return;
       }
-      
-      const teamData = await teamResponse.json();
-      setTeam(teamData.team);
-      setMembers(teamData.members || []);
 
-      // Fetch all requests
-      const requestsResponse = await fetch('/api/leave-requests', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const data = await response.json();
       
-      if (!requestsResponse.ok) {
-        console.error('Failed to fetch requests:', requestsResponse.status);
-        return;
-      }
+      // Set all state from single response
+      setTeam(data.team);
+      setMembers(data.members || []);
+      setAllRequests(data.requests || []);
+      setPendingRequests((data.requests || []).filter((req: LeaveRequest) => req.status === 'pending'));
       
-      const requests = await requestsResponse.json();
-      setAllRequests(requests);
-      setPendingRequests(requests.filter((req: LeaveRequest) => req.status === 'pending'));
-
-      // Fetch analytics
-      const analyticsResponse = await fetch('/api/analytics', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      
-      if (analyticsResponse.ok) {
-        const analyticsData = await analyticsResponse.json();
-        setAnalytics(analyticsData.analytics); // Grouped analytics
+      // Analytics structure for leaders: { analytics: GroupedTeamAnalytics }
+      if (data.analytics) {
+        setAnalytics(data.analytics);
       }
     } catch (error) {
       console.error('Error fetching data:', error);

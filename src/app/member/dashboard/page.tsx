@@ -31,78 +31,53 @@ export default function MemberDashboard() {
         const userData = JSON.parse(localStorage.getItem('user') || '{}');
         setUser(userData); // Set the user state
 
-        // Fetch team data
-        const teamResponse = await fetch('/api/team', {
+        // Fetch all dashboard data in a single API call
+        const response = await fetch('/api/dashboard', {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
         });
-        
-        if (!teamResponse.ok) {
-          console.error('Failed to fetch team data:', teamResponse.status, teamResponse.statusText);
-          const errorData = await teamResponse.json();
+
+        if (!response.ok) {
+          console.error('Failed to fetch dashboard data:', response.status, response.statusText);
+          const errorData = await response.json();
           console.error('Error details:', errorData);
           setTeam(null);
-        } else {
-          const teamData = await teamResponse.json();
-          console.log('Team data received:', teamData);
-          setTeam(teamData.team);
-          
-          // Update user with fresh data from server (including shift schedule)
-          if (teamData.currentUser) {
-            setUser(teamData.currentUser);
-          }
-        }
-
-        // Fetch my requests
-        const requestsResponse = await fetch(`/api/leave-requests?teamId=${userData.teamId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        
-        if (!requestsResponse.ok) {
-          console.error('Failed to fetch requests:', requestsResponse.status, requestsResponse.statusText);
-          const errorData = await requestsResponse.json();
-          console.error('Error details:', errorData);
           setMyRequests([]);
           return;
         }
+
+        const data = await response.json();
+        console.log('Dashboard data received:', data);
         
-        const allRequests = await requestsResponse.json();
-        console.log('All requests received:', allRequests);
+        // Set team and user data
+        setTeam(data.team);
+        if (data.currentUser) {
+          setUser(data.currentUser);
+        }
         
-        // Ensure allRequests is an array before filtering
-        if (Array.isArray(allRequests)) {
-          const myRequests = allRequests.filter((req: LeaveRequest) => req.userId === userData.id);
+        // Filter requests for current user
+        if (Array.isArray(data.requests)) {
+          const myRequests = data.requests.filter((req: LeaveRequest) => req.userId === userData.id);
           setMyRequests(myRequests);
+          console.log('My requests filtered:', myRequests.length);
         } else {
-          console.error('Expected array but got:', typeof allRequests, allRequests);
+          console.error('Expected array but got:', typeof data.requests, data.requests);
           setMyRequests([]);
         }
 
-        // Fetch analytics
-        const analyticsResponse = await fetch('/api/analytics', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        
-        if (analyticsResponse.ok) {
-          const analyticsData = await analyticsResponse.json();
-          console.log('Member Dashboard - Analytics data received:', analyticsData);
-          console.log('Member Dashboard - Analytics object:', analyticsData.analytics);
-          if (analyticsData.analytics) {
-            console.log('Member Dashboard - Fields:', {
-              usableDays: analyticsData.analytics.usableDays,
-              realisticUsableDays: analyticsData.analytics.realisticUsableDays,
-              theoreticalWorkingDays: analyticsData.analytics.theoreticalWorkingDays,
-              remainingLeaveBalance: analyticsData.analytics.remainingLeaveBalance
-            });
-          }
-          setAnalytics(analyticsData.analytics);
+        // Set analytics (structure for members: { analytics: MemberAnalytics })
+        if (data.analytics && data.analytics.analytics) {
+          console.log('Member Dashboard - Analytics data received:', data.analytics.analytics);
+          console.log('Member Dashboard - Fields:', {
+            usableDays: data.analytics.analytics.usableDays,
+            realisticUsableDays: data.analytics.analytics.realisticUsableDays,
+            theoreticalWorkingDays: data.analytics.analytics.theoreticalWorkingDays,
+            remainingLeaveBalance: data.analytics.analytics.remainingLeaveBalance
+          });
+          setAnalytics(data.analytics.analytics);
         } else {
-          console.error('Analytics API error:', await analyticsResponse.text());
+          console.error('No analytics data in response');
         }
       } catch (error) {
         console.error('Error fetching data:', error);

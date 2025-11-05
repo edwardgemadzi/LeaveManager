@@ -20,15 +20,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No team assigned' }, { status: 400 });
     }
     
-    const team = await TeamModel.findById(user.teamId);
+    // Fetch team, members, and currentUser in parallel
+    const [team, members, currentUser] = await Promise.all([
+      TeamModel.findById(user.teamId),
+      UserModel.findByTeamId(user.teamId),
+      UserModel.findById(user.id),
+    ]);
+
     if (!team) {
       return NextResponse.json({ error: 'Team not found' }, { status: 404 });
     }
-
-    const members = await UserModel.findByTeamId(user.teamId);
-    
-    // Get current user data with shift schedule
-    const currentUser = await UserModel.findById(user.id);
 
     // Use members as-is, no need to add current user separately
     const allMembers = members;
