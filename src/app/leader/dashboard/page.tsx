@@ -175,9 +175,18 @@ export default function LeaderDashboard() {
         const newRequests = currentPending.filter((req: LeaveRequest) => !previousIds.has(req._id));
         
         if (newRequests.length > 0) {
+          // Update state with new data
+          setAllRequests(data.requests || []);
+          setPendingRequests(currentPending);
+          setMembers(data.members || []);
+          if (data.analytics) {
+            setAnalytics(data.analytics);
+          }
+          
           // Find member names for new requests
+          const currentMembers = data.members || members;
           newRequests.forEach((req: LeaveRequest) => {
-            const member = members.find(m => m._id === req.userId);
+            const member = currentMembers.find((m: User) => m._id === req.userId);
             const memberName = member?.fullName || member?.username || 'A team member';
             const startDate = new Date(req.startDate).toLocaleDateString();
             const endDate = new Date(req.endDate).toLocaleDateString();

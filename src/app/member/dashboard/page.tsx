@@ -154,6 +154,19 @@ export default function MemberDashboard() {
             }
           });
           
+          // Update state if requests changed
+          if (currentRequests.length !== myRequests.length || 
+              currentRequests.some((req, idx) => req._id !== myRequests[idx]?._id || req.status !== myRequests[idx]?.status)) {
+            setMyRequests(currentRequests);
+            setTeam(data.team);
+            if (data.currentUser) {
+              setUser(data.currentUser);
+            }
+            if (data.analytics && data.analytics.analytics) {
+              setAnalytics(data.analytics.analytics);
+            }
+          }
+          
           previousRequestsRef.current = currentRequests;
         }
       }
