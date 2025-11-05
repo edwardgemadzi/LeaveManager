@@ -45,6 +45,7 @@ export class UserModel {
       const teamIdStr = teamId.toString().trim();
       
       // Try to create ObjectId if teamId is a valid ObjectId string
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let query: any;
       
       try {

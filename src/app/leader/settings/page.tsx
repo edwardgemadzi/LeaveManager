@@ -433,7 +433,7 @@ export default function TeamSettingsPage() {
                               name="maternityCountingMethod"
                               value="working"
                               checked={settings.maternityLeave?.countingMethod === 'working'}
-                              onChange={(e) => setSettings({
+                              onChange={() => setSettings({
                                 ...settings,
                                 maternityLeave: {
                                   ...settings.maternityLeave,
@@ -454,7 +454,7 @@ export default function TeamSettingsPage() {
                               name="maternityCountingMethod"
                               value="calendar"
                               checked={settings.maternityLeave?.countingMethod === 'calendar'}
-                              onChange={(e) => setSettings({
+                              onChange={() => setSettings({
                                 ...settings,
                                 maternityLeave: {
                                   ...settings.maternityLeave,

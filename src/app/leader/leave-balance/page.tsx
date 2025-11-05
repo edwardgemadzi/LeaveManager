@@ -699,7 +699,7 @@ export default function LeaderLeaveBalancePage() {
         : maxMaternityLeaveDays;
       
       // If balance is less than base, set it as the new base
-      const newBaseBalance = balanceValue < baseBalance ? balanceValue : baseBalance;
+      // const newBaseBalance = balanceValue < baseBalance ? balanceValue : baseBalance;
       
       // Calculate new base balance
       const newManualMaternityLeaveBalance = balanceValue + daysUsed;

@@ -5,7 +5,7 @@ import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { LeaveRequest, Team, User } from '@/types';
 import { calculateLeaveBalance, countWorkingDays, calculateSurplusBalance, calculateMaternityLeaveBalance, calculateMaternitySurplusBalance, isMaternityLeave, countMaternityLeaveDays } from '@/lib/leaveCalculations';
-import { MemberAnalytics, getMaternityMemberAnalytics } from '@/lib/analyticsCalculations';
+import { MemberAnalytics } from '@/lib/analyticsCalculations';
 import { 
   ClockIcon, 
   CalendarIcon, 

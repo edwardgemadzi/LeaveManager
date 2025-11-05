@@ -384,8 +384,7 @@ export const calculateAverageDaysPerMember = (
 // The allocation respects these constraints since we're allocating from the constrained pool
 export const calculateGroupRemainderDays = (
   groupUsableDays: number,
-  groupMembers: Array<{ analytics: MemberAnalytics }>,
-  team: Team
+  groupMembers: Array<{ analytics: MemberAnalytics }>
 ): number => {
   // Create working copy of members with their remaining balance
   let availableMembers = groupMembers
@@ -882,14 +881,13 @@ export const getTeamAnalytics = (
   let totalUsableDays = 0;
   let totalRemainderDays = 0;
   let totalRealisticUsableDays = 0;
-  for (const [groupKey, groupMembers] of groupsMap.entries()) {
+  for (const [, groupMembers] of groupsMap.entries()) {
     // All members in the same group should see the same usableDays
     const groupUsableDays = groupMembers.length > 0 ? groupMembers[0].analytics.usableDays : 0;
-    const groupTotalMembers = groupMembers.length;
     totalUsableDays += groupUsableDays; // Add each group's pool once (not per member)
     // Calculate remainder using iterative allocation that accounts for member constraints
     // Note: groupUsableDays already accounts for concurrent leave constraints
-    totalRemainderDays += calculateGroupRemainderDays(groupUsableDays, groupMembers, team);
+    totalRemainderDays += calculateGroupRemainderDays(groupUsableDays, groupMembers);
     
     // Calculate groupTotalRealisticUsableDays by summing individual member realisticUsableDays within the group
     // This accounts for individual member constraints (remainingBalance) while correctly grouping
@@ -1088,7 +1086,7 @@ export const getGroupedTeamAnalytics = (
     // This allocates days one by one, removing members when they reach their max,
     // and returns days that can't be allocated evenly
     // Note: groupUsableDays already accounts for concurrent leave constraints (only counts days with availability > 0)
-    const groupTotalRemainderDays = calculateGroupRemainderDays(groupUsableDays, groupMembers, team);
+    const groupTotalRemainderDays = calculateGroupRemainderDays(groupUsableDays, groupMembers);
     const groupTotalLeaveBalance = groupMembers.reduce((sum, m) => sum + m.analytics.remainingLeaveBalance, 0);
     
     return {

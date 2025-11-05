@@ -295,7 +295,7 @@ export default function LeaderRequestsPage() {
 
       const results = await Promise.allSettled(promises);
       
-      results.forEach((result, index) => {
+      results.forEach((result) => {
         if (result.status === 'fulfilled' && result.value.ok) {
           successCount++;
         } else {

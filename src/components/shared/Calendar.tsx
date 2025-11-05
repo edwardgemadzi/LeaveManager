@@ -584,7 +584,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
     } finally {
       setSubmitting(false);
     }
-  }, [selectedDates, selectedReasonType, customReason, teamSettings, getFinalReason, requestAsRange, teamId, members, clearSelectionMode, refreshCalendar, currentUser]);
+  }, [selectedDates, selectedReasonType, customReason, teamSettings, getFinalReason, requestAsRange, clearSelectionMode, refreshCalendar, currentUser]);
 
   const closeRequestModal = useCallback(() => {
     setShowRequestModal(false);

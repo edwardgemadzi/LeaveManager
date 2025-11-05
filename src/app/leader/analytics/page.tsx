@@ -6,7 +6,7 @@ import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { Team, User, LeaveRequest } from '@/types';
 import { GroupedTeamAnalytics, getMaternityMemberAnalytics } from '@/lib/analyticsCalculations';
 import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
-import { calculateMaternityLeaveBalance, isMaternityLeave, countMaternityLeaveDays } from '@/lib/leaveCalculations';
+// Removed unused imports: calculateMaternityLeaveBalance, isMaternityLeave, countMaternityLeaveDays
 import { UsersIcon, CalendarIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 
 export default function LeaderAnalyticsPage() {
@@ -568,7 +568,7 @@ export default function LeaderAnalyticsPage() {
           {/* Maternity Leave Analytics */}
           {showMaternityLeave && team && members.length > 0 && (() => {
             const maxMaternityLeaveDays = team.settings.maternityLeave?.maxDays || 90;
-            const countingMethod = team.settings.maternityLeave?.countingMethod || 'working';
+            // const countingMethod = team.settings.maternityLeave?.countingMethod || 'working';
             
             // Calculate maternity leave analytics for all members
             const memberMaternityAnalytics = members
