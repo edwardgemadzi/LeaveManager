@@ -1086,11 +1086,6 @@ export const getGroupedTeamAnalytics = (
       members
     );
     
-    // Debug logging for specific users
-    if (member.username === 'francisbentum' || member.username === 'edgemadzi') {
-      console.log(`[DEBUG getGroupedTeamAnalytics] ${member.username}: remainingLeaveBalance=${analytics.remainingLeaveBalance}, baseLeaveBalance=${analytics.baseLeaveBalance}`);
-    }
-    
     return {
       userId: member._id || '',
       username: member.username,
