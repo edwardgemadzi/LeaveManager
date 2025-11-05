@@ -1221,10 +1221,62 @@ export default function LeaderLeaveBalancePage() {
                                         if (baseBalance === 0) {
                                           return <>0 / 0</>;
                                         }
-                                        return <>{Math.round(leaveData.remainingBalance)} / {maxLeave}</>;
+                                        const isNegative = leaveData.remainingBalance < 0;
+                                        return (
+                                          <span className={isNegative ? 'text-red-600 dark:text-red-400 font-semibold' : ''}>
+                                            {isNegative 
+                                              ? `-${Math.round(Math.abs(leaveData.remainingBalance))} / ${maxLeave}`
+                                              : `${Math.round(leaveData.remainingBalance)} / ${maxLeave}`
+                                            }
+                                          </span>
+                                        );
                                       })()}
                                       <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">(remaining)</span>
-                                      {leaveData.surplusBalance > 0 && (
+                                      {leaveData.remainingBalance < 0 && (() => {
+                                        // Check if member has taken compassionate leave (maternity, sick, bereavement, medical, etc.)
+                                        const memberCompassionateRequests = allRequests.filter(req => 
+                                          req.userId === member._id && 
+                                          req.status === 'approved' && 
+                                          req.reason && 
+                                          (isMaternityLeave(req.reason) || 
+                                           req.reason.toLowerCase().includes('sick') ||
+                                           req.reason.toLowerCase().includes('bereavement') ||
+                                           req.reason.toLowerCase().includes('medical') ||
+                                           req.reason.toLowerCase().includes('family emergency') ||
+                                           req.reason.toLowerCase().includes('emergency'))
+                                        );
+                                        const hasCompassionateLeave = memberCompassionateRequests.length > 0;
+                                        
+                                        // Determine compassionate reason for message
+                                        let compassionateNote = '';
+                                        if (hasCompassionateLeave) {
+                                          if (memberCompassionateRequests.some(r => isMaternityLeave(r.reason || ''))) {
+                                            compassionateNote = ' (maternity/paternity noted)';
+                                          } else if (memberCompassionateRequests.some(r => r.reason?.toLowerCase().includes('sick'))) {
+                                            compassionateNote = ' (sick leave noted)';
+                                          } else if (memberCompassionateRequests.some(r => r.reason?.toLowerCase().includes('bereavement'))) {
+                                            compassionateNote = ' (bereavement leave noted)';
+                                          } else if (memberCompassionateRequests.some(r => r.reason?.toLowerCase().includes('medical'))) {
+                                            compassionateNote = ' (medical leave noted)';
+                                          } else if (memberCompassionateRequests.some(r => r.reason?.toLowerCase().includes('emergency'))) {
+                                            compassionateNote = ' (emergency leave noted)';
+                                          } else {
+                                            compassionateNote = ' (necessary leave noted)';
+                                          }
+                                        }
+                                        
+                                        const textColor = hasCompassionateLeave 
+                                          ? 'text-pink-600 dark:text-pink-400'
+                                          : 'text-red-600 dark:text-red-400';
+                                        
+                                        return (
+                                          <span className={`ml-2 text-xs ${textColor} font-medium`} title={hasCompassionateLeave ? "Over allocated - necessary leave noted, will be adjusted next year" : "Over allocated - will be adjusted in next year's allocation"}>
+                                            {Math.round(Math.abs(leaveData.remainingBalance))} over allocated
+                                            {compassionateNote}
+                                          </span>
+                                        );
+                                      })()}
+                                      {leaveData.surplusBalance > 0 && leaveData.remainingBalance >= 0 && (
                                         <span className="ml-2 text-xs text-green-600 dark:text-green-400" title="Surplus balance">
                                           (+{Math.round(leaveData.surplusBalance)} surplus)
                                         </span>

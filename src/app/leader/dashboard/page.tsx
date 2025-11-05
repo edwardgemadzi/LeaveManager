@@ -700,7 +700,7 @@ export default function LeaderDashboard() {
                   <p className="text-gray-500 dark:text-gray-400 text-sm">No pending requests at the moment</p>
                 </div>
               ) : (
-                <div className="space-y-3 max-h-96 overflow-y-auto pr-2 scrollbar-thin">
+                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 scrollbar-thin">
                   {pendingRequests.map((request, index) => {
                     const member = members?.find(m => m._id === request.userId);
                     return (
@@ -781,10 +781,11 @@ export default function LeaderDashboard() {
             <div className="lg:col-span-1">
               <div className="card h-full">
                 <div className="p-5 sm:p-6">
-                  <div className="flex items-center gap-2 mb-4">
+                  <div className="flex items-center gap-2 mb-2">
                     <FireIcon className="h-5 w-5 text-orange-600 dark:text-orange-400" />
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white">Action Needed</h3>
                   </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Members with highest days to lose at year-end</p>
                   {(() => {
                     if (!analytics || !team || !members.length) {
                       return (
@@ -797,7 +798,8 @@ export default function LeaderDashboard() {
                     // Get all members with their analytics
                     const allMembersWithAnalytics = analytics.groups.flatMap(g => g.members);
                     
-                    // Create member at risk list with priority scoring
+                    // Create member at risk list - ONLY members who will lose days at year-end
+                    // Focus on highest days to be lost
                     const membersAtRisk = allMembersWithAnalytics
                       .map(m => {
                         const member = members.find(mem => mem._id === m.userId);
@@ -806,46 +808,28 @@ export default function LeaderDashboard() {
                         const willLose = m.analytics.willLose || 0;
                         const remainingBalance = m.analytics.remainingLeaveBalance || 0;
                         const realisticUsableDays = m.analytics.realisticUsableDays || 0;
-                        const maxLeavePerYear = team.settings.maxLeavePerYear;
                         
-                        // Priority score: higher = more urgent
-                        // 1. Members who will lose days (weighted by amount)
-                        // 2. Members with low remaining balance (< 25% of max)
-                        // 3. Members with high balance but low realistic usable days
-                        let priorityScore = 0;
-                        
-                        if (willLose > 0) {
-                          priorityScore += 1000 + (willLose * 10); // Highest priority
-                        }
-                        
-                        if (remainingBalance < maxLeavePerYear * 0.25 && remainingBalance > 0) {
-                          priorityScore += 500 + (maxLeavePerYear * 0.25 - remainingBalance); // Low balance
-                        }
-                        
-                        // If realistic usable days is much less than remaining balance, they're at risk
-                        if (remainingBalance > 0 && realisticUsableDays < remainingBalance * 0.8) {
-                          priorityScore += 200 + (remainingBalance - realisticUsableDays);
-                        }
+                        // Only include members who will lose days
+                        if (willLose <= 0) return null;
 
                         return {
                           member,
                           analytics: m.analytics,
                           willLose,
                           remainingBalance,
-                          realisticUsableDays,
-                          priorityScore
+                          realisticUsableDays
                         };
                       })
-                      .filter(m => m !== null && m.priorityScore > 0)
-                      .sort((a, b) => (b?.priorityScore || 0) - (a?.priorityScore || 0))
-                      .slice(0, 5); // Show top 5 most urgent
+                      .filter(m => m !== null)
+                      .sort((a, b) => (b?.willLose || 0) - (a?.willLose || 0)) // Sort by highest days to lose
+                      .slice(0, 5); // Show top 5 with highest days to lose
 
                     if (membersAtRisk.length === 0) {
                       return (
                         <div className="text-center py-8">
                           <CheckCircleIcon className="h-8 w-8 text-green-600 dark:text-green-400 mx-auto mb-2" />
                           <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">All Clear!</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">No members at risk of losing days</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">No members will lose days at year-end</p>
                         </div>
                       );
                     }
@@ -864,8 +848,6 @@ export default function LeaderDashboard() {
                               className={`p-3 rounded-lg border transition-all duration-200 stagger-item ${
                                 willLose > 0
                                   ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                                  : isLowBalance
-                                  ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
                                   : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
                               }`}
                               style={{ animationDelay: `${index * 0.05}s` }}
@@ -879,20 +861,20 @@ export default function LeaderDashboard() {
                                     </p>
                                   </div>
                                   <div className="space-y-1 text-xs">
+                                    {/* Focus on days to lose - this is the primary concern */}
                                     {willLose > 0 && (
                                       <div className="flex items-center gap-1.5 text-red-700 dark:text-red-400 font-medium">
                                         <ExclamationTriangleIcon className="h-3.5 w-3.5" />
-                                        <span>Will lose {Math.round(willLose)} day{willLose !== 1 ? 's' : ''} at year end</span>
+                                        <span className="font-semibold">Will lose {Math.round(willLose)} day{willLose !== 1 ? 's' : ''} at year end</span>
                                       </div>
                                     )}
-                                    {isLowBalance && remainingBalance > 0 && (
-                                      <div className="flex items-center gap-1.5 text-yellow-700 dark:text-yellow-400">
-                                        <ClockIcon className="h-3.5 w-3.5" />
-                                        <span>Low balance: {Math.round(remainingBalance)} remaining</span>
-                                      </div>
-                                    )}
+                                    {/* Show remaining balance for context */}
+                                    <div className="text-gray-600 dark:text-gray-400 mt-1">
+                                      {Math.round(remainingBalance)} days remaining
+                                    </div>
+                                    {/* Show realistic usable days if significantly less than remaining */}
                                     {realisticUsableDays < remainingBalance && remainingBalance > 0 && (
-                                      <div className="text-gray-600 dark:text-gray-400">
+                                      <div className="text-gray-500 dark:text-gray-500 text-xs">
                                         Only {Math.round(realisticUsableDays)} realistic days available
                                       </div>
                                     )}
@@ -901,15 +883,37 @@ export default function LeaderDashboard() {
                                 {index === 0 && willLose > 0 && (
                                   <div className="flex-shrink-0">
                                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-600 text-white uppercase tracking-wider">
-                                      Urgent
+                                      Highest Risk
                                     </span>
                                   </div>
                                 )}
                               </div>
                               <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700 mt-2">
                                 <span className="text-xs text-gray-600 dark:text-gray-400">Balance</span>
-                                <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                                  {Math.round(remainingBalance)} / {Math.round(maxLeavePerYear)}
+                                <span className={`text-sm font-semibold ${
+                                  remainingBalance < 0 
+                                    ? (() => {
+                                        const memberCompassionateRequests = allRequests.filter(req => 
+                                          req.userId === member._id && 
+                                          req.status === 'approved' && 
+                                          req.reason && 
+                                          (isMaternityLeave(req.reason) || 
+                                           req.reason.toLowerCase().includes('sick') ||
+                                           req.reason.toLowerCase().includes('bereavement') ||
+                                           req.reason.toLowerCase().includes('medical') ||
+                                           req.reason.toLowerCase().includes('family emergency') ||
+                                           req.reason.toLowerCase().includes('emergency'))
+                                        );
+                                        return memberCompassionateRequests.length > 0
+                                          ? 'text-pink-600 dark:text-pink-400'
+                                          : 'text-red-600 dark:text-red-400';
+                                      })()
+                                    : 'text-gray-900 dark:text-white'
+                                }`}>
+                                  {remainingBalance < 0 
+                                    ? `-${Math.round(Math.abs(remainingBalance))} / ${Math.round(maxLeavePerYear)}`
+                                    : `${Math.round(remainingBalance)} / ${Math.round(maxLeavePerYear)}`
+                                  }
                                 </span>
                               </div>
                             </div>

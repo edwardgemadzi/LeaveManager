@@ -420,21 +420,103 @@ export default function MemberDashboard() {
             </div>
 
             {/* Leave Balance Card */}
-            <div className="stat-card group">
+            {(() => {
+              const isNegative = analytics && analytics.remainingLeaveBalance < 0;
+              const maternityBalance = getMaternityLeaveBalance();
+              const hasCompassionateLeave = isNegative && (
+                maternityBalance.daysUsed > 0 || 
+                myRequests.some(req => 
+                  req.status === 'approved' && 
+                  req.reason && 
+                  (isMaternityLeave(req.reason) || 
+                   req.reason.toLowerCase().includes('sick') ||
+                   req.reason.toLowerCase().includes('bereavement') ||
+                   req.reason.toLowerCase().includes('medical') ||
+                   req.reason.toLowerCase().includes('family emergency') ||
+                   req.reason.toLowerCase().includes('emergency'))
+                )
+              );
+              
+              return (
+                <div className={`stat-card group ${isNegative ? (hasCompassionateLeave ? 'border-2 border-pink-300 dark:border-pink-700 bg-pink-50 dark:bg-pink-900/30' : 'border-2 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30') : ''}`}>
               <div className="p-5 sm:p-6">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Leave Balance</p>
-                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
-                      {Math.round(leaveBalance.balance)} / {team?.settings.maxLeavePerYear || 20}
+                    <p className={`text-3xl sm:text-4xl font-bold mb-1 fade-in ${
+                      analytics && analytics.remainingLeaveBalance < 0 
+                        ? (hasCompassionateLeave 
+                            ? 'text-pink-600 dark:text-pink-400' 
+                            : 'text-red-600 dark:text-red-400')
+                        : 'text-gray-900 dark:text-white'
+                    }`}>
+                      {analytics && analytics.remainingLeaveBalance < 0 ? (
+                        <>-{Math.round(Math.abs(analytics.remainingLeaveBalance))} / {team?.settings.maxLeavePerYear || 20}</>
+                      ) : (
+                        <>{Math.round(leaveBalance.balance)} / {team?.settings.maxLeavePerYear || 20}</>
+                      )}
                     </p>
                     <div className="mt-2 space-y-1">
+                      {analytics && analytics.remainingLeaveBalance < 0 && (() => {
+                        const maternityBalance = getMaternityLeaveBalance();
+                        const hasTakenMaternityLeave = maternityBalance.daysUsed > 0;
+                        
+                        // Check for other compassionate leave reasons
+                        const compassionateRequests = myRequests.filter(req => 
+                          req.status === 'approved' && 
+                          req.reason && 
+                          (isMaternityLeave(req.reason) || 
+                           req.reason.toLowerCase().includes('sick') ||
+                           req.reason.toLowerCase().includes('bereavement') ||
+                           req.reason.toLowerCase().includes('medical') ||
+                           req.reason.toLowerCase().includes('family emergency') ||
+                           req.reason.toLowerCase().includes('emergency'))
+                        );
+                        const hasCompassionateLeave = hasTakenMaternityLeave || compassionateRequests.length > 0;
+                        
+                        // Determine compassionate reason for message
+                        let compassionateNote = '';
+                        if (hasCompassionateLeave) {
+                          if (hasTakenMaternityLeave) {
+                            compassionateNote = ' - maternity/paternity leave noted, will be adjusted next year';
+                          } else if (compassionateRequests.some(r => r.reason?.toLowerCase().includes('sick'))) {
+                            compassionateNote = ' - sick leave noted, will be adjusted next year';
+                          } else if (compassionateRequests.some(r => r.reason?.toLowerCase().includes('bereavement'))) {
+                            compassionateNote = ' - bereavement leave noted, will be adjusted next year';
+                          } else if (compassionateRequests.some(r => r.reason?.toLowerCase().includes('medical'))) {
+                            compassionateNote = ' - medical leave noted, will be adjusted next year';
+                          } else if (compassionateRequests.some(r => r.reason?.toLowerCase().includes('emergency'))) {
+                            compassionateNote = ' - emergency leave noted, will be adjusted next year';
+                          } else {
+                            compassionateNote = ' - necessary leave noted, will be adjusted next year';
+                          }
+                        } else {
+                          compassionateNote = ' - will be adjusted in next year\'s allocation';
+                        }
+                        
+                        const iconColor = hasCompassionateLeave 
+                          ? 'text-pink-600 dark:text-pink-400'
+                          : 'text-red-600 dark:text-red-400';
+                        const textColor = hasCompassionateLeave 
+                          ? 'text-pink-700 dark:text-pink-400'
+                          : 'text-red-700 dark:text-red-400';
+                        
+                        return (
+                          <div className="flex items-start gap-1.5">
+                            <ExclamationTriangleIcon className={`h-4 w-4 ${iconColor} flex-shrink-0 mt-0.5`} />
+                            <p className={`text-xs ${textColor} font-medium`}>
+                              {Math.round(Math.abs(analytics.remainingLeaveBalance))} day{Math.abs(analytics.remainingLeaveBalance) !== 1 ? 's' : ''} over allocated
+                              {compassionateNote}
+                            </p>
+                          </div>
+                        );
+                      })()}
                       {leaveBalance.surplus > 0 && (
                         <p className="text-xs text-green-600 dark:text-green-400 font-medium">
                           +{Math.round(leaveBalance.surplus)} surplus
                         </p>
                       )}
-                      {analytics && (() => {
+                      {analytics && analytics.remainingLeaveBalance >= 0 && (() => {
                         const realisticUsableDays = analytics.realisticUsableDays ?? 0;
                         const remainingBalance = analytics.remainingLeaveBalance ?? leaveBalance.balance;
                         const willLoseDays = analytics.willLose ?? (realisticUsableDays < remainingBalance ? remainingBalance - realisticUsableDays : 0);
@@ -453,15 +535,46 @@ export default function MemberDashboard() {
                     {(() => {
                       const realisticUsableDays = analytics?.realisticUsableDays ?? 0;
                       const remainingBalance = analytics?.remainingLeaveBalance ?? leaveBalance.balance;
-                      const iconBg = realisticUsableDays >= remainingBalance
+                      const isNegative = analytics && analytics.remainingLeaveBalance < 0;
+                      
+                      // Check for compassionate leave if negative
+                      let hasCompassionateLeave = false;
+                      if (isNegative) {
+                        const maternityBalance = getMaternityLeaveBalance();
+                        hasCompassionateLeave = maternityBalance.daysUsed > 0 || 
+                          myRequests.some(req => 
+                            req.status === 'approved' && 
+                            req.reason && 
+                            (isMaternityLeave(req.reason) || 
+                             req.reason.toLowerCase().includes('sick') ||
+                             req.reason.toLowerCase().includes('bereavement') ||
+                             req.reason.toLowerCase().includes('medical') ||
+                             req.reason.toLowerCase().includes('family emergency') ||
+                             req.reason.toLowerCase().includes('emergency'))
+                          );
+                      }
+                      
+                      const iconBg = isNegative
+                        ? (hasCompassionateLeave 
+                            ? 'bg-pink-100 dark:bg-pink-900/30'
+                            : 'bg-red-100 dark:bg-red-900/30')
+                        : realisticUsableDays >= remainingBalance
                         ? 'bg-green-100 dark:bg-green-900/30'
                         : 'bg-orange-100 dark:bg-orange-900/30';
-                      const iconColor = realisticUsableDays >= remainingBalance
+                      const iconColor = isNegative
+                        ? (hasCompassionateLeave 
+                            ? 'text-pink-700 dark:text-pink-400'
+                            : 'text-red-700 dark:text-red-400')
+                        : realisticUsableDays >= remainingBalance
                         ? 'text-green-700 dark:text-green-400'
                         : 'text-orange-700 dark:text-orange-400';
                       return (
                         <div className={`w-12 h-12 ${iconBg} rounded-xl flex items-center justify-center`}>
-                          <CalendarIcon className={`h-6 w-6 ${iconColor}`} />
+                          {isNegative ? (
+                            <ExclamationTriangleIcon className={`h-6 w-6 ${iconColor}`} />
+                          ) : (
+                            <CalendarIcon className={`h-6 w-6 ${iconColor}`} />
+                          )}
                         </div>
                       );
                     })()}
@@ -469,6 +582,8 @@ export default function MemberDashboard() {
                 </div>
               </div>
             </div>
+              );
+            })()}
 
             {/* Working Days Taken Card */}
             <div className="stat-card group">
@@ -550,6 +665,8 @@ export default function MemberDashboard() {
             const remainingBalance = analytics.remainingLeaveBalance ?? 0;
             const willLoseDays = analytics.willLose ?? 0;
             const willCarryoverDays = analytics.willCarryover ?? 0;
+            const isNegativeBalance = remainingBalance < 0;
+            const negativeBalanceAmount = isNegativeBalance ? Math.abs(remainingBalance) : 0;
             
             // Determine score and status
             let score = 'excellent';
@@ -562,8 +679,67 @@ export default function MemberDashboard() {
             let message = '';
             let scoreLabel = 'Excellent';
             
-            // Score logic based on leave situation
-            if (realisticUsableDays >= remainingBalance && remainingBalance > 0) {
+            // Score logic based on leave situation - Negative balance takes highest priority
+            if (isNegativeBalance) {
+              // Check if user has taken compassionate leave this year (maternity, sick, bereavement, medical, etc.)
+              const maternityBalance = getMaternityLeaveBalance();
+              const hasTakenMaternityLeave = maternityBalance.daysUsed > 0;
+              
+              // Check for other compassionate leave reasons
+              const compassionateRequests = myRequests.filter(req => 
+                req.status === 'approved' && 
+                req.reason && 
+                (isMaternityLeave(req.reason) || 
+                 req.reason.toLowerCase().includes('sick') ||
+                 req.reason.toLowerCase().includes('bereavement') ||
+                 req.reason.toLowerCase().includes('medical') ||
+                 req.reason.toLowerCase().includes('family emergency') ||
+                 req.reason.toLowerCase().includes('emergency'))
+              );
+              const hasCompassionateLeave = hasTakenMaternityLeave || compassionateRequests.length > 0;
+              
+              if (hasCompassionateLeave) {
+                // Softer colors (maternity/pink tones) for compassionate leave
+                score = 'critical';
+                gradientColors = 'from-pink-500 via-rose-500 to-pink-600';
+                bgGradient = 'bg-gradient-to-br from-pink-50 to-rose-50 dark:from-pink-900/20 dark:to-rose-900/20';
+                borderColor = 'border-pink-400 dark:border-pink-600';
+                textColor = 'text-pink-800 dark:text-pink-200';
+                badgeColor = 'bg-pink-200 dark:bg-pink-900/50 text-pink-900 dark:text-pink-100';
+                
+                // Determine specific compassionate reason for message
+                let compassionateReason = '';
+                if (hasTakenMaternityLeave) {
+                  compassionateReason = 'maternity/paternity leave';
+                } else if (compassionateRequests.some(r => r.reason?.toLowerCase().includes('sick'))) {
+                  compassionateReason = 'sick leave';
+                } else if (compassionateRequests.some(r => r.reason?.toLowerCase().includes('bereavement'))) {
+                  compassionateReason = 'bereavement leave';
+                } else if (compassionateRequests.some(r => r.reason?.toLowerCase().includes('medical'))) {
+                  compassionateReason = 'medical leave';
+                } else if (compassionateRequests.some(r => r.reason?.toLowerCase().includes('emergency'))) {
+                  compassionateReason = 'emergency leave';
+                } else {
+                  compassionateReason = 'necessary leave';
+                }
+                
+                quote = 'Taking necessary leave is important.';
+                message = `You've used ${Math.round(negativeBalanceAmount)} more day${negativeBalanceAmount !== 1 ? 's' : ''} than your allocated regular leave this year. We understand that ${compassionateReason} is necessary and important. This will be adjusted in your next year's allocation. Please coordinate with your team leader to discuss how this will be handled.`;
+                scoreLabel = 'Over Allocated';
+              } else {
+                // Harsh red colors only when it's regular leave over-allocation
+                score = 'critical';
+                gradientColors = 'from-red-700 via-rose-700 to-pink-700';
+                bgGradient = 'bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/30 dark:to-rose-900/30';
+                borderColor = 'border-red-500 dark:border-red-500';
+                textColor = 'text-red-800 dark:text-red-200';
+                badgeColor = 'bg-red-200 dark:bg-red-900/70 text-red-900 dark:text-red-100';
+                
+                quote = 'Taking time off when needed is important.';
+                message = `You've used ${Math.round(negativeBalanceAmount)} more day${negativeBalanceAmount !== 1 ? 's' : ''} than your allocated leave this year. This is understandable - sometimes leave is needed beyond what's allocated. This will be adjusted in your next year's leave allocation. Please coordinate with your team leader to discuss how this will be handled.`;
+                scoreLabel = 'Over Allocated';
+              }
+            } else if (realisticUsableDays >= remainingBalance && remainingBalance > 0) {
               // Excellent: Can use all remaining days
               score = 'excellent';
               gradientColors = 'from-green-500 via-emerald-500 to-teal-500';
@@ -620,11 +796,13 @@ export default function MemberDashboard() {
               scoreLabel = 'Requires Planning';
             }
             
-            // Add messages about carryover or loss
-            if (willCarryoverDays > 0) {
-              message += ` Great news: ${Math.round(willCarryoverDays)} days will carry over to next year!`;
-            } else if (willLoseDays > 0) {
-              message += ` Note: ${Math.round(willLoseDays)} days will be lost at year end if not used.`;
+            // Add messages about carryover or loss (only if not negative balance)
+            if (!isNegativeBalance) {
+              if (willCarryoverDays > 0) {
+                message += ` Great news: ${Math.round(willCarryoverDays)} days will carry over to next year!`;
+              } else if (willLoseDays > 0) {
+                message += ` Note: ${Math.round(willLoseDays)} days will be lost at year end if not used.`;
+              }
             }
             
             return (
@@ -647,7 +825,10 @@ export default function MemberDashboard() {
                         </div>
                       </div>
                       <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold ${badgeColor} shadow-md`}>
-                        {Math.round(realisticUsableDays)} / {Math.round(remainingBalance)} days usable
+                        {isNegativeBalance 
+                          ? `${Math.round(negativeBalanceAmount)} days over limit`
+                          : `${Math.round(realisticUsableDays)} / ${Math.round(remainingBalance)} days usable`
+                        }
                       </span>
                     </div>
                     

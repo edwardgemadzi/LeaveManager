@@ -6,7 +6,7 @@ import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { Team, User, LeaveRequest } from '@/types';
 import { GroupedTeamAnalytics, getMaternityMemberAnalytics } from '@/lib/analyticsCalculations';
 import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
-// Removed unused imports: calculateMaternityLeaveBalance, isMaternityLeave, countMaternityLeaveDays
+import { isMaternityLeave } from '@/lib/leaveCalculations';
 import { UsersIcon, CalendarIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 
 export default function LeaderAnalyticsPage() {
@@ -569,16 +569,127 @@ export default function LeaderAnalyticsPage() {
                                           return 'text-red-500 dark:text-red-400'; // Bad - will lose some days
                                         }
                                       })();
+                                  const isNegative = member.analytics.remainingLeaveBalance < 0;
+                                  
+                                  // Check for compassionate leave if negative
+                                  let hasCompassionateLeave = false;
+                                  if (isNegative) {
+                                    const memberCompassionateRequests = allRequests.filter(req => 
+                                      req.userId === member.userId && 
+                                      req.status === 'approved' && 
+                                      req.reason && 
+                                      (isMaternityLeave(req.reason) || 
+                                       req.reason.toLowerCase().includes('sick') ||
+                                       req.reason.toLowerCase().includes('bereavement') ||
+                                       req.reason.toLowerCase().includes('medical') ||
+                                       req.reason.toLowerCase().includes('family emergency') ||
+                                       req.reason.toLowerCase().includes('emergency'))
+                                    );
+                                    hasCompassionateLeave = memberCompassionateRequests.length > 0;
+                                  }
+                                  
                                   return (
-                                    <p className={`font-medium ${balanceColor}`}>
-                                      {Math.round(member.analytics.remainingLeaveBalance)}
-                                      <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">(remaining)</span>
-                                      {member.analytics.surplusBalance > 0 && (
-                                        <span className="ml-1 text-xs text-green-600 dark:text-green-400">
-                                          (+{Math.round(member.analytics.surplusBalance)})
-                                        </span>
-                                      )}
-                                    </p>
+                                    <div>
+                                      <p className={`font-medium ${isNegative ? (hasCompassionateLeave ? 'text-pink-600 dark:text-pink-400' : 'text-red-600 dark:text-red-400') : balanceColor}`}>
+                                        {isNegative 
+                                          ? `-${Math.round(Math.abs(member.analytics.remainingLeaveBalance))}`
+                                          : Math.round(member.analytics.remainingLeaveBalance)
+                                        }
+                                        <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">(remaining)</span>
+                                        {isNegative && (() => {
+                                          // Check if member has taken compassionate leave (maternity, sick, bereavement, medical, etc.)
+                                          const memberCompassionateRequests = allRequests.filter(req => 
+                                            req.userId === member.userId && 
+                                            req.status === 'approved' && 
+                                            req.reason && 
+                                            (isMaternityLeave(req.reason) || 
+                                             req.reason.toLowerCase().includes('sick') ||
+                                             req.reason.toLowerCase().includes('bereavement') ||
+                                             req.reason.toLowerCase().includes('medical') ||
+                                             req.reason.toLowerCase().includes('family emergency') ||
+                                             req.reason.toLowerCase().includes('emergency'))
+                                          );
+                                          const hasCompassionateLeave = memberCompassionateRequests.length > 0;
+                                          
+                                          // Determine compassionate reason for message
+                                          let compassionateNote = '';
+                                          if (hasCompassionateLeave) {
+                                            if (memberCompassionateRequests.some(r => isMaternityLeave(r.reason || ''))) {
+                                              compassionateNote = ' (maternity/paternity noted)';
+                                            } else if (memberCompassionateRequests.some(r => r.reason?.toLowerCase().includes('sick'))) {
+                                              compassionateNote = ' (sick leave noted)';
+                                            } else if (memberCompassionateRequests.some(r => r.reason?.toLowerCase().includes('bereavement'))) {
+                                              compassionateNote = ' (bereavement leave noted)';
+                                            } else if (memberCompassionateRequests.some(r => r.reason?.toLowerCase().includes('medical'))) {
+                                              compassionateNote = ' (medical leave noted)';
+                                            } else if (memberCompassionateRequests.some(r => r.reason?.toLowerCase().includes('emergency'))) {
+                                              compassionateNote = ' (emergency leave noted)';
+                                            } else {
+                                              compassionateNote = ' (necessary leave noted)';
+                                            }
+                                          }
+                                          
+                                          const textColor = hasCompassionateLeave 
+                                            ? 'text-pink-600 dark:text-pink-400'
+                                            : 'text-red-600 dark:text-red-400';
+                                          
+                                          return (
+                                            <span className={`ml-1 text-xs ${textColor} font-medium`}>
+                                              will be adjusted next year{compassionateNote}
+                                            </span>
+                                          );
+                                        })()}
+                                        {member.analytics.surplusBalance > 0 && !isNegative && (
+                                          <span className="ml-1 text-xs text-green-600 dark:text-green-400">
+                                            (+{Math.round(member.analytics.surplusBalance)})
+                                          </span>
+                                        )}
+                                      </p>
+                                      {isNegative && (() => {
+                                        // Check if member has taken compassionate leave (maternity, sick, bereavement, medical, etc.)
+                                        const memberCompassionateRequests = allRequests.filter(req => 
+                                          req.userId === member.userId && 
+                                          req.status === 'approved' && 
+                                          req.reason && 
+                                          (isMaternityLeave(req.reason) || 
+                                           req.reason.toLowerCase().includes('sick') ||
+                                           req.reason.toLowerCase().includes('bereavement') ||
+                                           req.reason.toLowerCase().includes('medical') ||
+                                           req.reason.toLowerCase().includes('family emergency') ||
+                                           req.reason.toLowerCase().includes('emergency'))
+                                        );
+                                        const hasCompassionateLeave = memberCompassionateRequests.length > 0;
+                                        
+                                        // Determine compassionate reason for message
+                                        let compassionateNote = '';
+                                        if (hasCompassionateLeave) {
+                                          if (memberCompassionateRequests.some(r => isMaternityLeave(r.reason || ''))) {
+                                            compassionateNote = ' - maternity/paternity leave noted';
+                                          } else if (memberCompassionateRequests.some(r => r.reason?.toLowerCase().includes('sick'))) {
+                                            compassionateNote = ' - sick leave noted';
+                                          } else if (memberCompassionateRequests.some(r => r.reason?.toLowerCase().includes('bereavement'))) {
+                                            compassionateNote = ' - bereavement leave noted';
+                                          } else if (memberCompassionateRequests.some(r => r.reason?.toLowerCase().includes('medical'))) {
+                                            compassionateNote = ' - medical leave noted';
+                                          } else if (memberCompassionateRequests.some(r => r.reason?.toLowerCase().includes('emergency'))) {
+                                            compassionateNote = ' - emergency leave noted';
+                                          } else {
+                                            compassionateNote = ' - necessary leave noted';
+                                          }
+                                        }
+                                        
+                                        const textColor = hasCompassionateLeave 
+                                          ? 'text-pink-600 dark:text-pink-400'
+                                          : 'text-red-600 dark:text-red-400';
+                                        
+                                        return (
+                                          <p className={`text-xs ${textColor} mt-0.5 font-medium`}>
+                                            {Math.round(Math.abs(member.analytics.remainingLeaveBalance))} day{Math.abs(member.analytics.remainingLeaveBalance) !== 1 ? 's' : ''} over allocated
+                                            {compassionateNote}
+                                          </p>
+                                        );
+                                      })()}
+                                    </div>
                                   );
                                 })()}
                                 {/* Show base balance if different from remaining balance */}

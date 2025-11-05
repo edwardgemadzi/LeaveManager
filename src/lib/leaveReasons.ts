@@ -39,3 +39,42 @@ export const isEmergencyReason = (reason: string): boolean => {
   return EMERGENCY_REASONS.some(er => er.value === reason);
 };
 
+// Helper function to check if a leave reason is compassionate/necessary
+// These reasons justify going over allocated leave and should be treated with understanding
+export const isCompassionateLeaveReason = (reason: string): boolean => {
+  if (!reason) return false;
+  const lowerReason = reason.toLowerCase();
+  
+  // Check for maternity/paternity
+  if (lowerReason === 'maternity' || lowerReason.includes('maternity') || lowerReason.includes('paternity')) {
+    return true;
+  }
+  
+  // Check for sick leave
+  if (lowerReason === 'sick' || lowerReason.includes('sick') || lowerReason.includes('illness')) {
+    return true;
+  }
+  
+  // Check for bereavement
+  if (lowerReason === 'bereavement' || lowerReason.includes('bereavement') || lowerReason.includes('death') || lowerReason.includes('funeral')) {
+    return true;
+  }
+  
+  // Check for medical reasons
+  if (lowerReason === 'medical' || lowerReason.includes('medical') || lowerReason.includes('doctor') || lowerReason.includes('hospital')) {
+    return true;
+  }
+  
+  // Check for family emergencies
+  if (lowerReason === 'family' || lowerReason.includes('family emergency') || lowerReason.includes('family crisis')) {
+    return true;
+  }
+  
+  // Check for emergency reasons
+  if (isEmergencyReason(reason)) {
+    return true;
+  }
+  
+  return false;
+};
+
