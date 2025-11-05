@@ -636,7 +636,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
           events={events}
           startAccessor="start"
           endAccessor="end"
-          style={{ height: '700px' }}
+          style={{ height: '850px' }}
           eventPropGetter={eventStyleGetter}
           dayPropGetter={dayPropGetter}
           views={[Views.MONTH, Views.WEEK]}

@@ -87,7 +87,10 @@ export default function MemberCalendarPage() {
       <div className="min-h-screen bg-gray-50 dark:bg-black">
         <Navbar />
         <div className="flex items-center justify-center h-64 pt-24">
-          <div className="animate-spin rounded-full h-32 w-32 border-2 border-gray-200 dark:border-gray-800 border-t-gray-400 dark:border-t-gray-500"></div>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-indigo-600 dark:border-t-indigo-400 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">Loading calendar...</p>
+          </div>
         </div>
       </div>
     );
@@ -97,21 +100,22 @@ export default function MemberCalendarPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       <Navbar />
       
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 pt-24">
-        <div className="px-4 py-6 sm:px-0">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+      <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12">
+        {/* Header Section - Enhanced */}
+        <div className="mb-8 fade-in">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">
             {team?.settings?.enableSubgrouping && user?.subgroupTag 
               ? `${user.subgroupTag} Calendar`
               : 'Team Calendar'}
           </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-400">
+          <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400">
             {team?.settings?.enableSubgrouping && user?.subgroupTag
-              ? `View all leave requests for your subgroup.`
-              : 'View all leave requests for your team.'}
+              ? `View all leave requests for your subgroup`
+              : 'View all leave requests for your team'}
           </p>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 shadow-xl rounded-none border border-gray-200 dark:border-gray-800 relative z-10">
+        <div className="card rounded-none relative z-10">
           <div className="px-6 py-8 relative z-10">
             {team?._id ? (
               <TeamCalendar 

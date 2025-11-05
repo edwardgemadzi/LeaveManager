@@ -165,9 +165,12 @@ export default function MemberProfilePage() {
       <ProtectedRoute requiredRole="member">
         <div className="min-h-screen bg-gray-50 dark:bg-black">
           <Navbar />
-          <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 pt-24">
+          <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12">
             <div className="flex justify-center items-center h-64">
-              <div className="spinner w-8 h-8"></div>
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-indigo-600 dark:border-t-indigo-400 mx-auto mb-4"></div>
+                <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">Loading profile...</p>
+              </div>
             </div>
           </div>
         </div>
@@ -179,16 +182,17 @@ export default function MemberProfilePage() {
     <ProtectedRoute requiredRole="member">
       <div className="min-h-screen bg-gray-50 dark:bg-black">
         <Navbar />
-        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 pt-24">
-          <div className="px-4 py-6 sm:px-0">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Profile</h1>
-            <p className="mt-2 text-gray-600 dark:text-gray-400">Manage your account settings and password.</p>
+        <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12">
+          {/* Header Section - Enhanced */}
+          <div className="mb-8 fade-in">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">My Profile</h1>
+            <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400">Manage your account settings and password</p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
             {/* Profile Information */}
-            <div className="bg-white dark:bg-gray-900 shadow-xl rounded-xl border border-gray-200 dark:border-gray-800">
-              <div className="p-6">
+            <div className="card">
+              <div className="p-5 sm:p-6">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Profile Information</h2>
                 
                 <form onSubmit={handleProfileUpdate} className="space-y-4">
@@ -279,7 +283,7 @@ export default function MemberProfilePage() {
                   <button
                     type="submit"
                     disabled={updatingProfile}
-                    className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-900 disabled:opacity-50"
+                    className="btn-primary w-full disabled:opacity-50"
                   >
                     {updatingProfile ? 'Updating...' : 'Update Profile'}
                   </button>
@@ -288,8 +292,8 @@ export default function MemberProfilePage() {
             </div>
 
             {/* Change Password */}
-            <div className="bg-white dark:bg-gray-900 shadow-xl rounded-xl border border-gray-200 dark:border-gray-800">
-              <div className="p-6">
+            <div className="card">
+              <div className="p-5 sm:p-6">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Change Password</h2>
                 
                 <form onSubmit={handlePasswordChange} className="space-y-4">
@@ -362,7 +366,7 @@ export default function MemberProfilePage() {
                   <button
                     type="submit"
                     disabled={changingPassword}
-                    className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-900 disabled:opacity-50"
+                    className="btn-primary w-full disabled:opacity-50"
                   >
                     {changingPassword ? 'Changing Password...' : 'Change Password'}
                   </button>

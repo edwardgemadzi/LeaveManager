@@ -5,7 +5,7 @@ import Navbar from '@/components/shared/Navbar';
 import MigrationCalendar from '@/components/shared/MigrationCalendar';
 import { LeaveRequest, User } from '@/types';
 import { LEAVE_REASONS, EMERGENCY_REASONS, isEmergencyReason } from '@/lib/leaveReasons';
-import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { ExclamationTriangleIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 
 export default function LeaderRequestsPage() {
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
@@ -360,7 +360,10 @@ export default function LeaderRequestsPage() {
       <div className="min-h-screen bg-gray-50 dark:bg-black">
         <Navbar />
         <div className="flex items-center justify-center h-64 pt-24">
-          <div className="animate-spin rounded-full h-32 w-32 border-2 border-gray-200 dark:border-gray-800 border-t-gray-400 dark:border-t-gray-500"></div>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-indigo-600 dark:border-t-indigo-400 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">Loading requests...</p>
+          </div>
         </div>
       </div>
     );
@@ -370,56 +373,67 @@ export default function LeaderRequestsPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       <Navbar />
       
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 pt-24">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="flex justify-between items-center">
+      <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12">
+        {/* Header Section - Enhanced */}
+        <div className="mb-8 fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Team Requests</h1>
-              <p className="mt-2 text-gray-600 dark:text-gray-400">Manage leave requests from your team members.</p>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">Team Requests</h1>
+              <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400">Manage leave requests from your team members</p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               <button
                 onClick={() => setShowMigrationForm(!showMigrationForm)}
-                className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                className="btn-primary flex items-center justify-center gap-2 px-4 py-2.5"
               >
                 Historical Entry
               </button>
               <button
                 onClick={() => setShowEmergencyForm(!showEmergencyForm)}
-                className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                className="btn-danger flex items-center justify-center gap-2 px-4 py-2.5"
               >
-                <span className="flex items-center gap-2">
-                  <ExclamationTriangleIcon className="h-5 w-5" />
-                  Emergency Request
-                </span>
+                <ExclamationTriangleIcon className="h-5 w-5" />
+                Emergency Request
               </button>
             </div>
           </div>
         </div>
 
-        {/* Historical/Migration Entry Form */}
+        {/* Historical/Migration Entry Form - Enhanced */}
         {showMigrationForm && (
-          <div className="mb-6 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
-            <h2 className="text-lg font-medium text-blue-900 dark:text-blue-300 mb-4">
-              Add Historical Leave Entries
-            </h2>
-            <p className="text-sm text-blue-700 dark:text-blue-400 mb-4">
-              Use this to record leave that has already been taken (for migration purposes). Select a member, then click dates on the calendar to select multiple leave periods. Historical entries are automatically approved and bypass notice period and concurrent leave restrictions.
-            </p>
+          <div className="card mb-8 bg-blue-50/50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+            <div className="p-5 sm:p-6">
+              <div className="flex items-start gap-4 mb-6">
+                <div className="flex-shrink-0">
+                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/40 rounded-lg flex items-center justify-center">
+                    <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-xl font-bold text-blue-900 dark:text-blue-200 mb-2">
+                    Add Historical Leave Entries
+                  </h2>
+                  <p className="text-sm text-blue-800 dark:text-blue-300">
+                    Use this to record leave that has already been taken (for migration purposes). Select a member, then click dates on the calendar to select multiple leave periods. Historical entries are automatically approved and bypass notice period and concurrent leave restrictions.
+                  </p>
+                </div>
+              </div>
             
-            <form onSubmit={handleMigrationRequest} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="migrationMemberId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Select Member
-                  </label>
-                  <select
-                    id="migrationMemberId"
-                    required
-                    value={migrationForm.memberId}
-                    onChange={(e) => setMigrationForm({ ...migrationForm, memberId: e.target.value })}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
-                  >
+              <form onSubmit={handleMigrationRequest} className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div>
+                    <label htmlFor="migrationMemberId" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      Select Member
+                    </label>
+                    <select
+                      id="migrationMemberId"
+                      required
+                      value={migrationForm.memberId}
+                      onChange={(e) => setMigrationForm({ ...migrationForm, memberId: e.target.value })}
+                      className="input-modern w-full"
+                    >
                     <option value="">Choose a member...</option>
                     {members.filter(member => member.role !== 'leader').map((member) => (
                       <option key={member._id} value={member._id}>
@@ -429,17 +443,17 @@ export default function LeaderRequestsPage() {
                   </select>
                 </div>
 
-                <div>
-                  <label htmlFor="migrationReason" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Reason (applies to all selected periods)
-                  </label>
-                  <select
-                    id="migrationReason"
-                    required
-                    value={selectedReasonType}
-                    onChange={(e) => handleMigrationReasonChange(e.target.value)}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
-                  >
+                  <div>
+                    <label htmlFor="migrationReason" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      Reason (applies to all selected periods)
+                    </label>
+                    <select
+                      id="migrationReason"
+                      required
+                      value={selectedReasonType}
+                      onChange={(e) => handleMigrationReasonChange(e.target.value)}
+                      className="input-modern w-full"
+                    >
                     <option value="">Select a reason...</option>
                     {LEAVE_REASONS.map((reason) => (
                       <option key={reason.value} value={reason.value}>
@@ -448,87 +462,97 @@ export default function LeaderRequestsPage() {
                     ))}
                   </select>
                   
-                  {selectedReasonType === 'other' && (
-                    <div className="mt-3">
-                      <label htmlFor="migrationCustomReason" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Please specify
-                      </label>
-                      <textarea
-                        id="migrationCustomReason"
-                        rows={3}
-                        required
-                        value={migrationForm.customReason}
-                        onChange={(e) => setMigrationForm({ ...migrationForm, customReason: e.target.value })}
-                        placeholder="Please provide details for the leave reason..."
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
-                      />
-                    </div>
-                  )}
+                    {selectedReasonType === 'other' && (
+                      <div className="mt-4">
+                        <label htmlFor="migrationCustomReason" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                          Please specify
+                        </label>
+                        <textarea
+                          id="migrationCustomReason"
+                          rows={3}
+                          required
+                          value={migrationForm.customReason}
+                          onChange={(e) => setMigrationForm({ ...migrationForm, customReason: e.target.value })}
+                          placeholder="Please provide details for the leave reason..."
+                          className="input-modern w-full"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              {/* Calendar Component */}
-              <div className="mt-6">
-                <MigrationCalendar
-                  selectedMemberId={migrationForm.memberId}
-                  onRangesChange={setSelectedRanges}
-                  existingRanges={existingRanges}
-                />
-              </div>
+                {/* Calendar Component */}
+                <div className="mt-6">
+                  <MigrationCalendar
+                    selectedMemberId={migrationForm.memberId}
+                    onRangesChange={setSelectedRanges}
+                    existingRanges={existingRanges}
+                  />
+                </div>
 
-              <div className="flex justify-end space-x-3 mt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowMigrationForm(false);
-                    setSelectedRanges([]);
-                    setExistingRanges([]);
-                    setMigrationForm({ memberId: '', reason: '', customReason: '' });
-                    setSelectedReasonType('');
-                  }}
-                  className="bg-gray-500 hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingMigration || selectedRanges.length === 0}
-                  className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {submittingMigration 
-                    ? `Creating ${selectedRanges.length} entries...` 
-                    : `Add ${selectedRanges.length} Historical ${selectedRanges.length === 1 ? 'Entry' : 'Entries'}`
-                  }
-                </button>
-              </div>
-            </form>
+                <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6 pt-6 border-t border-gray-200 dark:border-gray-800">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMigrationForm(false);
+                      setSelectedRanges([]);
+                      setExistingRanges([]);
+                      setMigrationForm({ memberId: '', reason: '', customReason: '' });
+                      setSelectedReasonType('');
+                    }}
+                    className="btn-secondary px-4 py-2.5"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingMigration || selectedRanges.length === 0}
+                    className="btn-primary px-4 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {submittingMigration 
+                      ? `Creating ${selectedRanges.length} entries...` 
+                      : `Add ${selectedRanges.length} Historical ${selectedRanges.length === 1 ? 'Entry' : 'Entries'}`
+                    }
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
 
-        {/* Emergency Request Form */}
+        {/* Emergency Request Form - Enhanced */}
         {showEmergencyForm && (
-          <div className="mb-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-6">
-            <h2 className="text-lg font-medium text-red-900 dark:text-red-300 mb-4 flex items-center gap-2">
-              <ExclamationTriangleIcon className="h-6 w-6" />
-              Create Emergency Leave Request
-            </h2>
-            <p className="text-sm text-red-700 dark:text-red-400 mb-4">
-              This will create an emergency leave request that bypasses normal team settings and is automatically approved.
-            </p>
+          <div className="card mb-8 bg-red-50/50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
+            <div className="p-5 sm:p-6">
+              <div className="flex items-start gap-4 mb-6">
+                <div className="flex-shrink-0">
+                  <div className="w-10 h-10 bg-red-100 dark:bg-red-900/40 rounded-lg flex items-center justify-center">
+                    <ExclamationTriangleIcon className="h-5 w-5 text-red-600 dark:text-red-400" />
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-xl font-bold text-red-900 dark:text-red-200 mb-2">
+                    Create Emergency Leave Request
+                  </h2>
+                  <p className="text-sm text-red-800 dark:text-red-300">
+                    This will create an emergency leave request that bypasses normal team settings and is automatically approved.
+                  </p>
+                </div>
+              </div>
             
-            <form onSubmit={handleEmergencyRequest} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="memberId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Select Member
-                  </label>
-                  <select
-                    id="memberId"
-                    required
-                    value={emergencyForm.memberId}
-                    onChange={(e) => setEmergencyForm({ ...emergencyForm, memberId: e.target.value })}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
-                  >
+              <form onSubmit={handleEmergencyRequest} className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div>
+                    <label htmlFor="memberId" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      Select Member
+                    </label>
+                    <select
+                      id="memberId"
+                      required
+                      value={emergencyForm.memberId}
+                      onChange={(e) => setEmergencyForm({ ...emergencyForm, memberId: e.target.value })}
+                      className="input-modern w-full"
+                    >
                     <option value="">Choose a member...</option>
                     {members.filter(member => member.role !== 'leader').map((member) => (
                       <option key={member._id} value={member._id}>
@@ -538,17 +562,17 @@ export default function LeaderRequestsPage() {
                   </select>
                 </div>
 
-                <div>
-                  <label htmlFor="reason" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Reason
-                  </label>
-                  <select
-                    id="reason"
-                    required
-                    value={emergencyForm.reason}
-                    onChange={(e) => setEmergencyForm({ ...emergencyForm, reason: e.target.value })}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
-                  >
+                  <div>
+                    <label htmlFor="reason" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      Reason
+                    </label>
+                    <select
+                      id="reason"
+                      required
+                      value={emergencyForm.reason}
+                      onChange={(e) => setEmergencyForm({ ...emergencyForm, reason: e.target.value })}
+                      className="input-modern w-full"
+                    >
                     <option value="">Select reason...</option>
                     {EMERGENCY_REASONS.map((reason) => (
                       <option key={reason.value} value={reason.value}>
@@ -558,146 +582,151 @@ export default function LeaderRequestsPage() {
                   </select>
                 </div>
 
-                <div>
-                  <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Start Date
-                  </label>
-                  <input
-                    type="date"
-                    id="startDate"
-                    required
-                    value={emergencyForm.startDate}
-                    onChange={(e) => setEmergencyForm({ ...emergencyForm, startDate: e.target.value })}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
-                  />
+                  <div>
+                    <label htmlFor="startDate" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      id="startDate"
+                      required
+                      value={emergencyForm.startDate}
+                      onChange={(e) => setEmergencyForm({ ...emergencyForm, startDate: e.target.value })}
+                      className="input-modern w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="endDate" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      End Date
+                    </label>
+                    <input
+                      type="date"
+                      id="endDate"
+                      required
+                      value={emergencyForm.endDate}
+                      onChange={(e) => setEmergencyForm({ ...emergencyForm, endDate: e.target.value })}
+                      className="input-modern w-full"
+                    />
+                  </div>
                 </div>
 
                 <div>
-                  <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    End Date
+                  <label htmlFor="password" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Your Password (for authentication)
                   </label>
                   <input
-                    type="date"
-                    id="endDate"
+                    type="password"
+                    id="password"
                     required
-                    value={emergencyForm.endDate}
-                    onChange={(e) => setEmergencyForm({ ...emergencyForm, endDate: e.target.value })}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
+                    value={emergencyForm.password}
+                    onChange={(e) => setEmergencyForm({ ...emergencyForm, password: e.target.value })}
+                    placeholder="Enter your password to authenticate this emergency request"
+                    className="input-modern w-full"
                   />
                 </div>
-              </div>
 
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Your Password (for authentication)
-                </label>
-                <input
-                  type="password"
-                  id="password"
-                  required
-                  value={emergencyForm.password}
-                  onChange={(e) => setEmergencyForm({ ...emergencyForm, password: e.target.value })}
-                  placeholder="Enter your password to authenticate this emergency request"
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
-                />
-              </div>
-
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setShowEmergencyForm(false)}
-                  className="bg-gray-500 hover:bg-gray-600 dark:bg-gray-600 dark:hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingEmergency}
-                  className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
-                >
-                  {submittingEmergency ? 'Creating...' : 'Create Emergency Request'}
-                </button>
-              </div>
-            </form>
+                <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-gray-200 dark:border-gray-800">
+                  <button
+                    type="button"
+                    onClick={() => setShowEmergencyForm(false)}
+                    className="btn-secondary px-4 py-2.5"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingEmergency}
+                    className="btn-danger px-4 py-2.5 disabled:opacity-50"
+                  >
+                    {submittingEmergency ? 'Creating...' : 'Create Emergency Request'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
 
-        {/* Filter Tabs */}
-        <div className="mb-6">
-          <div className="border-b border-gray-200 dark:border-gray-800">
-            <nav className="-mb-px flex space-x-8">
-              {[
-                { key: 'all', label: 'All Requests' },
-                { key: 'pending', label: 'Pending' },
-                { key: 'approved', label: 'Approved' },
-                { key: 'rejected', label: 'Rejected' },
-              ].map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setFilter(tab.key as 'all' | 'pending' | 'approved' | 'rejected')}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                    filter === tab.key
-                      ? 'tab-active'
-                      : 'tab-inactive'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
+        {/* Filter Tabs - Enhanced */}
+        <div className="card mb-8">
+          <div className="p-5 sm:p-6">
+            <div className="border-b border-gray-200 dark:border-gray-800">
+              <nav className="-mb-px flex flex-wrap gap-4 sm:gap-8">
+                {[
+                  { key: 'all', label: 'All Requests' },
+                  { key: 'pending', label: 'Pending' },
+                  { key: 'approved', label: 'Approved' },
+                  { key: 'rejected', label: 'Rejected' },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setFilter(tab.key as 'all' | 'pending' | 'approved' | 'rejected')}
+                    className={`py-2 px-1 border-b-2 font-semibold text-sm transition-colors ${
+                      filter === tab.key
+                        ? 'tab-active'
+                        : 'tab-inactive'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </nav>
+            </div>
           </div>
         </div>
 
-        {/* Requests List */}
-        <div className="bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-100 dark:border-gray-800">
-          <div className="px-4 py-5 sm:p-6">
+        {/* Requests List - Enhanced */}
+        <div className="card">
+          <div className="p-5 sm:p-6">
             {filteredRequests.length === 0 ? (
-              <p className="text-gray-500 dark:text-gray-400 text-center py-8">No requests found.</p>
+              <div className="text-center py-12">
+                <div className="flex flex-col items-center justify-center">
+                  <svg className="h-16 w-16 text-gray-400 dark:text-gray-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <p className="text-base font-medium text-gray-500 dark:text-gray-400">No requests found</p>
+                </div>
+              </div>
             ) : (
               <div className="space-y-4">
                 {filteredRequests.map((request) => {
                   const member = members.find(m => m._id === request.userId);
                   return (
-                    <div key={request._id} className="border border-gray-200 dark:border-gray-800 rounded-lg p-6 bg-gray-50 dark:bg-gray-900">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3">
-                            <h4 className="text-lg font-medium text-gray-900 dark:text-white">
-                              {member?.username || 'Unknown User'}
+                    <div key={request._id} className="bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-900 dark:to-gray-800/50 rounded-xl p-5 sm:p-6 border border-gray-200 dark:border-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all duration-200 stagger-item">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center flex-wrap gap-3 mb-3">
+                            <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+                              {member?.fullName || member?.username || 'Unknown User'}
                             </h4>
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${getStatusColor(request.status)}`}>
                               {request.status}
                             </span>
                           </div>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
                             {new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()}
                           </p>
-                          <p className="text-gray-700 dark:text-gray-300 mt-2">{request.reason}</p>
-                          <div className="flex items-center space-x-2 mt-2">
+                          <p className="text-base text-gray-700 dark:text-gray-300 mb-3">{request.reason}</p>
+                          <div className="flex items-center flex-wrap gap-2">
                             <p className="text-xs text-gray-500 dark:text-gray-400">
                               Requested on {new Date(request.createdAt).toLocaleDateString()}
                             </p>
                             {request.requestedBy && (() => {
-                              // Check if this is an emergency request (created through emergency endpoint)
-                              // Only mark as emergency if reason exactly matches EMERGENCY_REASONS values
                               const isEmergency = request.reason && isEmergencyReason(request.reason);
-                              
-                              // Check if this is a historical entry (created by leader, approved, and start date is in the past)
-                              // Only if it's NOT an emergency request
                               const isHistorical = !isEmergency && 
                                 request.status === 'approved' && 
                                 new Date(request.startDate) < new Date();
                               
                               if (isEmergency) {
                                 return (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400">
                                     <ExclamationTriangleIcon className="h-3 w-3" />
                                     Emergency
                                   </span>
                                 );
                               } else if (isHistorical) {
                                 return (
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400">
                                     Historical
                                   </span>
                                 );
@@ -706,19 +735,21 @@ export default function LeaderRequestsPage() {
                             })()}
                           </div>
                         </div>
-                        <div className="flex space-x-2 ml-4">
+                        <div className="flex flex-wrap gap-2 sm:ml-4 sm:flex-shrink-0">
                           {request.status === 'pending' && (
                             <>
                               <button
                                 onClick={() => handleApprove(request._id!)}
-                                className="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                                className="btn-success flex items-center justify-center gap-2 px-4 py-2.5 min-w-[100px]"
                               >
+                                <CheckCircleIcon className="h-4 w-4" />
                                 Approve
                               </button>
                               <button
                                 onClick={() => handleReject(request._id!)}
-                                className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                                className="btn-danger flex items-center justify-center gap-2 px-4 py-2.5 min-w-[100px]"
                               >
+                                <XCircleIcon className="h-4 w-4" />
                                 Reject
                               </button>
                             </>
@@ -727,7 +758,7 @@ export default function LeaderRequestsPage() {
                             <button
                               onClick={() => handleDelete(request._id!)}
                               disabled={deleting === request._id}
-                              className="bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="btn-danger px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                               title="Delete approved request"
                             >
                               {deleting === request._id ? 'Deleting...' : 'Delete'}

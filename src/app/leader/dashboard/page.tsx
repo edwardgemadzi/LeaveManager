@@ -11,13 +11,13 @@ import {
   UsersIcon, 
   ClockIcon, 
   ChartBarIcon, 
-  DocumentIcon, 
   UserIcon, 
   CalendarIcon,
   CheckCircleIcon,
   XCircleIcon,
   ExclamationTriangleIcon,
-  ArrowTrendingUpIcon
+  ArrowTrendingUpIcon,
+  FireIcon
 } from '@heroicons/react/24/outline';
 
 export default function LeaderDashboard() {
@@ -300,165 +300,221 @@ export default function LeaderDashboard() {
 
   return (
     <ProtectedRoute requiredRole="leader">
-      <div className="min-h-screen">
+      <div className="min-h-screen bg-gray-50 dark:bg-black">
         <Navbar />
         
-        <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 pt-24 bg-gray-50 dark:bg-black min-h-screen">
+        <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12">
+          {/* Header Section - Enhanced */}
           <div className="mb-8 fade-in">
-            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">Leader Dashboard</h1>
-            <p className="text-gray-600 dark:text-gray-400 text-lg">Welcome back! Here&apos;s what&apos;s happening with your team</p>
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">Leader Dashboard</h1>
+            <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400">Welcome back! Here&apos;s what&apos;s happening with your team</p>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="card card-hover">
-              <div className="p-6">
-                <div className="flex items-center">
-                    <div className="flex-shrink-0">
+          {/* Stats Cards - Enhanced with Gradients and Better Layout */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 mb-8">
+            {/* Team Members Card */}
+            <div className="stat-card group">
+              <div className="p-5 sm:p-6">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Team Members</p>
+                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
+                      {members?.filter(m => m.role === 'member').length || 0}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Active members</p>
+                  </div>
+                  <div className="flex-shrink-0 ml-4">
                     <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
                       <UsersIcon className="h-6 w-6 text-blue-700 dark:text-blue-400" />
                     </div>
                   </div>
-                  <div className="ml-5 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Team Members</dt>
-                      <dd className="text-2xl font-bold text-gray-900 dark:text-white">{members?.filter(m => m.role === 'member').length || 0}</dd>
-                    </dl>
-                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="card card-hover">
-              <div className="p-6">
-                <div className="flex items-center">
-                    <div className="flex-shrink-0">
+            {/* Pending Requests Card */}
+            <div className={`stat-card group ${pendingRequests?.length > 0 ? 'border-yellow-300 dark:border-yellow-700' : ''}`}>
+              <div className="p-5 sm:p-6">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Pending Requests</p>
+                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
+                      {pendingRequests?.length || 0}
+                    </p>
+                    {pendingRequests?.length > 0 && (
+                      <p className="text-xs text-yellow-600 dark:text-yellow-400 font-medium mt-1">Requires attention</p>
+                    )}
+                    {pendingRequests?.length === 0 && (
+                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">All clear</p>
+                    )}
+                  </div>
+                  <div className="flex-shrink-0 ml-4">
                     <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/30 rounded-xl flex items-center justify-center">
                       <ClockIcon className="h-6 w-6 text-yellow-700 dark:text-yellow-400" />
                     </div>
                   </div>
-                  <div className="ml-5 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Pending Requests</dt>
-                      <dd className="text-2xl font-bold text-gray-900 dark:text-white">{pendingRequests?.length || 0}</dd>
-                    </dl>
-                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="card card-hover">
-              <div className="p-6">
-                <div className="flex items-center">
-                    <div className="flex-shrink-0">
+            {/* Avg Leave Balance Card */}
+            <div className="stat-card group">
+              <div className="p-5 sm:p-6">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Avg Leave Balance</p>
+                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
+                      {Math.round(getLeaveBalanceSummary().averageRemaining)}
+                    </p>
+                    <div className="mt-2 space-y-1">
+                      {getLeaveBalanceSummary().membersWithLowBalance > 0 && (
+                        <p className="text-xs text-red-600 dark:text-red-400 font-medium">
+                          {getLeaveBalanceSummary().membersWithLowBalance} with low balance
+                        </p>
+                      )}
+                      {getLeaveBalanceSummary().totalSurplus > 0 && (
+                        <p className="text-xs text-green-600 dark:text-green-400 font-medium">
+                          +{Math.round(getLeaveBalanceSummary().totalSurplus)} surplus
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 ml-4">
                     <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center">
                       <ChartBarIcon className="h-6 w-6 text-green-700 dark:text-green-400" />
                     </div>
-                  </div>
-                  <div className="ml-5 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Avg Leave Balance</dt>
-                      <dd className="text-2xl font-bold text-gray-900 dark:text-white">{Math.round(getLeaveBalanceSummary().averageRemaining)}</dd>
-                      <dd className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                        {getLeaveBalanceSummary().membersWithLowBalance} member(s) with low balance
-                      </dd>
-                      {getLeaveBalanceSummary().totalSurplus > 0 && (
-                        <dd className="text-xs text-green-600 dark:text-green-400 mt-1">
-                          +{Math.round(getLeaveBalanceSummary().totalSurplus)} total surplus ({getLeaveBalanceSummary().membersWithSurplus} member(s))
-                        </dd>
-                      )}
-                    </dl>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Maternity Leave Summary Card */}
-            <div className="card card-hover">
-              <div className="p-6">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
+            <div className="stat-card group">
+              <div className="p-5 sm:p-6">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Maternity/Paternity</p>
+                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
+                      {Math.round(getMaternityLeaveSummary().averageRemaining)}
+                    </p>
+                    <div className="mt-2 space-y-1">
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        {Math.round(getMaternityLeaveSummary().totalUsed)} used
+                      </p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        {Math.round(getMaternityLeaveSummary().totalRemaining)} remaining
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 ml-4">
                     <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900/30 rounded-xl flex items-center justify-center">
                       <CalendarIcon className="h-6 w-6 text-pink-700 dark:text-pink-400" />
                     </div>
-                  </div>
-                  <div className="ml-5 flex-1">
-                    <dl>
-                      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Maternity/Paternity Leave</dt>
-                      <dd className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {Math.round(getMaternityLeaveSummary().averageRemaining)}
-                      </dd>
-                      <dd className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                        {Math.round(getMaternityLeaveSummary().totalUsed)} days used this year
-                      </dd>
-                      <dd className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                        {getMaternityLeaveSummary().totalRemaining} total remaining
-                      </dd>
-                    </dl>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Recent Pending Requests */}
-          <div className="card card-hover mb-8">
-            <div className="p-6">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
-                Recent Pending Requests
-              </h3>
+          {/* Main Content Area - Side by Side Layout for Desktop */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+            {/* Pending Requests - Takes 1 column on mobile/tablet, 2 columns on desktop */}
+            <div className="lg:col-span-2">
+              <div className="card h-full">
+                <div className="p-5 sm:p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                        Pending Requests
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {pendingRequests?.length || 0} request{pendingRequests?.length !== 1 ? 's' : ''} awaiting your review
+                      </p>
+                    </div>
+                    {pendingRequests && pendingRequests.length > 0 && (
+                      <div className="flex-shrink-0">
+                        <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800">
+                          Action Required
+                        </span>
+                      </div>
+                    )}
+                  </div>
               {!pendingRequests || pendingRequests.length === 0 ? (
-                <div className="text-center py-12">
+                <div className="text-center py-12 fade-in">
                   <div className="flex justify-center mb-4">
                     <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-                      <DocumentIcon className="h-8 w-8 text-gray-600 dark:text-gray-400" />
+                      <CheckCircleIcon className="h-8 w-8 text-green-600 dark:text-green-400" />
                     </div>
                   </div>
-                  <p className="text-gray-500 dark:text-gray-400 text-lg">No pending requests at the moment</p>
-                  <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">All requests have been processed</p>
+                  <p className="text-gray-700 dark:text-gray-300 text-lg font-semibold mb-1">All clear!</p>
+                  <p className="text-gray-500 dark:text-gray-400 text-sm">No pending requests at the moment</p>
                 </div>
               ) : (
-                <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-                  {pendingRequests.map((request) => {
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-2 scrollbar-thin">
+                  {pendingRequests.map((request, index) => {
                     const member = members?.find(m => m._id === request.userId);
                     return (
-                      <div key={request._id} className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition-colors duration-200">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
-                              <UserIcon className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                              {member?.username || 'Unknown User'}
-                            </h4>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-2">
-                              <CalendarIcon className="h-4 w-4 text-gray-500 dark:text-gray-500" />
-                              {new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()}
+                      <div 
+                        key={request._id} 
+                        className="bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-900 dark:to-gray-800/50 rounded-xl p-4 sm:p-5 border border-gray-200 dark:border-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all duration-200 stagger-item"
+                        style={{ animationDelay: `${index * 0.05}s` }}
+                      >
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <UserIcon className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                              </div>
+                              <h4 className="font-semibold text-gray-900 dark:text-white truncate">
+                                {member?.username || 'Unknown User'}
+                              </h4>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-400 mb-2">
+                              <div className="flex items-center gap-1.5">
+                                <CalendarIcon className="h-4 w-4 text-gray-500 dark:text-gray-500" />
+                                <span className="font-medium">
+                                  {new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-sm text-gray-700 dark:text-gray-300 font-medium bg-white/50 dark:bg-gray-800/50 px-3 py-1.5 rounded-lg inline-block">
+                              {request.reason}
                             </p>
-                            <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">{request.reason}</p>
                           </div>
-                          <div className="flex space-x-2 ml-4">
+                          <div className="flex sm:flex-col gap-2 sm:ml-4">
                             <button 
                               onClick={() => handleApprove(request._id!)}
                               disabled={processingRequest === request._id}
-                              className="btn-success text-xs py-2 px-3 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                              className="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800 text-white text-xs sm:text-sm font-medium py-2 px-4 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[100px] sm:min-w-[120px] transition-colors duration-200"
                             >
                               {processingRequest === request._id ? (
-                                <ClockIcon className="h-4 w-4" />
+                                <>
+                                  <div className="spinner w-4 h-4 border-2 border-white/30 border-t-white"></div>
+                                  <span>Processing...</span>
+                                </>
                               ) : (
-                                <CheckCircleIcon className="h-4 w-4" />
+                                <>
+                                  <CheckCircleIcon className="h-4 w-4" />
+                                  <span>Approve</span>
+                                </>
                               )}
-                              {processingRequest === request._id ? 'Processing...' : 'Approve'}
                             </button>
                             <button 
                               onClick={() => handleReject(request._id!)}
                               disabled={processingRequest === request._id}
-                              className="btn-danger text-xs py-2 px-3 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                              className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 text-white text-xs sm:text-sm font-medium py-2 px-4 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-w-[100px] sm:min-w-[120px] transition-colors duration-200"
                             >
                               {processingRequest === request._id ? (
-                                <ClockIcon className="h-4 w-4" />
+                                <>
+                                  <div className="spinner w-4 h-4 border-2 border-white/30 border-t-white"></div>
+                                  <span>Processing...</span>
+                                </>
                               ) : (
-                                <XCircleIcon className="h-4 w-4" />
+                                <>
+                                  <XCircleIcon className="h-4 w-4" />
+                                  <span>Reject</span>
+                                </>
                               )}
-                              {processingRequest === request._id ? 'Processing...' : 'Reject'}
                             </button>
                           </div>
                         </div>
@@ -467,43 +523,199 @@ export default function LeaderDashboard() {
                   })}
                 </div>
               )}
+                </div>
+              </div>
+            </div>
+
+            {/* Members at Risk Sidebar - Priority List */}
+            <div className="lg:col-span-1">
+              <div className="card h-full">
+                <div className="p-5 sm:p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <FireIcon className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">Action Needed</h3>
+                  </div>
+                  {(() => {
+                    if (!analytics || !team || !members.length) {
+                      return (
+                        <div className="text-center py-8">
+                          <p className="text-sm text-gray-500 dark:text-gray-400">No data available</p>
+                        </div>
+                      );
+                    }
+
+                    // Get all members with their analytics
+                    const allMembersWithAnalytics = analytics.groups.flatMap(g => g.members);
+                    
+                    // Create member at risk list with priority scoring
+                    const membersAtRisk = allMembersWithAnalytics
+                      .map(m => {
+                        const member = members.find(mem => mem._id === m.userId);
+                        if (!member || member.role !== 'member') return null;
+
+                        const willLose = m.analytics.willLose || 0;
+                        const remainingBalance = m.analytics.remainingLeaveBalance || 0;
+                        const realisticUsableDays = m.analytics.realisticUsableDays || 0;
+                        const maxLeavePerYear = team.settings.maxLeavePerYear;
+                        
+                        // Priority score: higher = more urgent
+                        // 1. Members who will lose days (weighted by amount)
+                        // 2. Members with low remaining balance (< 25% of max)
+                        // 3. Members with high balance but low realistic usable days
+                        let priorityScore = 0;
+                        
+                        if (willLose > 0) {
+                          priorityScore += 1000 + (willLose * 10); // Highest priority
+                        }
+                        
+                        if (remainingBalance < maxLeavePerYear * 0.25 && remainingBalance > 0) {
+                          priorityScore += 500 + (maxLeavePerYear * 0.25 - remainingBalance); // Low balance
+                        }
+                        
+                        // If realistic usable days is much less than remaining balance, they're at risk
+                        if (remainingBalance > 0 && realisticUsableDays < remainingBalance * 0.8) {
+                          priorityScore += 200 + (remainingBalance - realisticUsableDays);
+                        }
+
+                        return {
+                          member,
+                          analytics: m.analytics,
+                          willLose,
+                          remainingBalance,
+                          realisticUsableDays,
+                          priorityScore
+                        };
+                      })
+                      .filter(m => m !== null && m.priorityScore > 0)
+                      .sort((a, b) => (b?.priorityScore || 0) - (a?.priorityScore || 0))
+                      .slice(0, 5); // Show top 5 most urgent
+
+                    if (membersAtRisk.length === 0) {
+                      return (
+                        <div className="text-center py-8">
+                          <CheckCircleIcon className="h-8 w-8 text-green-600 dark:text-green-400 mx-auto mb-2" />
+                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">All Clear!</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">No members at risk of losing days</p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 scrollbar-thin">
+                        {membersAtRisk.map((item, index) => {
+                          if (!item) return null;
+                          const { member, willLose, remainingBalance, realisticUsableDays } = item;
+                          const maxLeavePerYear = team.settings.maxLeavePerYear;
+                          const isLowBalance = remainingBalance < maxLeavePerYear * 0.25;
+                          
+                          return (
+                            <div 
+                              key={member._id}
+                              className={`p-3 rounded-lg border transition-all duration-200 stagger-item ${
+                                willLose > 0
+                                  ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                                  : isLowBalance
+                                  ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
+                                  : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                              }`}
+                              style={{ animationDelay: `${index * 0.05}s` }}
+                            >
+                              <div className="flex items-start justify-between gap-2 mb-2">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <UserIcon className="h-4 w-4 text-gray-600 dark:text-gray-400 flex-shrink-0" />
+                                    <p className="font-semibold text-sm text-gray-900 dark:text-white truncate">
+                                      {member.fullName || member.username}
+                                    </p>
+                                  </div>
+                                  <div className="space-y-1 text-xs">
+                                    {willLose > 0 && (
+                                      <div className="flex items-center gap-1.5 text-red-700 dark:text-red-400 font-medium">
+                                        <ExclamationTriangleIcon className="h-3.5 w-3.5" />
+                                        <span>Will lose {Math.round(willLose)} day{willLose !== 1 ? 's' : ''} at year end</span>
+                                      </div>
+                                    )}
+                                    {isLowBalance && remainingBalance > 0 && (
+                                      <div className="flex items-center gap-1.5 text-yellow-700 dark:text-yellow-400">
+                                        <ClockIcon className="h-3.5 w-3.5" />
+                                        <span>Low balance: {Math.round(remainingBalance)} remaining</span>
+                                      </div>
+                                    )}
+                                    {realisticUsableDays < remainingBalance && remainingBalance > 0 && (
+                                      <div className="text-gray-600 dark:text-gray-400">
+                                        Only {Math.round(realisticUsableDays)} realistic days available
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                {index === 0 && willLose > 0 && (
+                                  <div className="flex-shrink-0">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-600 text-white uppercase tracking-wider">
+                                      Urgent
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700 mt-2">
+                                <span className="text-xs text-gray-600 dark:text-gray-400">Balance</span>
+                                <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                                  {Math.round(remainingBalance)} / {Math.round(maxLeavePerYear)}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Analytics Section */}
-              {analytics && (
-            <div className="mb-8 space-y-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Year-End Analytics</h2>
+          {/* Analytics Section - Enhanced - Full Width */}
+          {analytics && (
+            <div className="mb-8 space-y-8 fade-in">
+              <div className="mb-6">
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-3">Year-End Analytics</h2>
+                <p className="text-base text-gray-500 dark:text-gray-400">Team performance metrics and insights</p>
+              </div>
               
-              {/* Aggregate Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-6">
-                <div className="card card-hover">
-                  <div className="p-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <h3 className="text-xs font-medium text-gray-500 dark:text-gray-400">Realistic Usable Days</h3>
-                        <p className="text-2xl font-bold text-blue-700 dark:text-blue-400 mt-1">{Math.round(analytics.aggregate.totalRealisticUsableDays ?? 0)}</p>
+              {/* Aggregate Stats - Enhanced Cards with Gradients - Better Horizontal Layout */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6 sm:gap-8 mb-8">
+                {/* Realistic Usable Days */}
+                <div className="stat-card group">
+                  <div className="p-5 sm:p-6">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-1">Realistic Usable</p>
+                        <p className="text-2xl sm:text-3xl font-bold text-indigo-700 dark:text-indigo-400 mb-1 fade-in">
+                          {Math.round(analytics.aggregate.totalRealisticUsableDays ?? 0)}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-500">With constraints</p>
                       </div>
                       <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center flex-shrink-0">
                         <ChartBarIcon className="h-6 w-6 text-blue-700 dark:text-blue-400" />
                       </div>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">With concurrent leave constraints</p>
                   </div>
                 </div>
 
-                <div className="card card-hover">
-                  <div className="p-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <h3 className="text-xs font-medium text-gray-500 dark:text-gray-400">Theoretical Working Days</h3>
-                        <p className="text-2xl font-bold text-gray-700 dark:text-gray-300 mt-1">{Math.round(analytics.aggregate.totalTheoreticalWorkingDays ?? 0)}</p>
+                {/* Theoretical Working Days */}
+                <div className="stat-card group">
+                  <div className="p-5 sm:p-6">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-1">Theoretical Days</p>
+                        <p className="text-2xl sm:text-3xl font-bold text-gray-700 dark:text-gray-300 mb-1 fade-in">
+                          {Math.round(analytics.aggregate.totalTheoreticalWorkingDays ?? 0)}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-500">Without constraints</p>
                       </div>
                       <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center flex-shrink-0">
                         <ArrowTrendingUpIcon className="h-6 w-6 text-gray-700 dark:text-gray-300" />
                       </div>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Total without constraints</p>
                   </div>
                 </div>
 
@@ -556,85 +768,94 @@ export default function LeaderDashboard() {
                   </div>
                 </div>
 
-                <div className={`card card-hover ${analytics.aggregate.totalWillCarryover > 0 ? 'border-2 border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/30' : ''}`}>
-                  <div className="p-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <h3 className="text-xs font-medium text-gray-500 dark:text-gray-400">Will Carry Over</h3>
-                        <p className="text-2xl font-bold text-green-700 dark:text-green-400 mt-1">{Math.round(analytics.aggregate.totalWillCarryover)}</p>
+                {/* Will Carry Over */}
+                <div className={`stat-card group ${analytics.aggregate.totalWillCarryover > 0 ? 'border-2 border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/30' : ''}`}>
+                  <div className="p-5 sm:p-6">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-1">Will Carry Over</p>
+                        <p className="text-2xl sm:text-3xl font-bold text-green-700 dark:text-green-400 mb-1 fade-in">
+                          {Math.round(analytics.aggregate.totalWillCarryover)}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-500">To next year</p>
                       </div>
                       <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center flex-shrink-0">
                         <CheckCircleIcon className="h-6 w-6 text-green-700 dark:text-green-400" />
                       </div>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Days to next year</p>
                   </div>
                 </div>
 
-                <div className={`card card-hover ${analytics.aggregate.totalWillLose > 0 ? 'border-2 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30' : ''}`}>
-                  <div className="p-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <h3 className="text-xs font-medium text-gray-500 dark:text-gray-400">Will Be Lost</h3>
-                        <p className="text-2xl font-bold text-red-700 dark:text-red-400 mt-1">{Math.round(analytics.aggregate.totalWillLose)}</p>
+                {/* Will Be Lost */}
+                <div className={`stat-card group ${analytics.aggregate.totalWillLose > 0 ? 'border-2 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30' : ''}`}>
+                  <div className="p-5 sm:p-6">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-1">Will Be Lost</p>
+                        <p className="text-2xl sm:text-3xl font-bold text-red-700 dark:text-red-400 mb-1 fade-in">
+                          {Math.round(analytics.aggregate.totalWillLose)}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-500">At year end</p>
                       </div>
                       <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-xl flex items-center justify-center flex-shrink-0">
                         <ExclamationTriangleIcon className="h-6 w-6 text-red-700 dark:text-red-400" />
                       </div>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Days lost at year end</p>
                   </div>
                 </div>
               </div>
 
-              {/* Competition Context Card */}
-              <div className="card border-2 border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30 mb-6">
-                <div className="p-4">
-                  <div className="flex items-start space-x-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
-                      <UsersIcon className="h-6 w-6 text-blue-700 dark:text-blue-400" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-blue-900 dark:text-blue-300 mb-1">Team Competition Context</p>
-                      <p className="text-sm text-blue-700 dark:text-blue-400 mb-2">
-                        <strong>{analytics.aggregate.membersCount}</strong> team member{analytics.aggregate.membersCount !== 1 ? 's' : ''} 
-                        {' '}need to coordinate use of <strong>{Math.round(analytics.aggregate.totalRealisticUsableDays)}</strong> realistic usable days.
-                        {analytics.aggregate.totalRemainderDays > 0 && (
-                          <> <strong className="text-blue-600 dark:text-blue-400">+{analytics.aggregate.totalRemainderDays}</strong> day(s) need allocation decisions</>
-                        )}
-                      </p>
-                      <p className="text-sm text-blue-700 dark:text-blue-400">
-                        Average of <strong>{Math.round(analytics.aggregate.averageDaysPerMemberAcrossTeam)}</strong> days per member available across the team.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Availability Constraint Info */}
-              {analytics.aggregate.totalRealisticUsableDays < analytics.aggregate.totalTheoreticalWorkingDays && (
-                <div className="card border-2 border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/30 mb-6">
-                  <div className="p-4">
+              {/* Competition Context and Constraint Info - Side by Side */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                {/* Competition Context Card */}
+                <div className="card border-2 border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/30">
+                  <div className="p-5">
                     <div className="flex items-start space-x-3">
-                      <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0">
-                        <ExclamationTriangleIcon className="h-6 w-6 text-orange-700 dark:text-orange-400" />
+                      <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
+                        <UsersIcon className="h-6 w-6 text-blue-700 dark:text-blue-400" />
                       </div>
-                      <div>
-                        <p className="font-semibold text-orange-900 dark:text-orange-300 mb-1">Concurrent Leave Constraints Active</p>
-                        <p className="text-sm text-orange-700 dark:text-orange-400">
-                          Team members can realistically use <strong>{Math.round(analytics.aggregate.totalRealisticUsableDays)}</strong> of <strong>{Math.round(analytics.aggregate.totalTheoreticalWorkingDays)}</strong> theoretical working days remaining.
-                          Some periods are fully booked due to concurrent leave limits.
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-indigo-900 dark:text-indigo-300 mb-2">Team Competition Context</p>
+                        <p className="text-sm text-indigo-700 dark:text-indigo-400 mb-2 leading-relaxed">
+                          <strong>{analytics.aggregate.membersCount}</strong> team member{analytics.aggregate.membersCount !== 1 ? 's' : ''} 
+                          {' '}need to coordinate use of <strong>{Math.round(analytics.aggregate.totalRealisticUsableDays)}</strong> realistic usable days.
+                          {analytics.aggregate.totalRemainderDays > 0 && (
+                            <> <strong className="text-indigo-600 dark:text-indigo-400">+{analytics.aggregate.totalRemainderDays}</strong> day(s) need allocation decisions</>
+                          )}
+                        </p>
+                        <p className="text-sm text-indigo-700 dark:text-indigo-400 leading-relaxed">
+                          Average of <strong>{Math.round(analytics.aggregate.averageDaysPerMemberAcrossTeam)}</strong> days per member available across the team.
                         </p>
                       </div>
                     </div>
                   </div>
                 </div>
-              )}
 
-              {/* Policy Info */}
+                {/* Availability Constraint Info */}
+                {analytics.aggregate.totalRealisticUsableDays < analytics.aggregate.totalTheoreticalWorkingDays && (
+                  <div className="card border-2 border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/30">
+                    <div className="p-5">
+                      <div className="flex items-start space-x-3">
+                        <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0">
+                          <ExclamationTriangleIcon className="h-6 w-6 text-orange-700 dark:text-orange-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-orange-900 dark:text-orange-300 mb-2">Concurrent Leave Constraints Active</p>
+                          <p className="text-sm text-orange-700 dark:text-orange-400 leading-relaxed">
+                            Team members can realistically use <strong>{Math.round(analytics.aggregate.totalRealisticUsableDays)}</strong> of <strong>{Math.round(analytics.aggregate.totalTheoreticalWorkingDays)}</strong> theoretical working days remaining.
+                            Some periods are fully booked due to concurrent leave limits.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Policy Info - Full Width */}
               {team && (
                 <div className={`card ${team.settings.allowCarryover ? 'border-2 border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/30' : 'border-2 border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/30'}`}>
-                  <div className="p-4">
+                  <div className="p-5">
                     <div className="flex items-center space-x-3">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${team.settings.allowCarryover ? 'bg-green-100 dark:bg-green-900/30' : 'bg-orange-100 dark:bg-orange-900/30'}`}>
                         {team.settings.allowCarryover ? (
@@ -643,8 +864,8 @@ export default function LeaderDashboard() {
                           <ExclamationTriangleIcon className="h-6 w-6 text-orange-700 dark:text-orange-400" />
                         )}
                       </div>
-                      <div>
-                        <p className="font-semibold text-gray-900 dark:text-white">
+                      <div className="flex-1">
+                        <p className="font-semibold text-gray-900 dark:text-white mb-1">
                           {team.settings.allowCarryover ? 'Carryover Enabled' : 'Carryover Disabled'}
                         </p>
                         <p className="text-sm text-gray-600 dark:text-gray-400">

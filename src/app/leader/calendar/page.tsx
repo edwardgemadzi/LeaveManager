@@ -201,7 +201,10 @@ export default function LeaderCalendarPage() {
       <div className="min-h-screen bg-gray-50 dark:bg-black">
         <Navbar />
         <div className="flex items-center justify-center h-64 pt-24">
-          <div className="animate-spin rounded-full h-32 w-32 border-2 border-gray-200 dark:border-gray-800 border-t-gray-400 dark:border-t-gray-500"></div>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-indigo-600 dark:border-t-indigo-400 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">Loading calendar...</p>
+          </div>
         </div>
       </div>
     );
@@ -211,16 +214,18 @@ export default function LeaderCalendarPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       <Navbar />
       
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 pt-24">
-        <div className="px-4 py-6 sm:px-0">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">Team Calendar</h1>
-          <p className="text-lg text-gray-600 dark:text-gray-400">View all leave requests for your team.</p>
+      <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12">
+        {/* Header Section - Enhanced */}
+        <div className="mb-8 fade-in">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">Team Calendar</h1>
+          <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400">View all leave requests for your team</p>
         </div>
 
-        {/* Filter Tabs */}
-        <div className="mb-6">
-          <div className="border-b border-gray-200 dark:border-gray-800">
-            <nav className="-mb-px flex space-x-8">
+        {/* Filter Tabs - Enhanced */}
+        <div className="card mb-8">
+          <div className="p-5 sm:p-6">
+            <div className="border-b border-gray-200 dark:border-gray-800">
+              <nav className="-mb-px flex flex-wrap gap-4 sm:gap-8">
               {[
                 { key: 'all', label: 'All Requests' },
                 { key: 'pending', label: 'Pending' },
@@ -238,14 +243,15 @@ export default function LeaderCalendarPage() {
                   {tab.label}
                 </button>
               ))}
-            </nav>
+              </nav>
+            </div>
           </div>
         </div>
 
-        {/* Filters Section */}
-        <div className="mb-6 space-y-4">
+        {/* Filters Section - Enhanced */}
+        <div className="mb-8 space-y-4">
           {/* Member Filter */}
-          <div className="bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-200 dark:border-gray-800 p-4">
+          <div className="card p-5 sm:p-6">
             <div className="flex items-center justify-between mb-3">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 Filter by Members:
@@ -283,7 +289,7 @@ export default function LeaderCalendarPage() {
 
           {/* Subgroup Filter (only show if subgrouping is enabled) */}
           {team?.settings.enableSubgrouping && uniqueSubgroups.length > 0 && (
-            <div className="bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-200 dark:border-gray-800 p-4">
+            <div className="card p-5 sm:p-6">
               <div className="flex items-center justify-between mb-3">
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Filter by Subgroups:
@@ -325,7 +331,7 @@ export default function LeaderCalendarPage() {
 
           {/* Working Days Grouping Filter */}
           {uniqueWorkingDaysTags.length > 0 && (
-            <div className="bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-200 dark:border-gray-800 p-4">
+            <div className="card p-5 sm:p-6">
               <div className="flex items-center justify-between mb-3">
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   Filter by Working Days Groups:
@@ -363,7 +369,7 @@ export default function LeaderCalendarPage() {
           )}
         </div>
 
-        <div className="bg-white dark:bg-gray-900 shadow-xl rounded-none border border-gray-200 dark:border-gray-800 relative z-10">
+        <div className="card rounded-none relative z-10">
           <div className="px-6 py-8 relative z-10">
             {team?._id ? (
               <TeamCalendar 

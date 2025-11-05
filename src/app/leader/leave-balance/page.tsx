@@ -669,7 +669,6 @@ export default function LeaderLeaveBalancePage() {
     setUpdating(memberId);
     try {
       const token = localStorage.getItem('token');
-      const maxMaternityLeaveDays = team?.settings.maternityLeave?.maxDays || 90;
       
       // Get days used - use manualMaternityYearToDateUsed if set, otherwise calculate from approved maternity requests
       let daysUsed: number;
@@ -878,10 +877,10 @@ export default function LeaderLeaveBalancePage() {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black">
         <Navbar />
-            <div className="flex items-center justify-center h-64 pt-24">
+        <div className="flex items-center justify-center h-64 pt-24">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-gray-400 dark:border-t-gray-500 mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-400 text-lg">Loading leave balances...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-indigo-600 dark:border-t-indigo-400 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">Loading leave balances...</p>
           </div>
         </div>
       </div>
@@ -931,127 +930,154 @@ export default function LeaderLeaveBalancePage() {
       <div className="min-h-screen bg-gray-50 dark:bg-black">
         <Navbar />
         
-        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 pt-24">
-          <div className="px-4 py-6 sm:px-0 mb-6">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Detailed Leave Balance</h1>
-            <p className="mt-2 text-gray-600 dark:text-gray-400">View comprehensive leave balance information for all team members.</p>
+        <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12">
+          {/* Header Section - Enhanced */}
+          <div className="mb-8 fade-in">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">Detailed Leave Balance</h1>
+            <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400">View comprehensive leave balance information for all team members</p>
           </div>
 
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-            <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-6 border border-gray-100 dark:border-gray-800">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                    <UsersIcon className="h-6 w-6 text-blue-700 dark:text-blue-400" />
+          {/* Summary Cards - Enhanced */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 mb-8">
+            <div className="stat-card group">
+              <div className="p-5 sm:p-6">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Total Members</p>
+                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
+                      {totalMembers}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Team members</p>
                   </div>
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Members</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{totalMembers}</p>
+                  <div className="flex-shrink-0 ml-4">
+                    <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
+                      <UsersIcon className="h-6 w-6 text-blue-700 dark:text-blue-400" />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-6 border border-gray-100 dark:border-gray-800">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                    <CalendarIcon className="h-6 w-6 text-green-700 dark:text-green-400" />
+            <div className="stat-card group">
+              <div className="p-5 sm:p-6">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Total Remaining</p>
+                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
+                      {Math.round(totalRemainingBalance)}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Days remaining</p>
                   </div>
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Remaining</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{Math.round(totalRemainingBalance)}</p>
+                  <div className="flex-shrink-0 ml-4">
+                    <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center">
+                      <CalendarIcon className="h-6 w-6 text-green-700 dark:text-green-400" />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-6 border border-gray-100 dark:border-gray-800">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg flex items-center justify-center">
-                    <ChartBarIcon className="h-6 w-6 text-yellow-700 dark:text-yellow-400" />
+            <div className="stat-card group">
+              <div className="p-5 sm:p-6">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Total Used</p>
+                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
+                      {Math.round(totalUsed)}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Days used</p>
                   </div>
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Used</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{Math.round(totalUsed)}</p>
+                  <div className="flex-shrink-0 ml-4">
+                    <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/30 rounded-xl flex items-center justify-center">
+                      <ChartBarIcon className="h-6 w-6 text-yellow-700 dark:text-yellow-400" />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-6 border border-gray-100 dark:border-gray-800">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
-                    <ArrowTrendingUpIcon className="h-6 w-6 text-purple-700 dark:text-purple-400" />
+            <div className="stat-card group">
+              <div className="p-5 sm:p-6">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Avg Balance</p>
+                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
+                      {Math.round(averageBalance)}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Average remaining</p>
+                  </div>
+                  <div className="flex-shrink-0 ml-4">
+                    <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-xl flex items-center justify-center">
+                      <ArrowTrendingUpIcon className="h-6 w-6 text-purple-700 dark:text-purple-400" />
+                    </div>
                   </div>
                 </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Avg Balance</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{Math.round(averageBalance)}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Filters and Sort */}
-          <div className="bg-white dark:bg-gray-900 shadow rounded-lg p-4 mb-6 border border-gray-100 dark:border-gray-800">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
-              <div className="flex items-center space-x-4">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Filter:</label>
-                <select
-                  value={filterBy}
-                  onChange={(e) => setFilterBy(e.target.value as 'all' | 'low' | 'high')}
-                  className="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
-                >
-                  <option value="all">All Members</option>
-                  <option value="low">Low Balance (&lt;30%)</option>
-                  <option value="high">High Balance (&gt;=70%)</option>
-                </select>
-              </div>
-
-              <div className="flex items-center space-x-4">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Sort by:</label>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as 'name' | 'balance' | 'used')}
-                  className="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
-                >
-                  <option value="name">Name</option>
-                  <option value="balance">Remaining Balance</option>
-                  <option value="used">Days Used</option>
-                </select>
               </div>
             </div>
           </div>
 
-          {/* Remainder Days Notice */}
+          {/* Filters and Sort - Enhanced */}
+          <div className="card mb-8">
+            <div className="p-5 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">Filter:</label>
+                  <select
+                    value={filterBy}
+                    onChange={(e) => setFilterBy(e.target.value as 'all' | 'low' | 'high')}
+                    className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:w-auto sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
+                  >
+                    <option value="all">All Members</option>
+                    <option value="low">Low Balance (&lt;30%)</option>
+                    <option value="high">High Balance (&gt;=70%)</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">Sort by:</label>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as 'name' | 'balance' | 'used')}
+                    className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:w-auto sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
+                  >
+                    <option value="name">Name</option>
+                    <option value="balance">Remaining Balance</option>
+                    <option value="used">Days Used</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Remainder Days Notice - Enhanced */}
           {(() => {
             // Use analytics aggregate remainder days if available
             const totalRemainderDays = analytics?.aggregate.totalRemainderDays ?? 0;
             
             if (totalRemainderDays > 0) {
               return (
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0">
-                      <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div className="ml-3 flex-1">
-                      <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">
-                        Remainder Days Require Allocation
-                      </h3>
-                      <div className="mt-2 text-sm text-blue-700 dark:text-blue-400">
-                        <p>
-                          There are <strong>{totalRemainderDays}</strong> day(s) that cannot be evenly distributed among members sharing the same shift schedule. These remainder days will need to be allocated manually, and not everyone in the affected groups will receive them.
-                        </p>
-                        <p className="mt-2">
-                          See the <strong>Analytics</strong> page for group-level breakdown and detailed allocation information.
-                        </p>
+                <div className="card mb-8 bg-blue-50/50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                  <div className="p-5 sm:p-6">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0">
+                        <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/40 rounded-lg flex items-center justify-center">
+                          <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-base font-semibold text-blue-900 dark:text-blue-200 mb-2">
+                          Remainder Days Require Allocation
+                        </h3>
+                        <div className="text-sm text-blue-800 dark:text-blue-300 space-y-2">
+                          <p>
+                            There are <strong className="font-semibold">{totalRemainderDays}</strong> day(s) that cannot be evenly distributed among members sharing the same shift schedule. These remainder days will need to be allocated manually, and not everyone in the affected groups will receive them.
+                          </p>
+                          <p>
+                            See the <strong className="font-semibold">Analytics</strong> page for group-level breakdown and detailed allocation information.
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1061,37 +1087,37 @@ export default function LeaderLeaveBalancePage() {
             return null;
           })()}
 
-          {/* Members Table */}
-          <div className="bg-white dark:bg-gray-900 shadow rounded-lg overflow-hidden border border-gray-100 dark:border-gray-800">
+          {/* Members Table - Enhanced */}
+          <div className="card overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800 table-enhanced">
                 <thead className="bg-gray-50 dark:bg-gray-900">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                       Member
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                       Remaining Balance
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                       Total Used
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                       Year-to-Date Used
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                       Usage %
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                       Requests
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                       Maternity/Paternity Balance
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                       Maternity Used
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                       Maternity Usage %
                     </th>
                   </tr>
@@ -1099,8 +1125,12 @@ export default function LeaderLeaveBalancePage() {
                 <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
                   {memberList.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                        No members found
+                      <td colSpan={9} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                        <div className="flex flex-col items-center justify-center">
+                          <UsersIcon className="h-12 w-12 text-gray-400 dark:text-gray-600 mb-3" />
+                          <p className="text-base font-medium">No members found</p>
+                          <p className="text-sm mt-1">Try adjusting your filters</p>
+                        </div>
                       </td>
                     </tr>
                   ) : (
@@ -1128,18 +1158,20 @@ export default function LeaderLeaveBalancePage() {
                       }
 
                       return (
-                        <tr key={member._id} className="hover:bg-gray-50 dark:hover:bg-gray-900">
-                          <td className="px-6 py-4 whitespace-nowrap">
+                        <tr key={member._id} className="stagger-item">
+                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
                               <div>
-                                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                <div className="text-sm font-semibold text-gray-900 dark:text-white">
                                   {member.fullName || member.username}
                                 </div>
-                                <div className="text-sm text-gray-500 dark:text-gray-400">{member.username}</div>
+                                {member.fullName && (
+                                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{member.username}</div>
+                                )}
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                             {editingBalance === member._id ? (
                               <div className="space-y-2">
                                 <div className="flex items-center space-x-2">
@@ -1288,10 +1320,10 @@ export default function LeaderLeaveBalancePage() {
                               </div>
                             )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                             {leaveData.baseBalance > 0 ? Math.round(leaveData.totalUsed) : '-'}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                             {editingDaysTaken === member._id ? (
                               <div className="flex items-center space-x-2">
                                 <input
@@ -1348,17 +1380,25 @@ export default function LeaderLeaveBalancePage() {
                               </div>
                             )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`text-sm font-medium ${percentageColor}`}>
+                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                            <span className={`text-sm font-semibold ${percentageColor}`}>
                               {leaveData.percentageUsed !== null ? `${Math.round(leaveData.percentageUsed)}%` : '-'}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            <div className="flex items-center space-x-2">
-                              <span className="text-green-600 dark:text-green-400">{leaveData.approvedCount} approved</span>
-                              <span className="text-yellow-600 dark:text-yellow-400">{leaveData.pendingCount} pending</span>
+                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400">
+                                {leaveData.approvedCount} approved
+                              </span>
+                              {leaveData.pendingCount > 0 && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400">
+                                  {leaveData.pendingCount} pending
+                                </span>
+                              )}
                               {leaveData.rejectedCount > 0 && (
-                                <span className="text-red-600 dark:text-red-400">{leaveData.rejectedCount} rejected</span>
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400">
+                                  {leaveData.rejectedCount} rejected
+                                </span>
                               )}
                             </div>
                           </td>
@@ -1368,7 +1408,7 @@ export default function LeaderLeaveBalancePage() {
                             const maxMaternityDays = team?.settings.maternityLeave?.maxDays || 90;
                             return (
                               <>
-                                <td className="px-6 py-4 whitespace-nowrap">
+                                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                                   {editingMaternityBalance === member._id ? (
                                     <div className="space-y-2">
                                       <div className="flex items-center space-x-2">
@@ -1431,7 +1471,7 @@ export default function LeaderLeaveBalancePage() {
                                     </div>
                                   )}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
+                                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                                   {editingMaternityDaysTaken === member._id ? (
                                     <div className="flex items-center space-x-2">
                                       <input
@@ -1476,8 +1516,8 @@ export default function LeaderLeaveBalancePage() {
                                     </div>
                                   )}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                                  <span className="text-sm font-semibold text-gray-900 dark:text-white">
                                     {maternityData.percentageUsed !== null ? `${Math.round(maternityData.percentageUsed)}%` : '-'}
                                   </span>
                                 </td>

@@ -216,7 +216,10 @@ export default function TeamSettingsPage() {
       <div className="min-h-screen bg-gray-50 dark:bg-black">
         <Navbar />
         <div className="flex items-center justify-center h-64 pt-24">
-          <div className="animate-spin rounded-full h-32 w-32 border-2 border-gray-200 dark:border-gray-800 border-t-gray-400 dark:border-t-gray-500"></div>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-indigo-600 dark:border-t-indigo-400 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">Loading settings...</p>
+          </div>
         </div>
       </div>
     );
@@ -226,14 +229,15 @@ export default function TeamSettingsPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       <Navbar />
       
-      <div className="max-w-3xl mx-auto py-6 sm:px-6 lg:px-8 pt-24">
-        <div className="px-4 py-6 sm:px-0">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Team Settings</h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">Configure your team&apos;s leave policies.</p>
+      <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12 max-w-4xl mx-auto">
+        {/* Header Section - Enhanced */}
+        <div className="mb-8 fade-in">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">Team Settings</h1>
+          <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400">Configure your team&apos;s leave policies</p>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-100 dark:border-gray-800">
-          <form onSubmit={handleSave} className="px-4 py-5 sm:p-6">
+        <div className="card">
+          <form onSubmit={handleSave} className="p-5 sm:p-6">
             <div className="space-y-6">
               <div>
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Leave Policies</h3>
@@ -638,7 +642,7 @@ export default function TeamSettingsPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-900 disabled:opacity-50"
+                className="btn-primary ml-3 disabled:opacity-50"
               >
                 {saving ? 'Saving...' : 'Save Settings'}
               </button>

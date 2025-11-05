@@ -406,8 +406,8 @@ export default function LeaderMembersPage() {
         <Navbar />
         <div className="flex items-center justify-center h-64 pt-24">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-gray-400 dark:border-t-gray-500 mx-auto mb-4"></div>
-            <p className="text-gray-500 dark:text-gray-400 text-lg">Loading team members...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-indigo-600 dark:border-t-indigo-400 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">Loading team members...</p>
           </div>
         </div>
       </div>
@@ -418,14 +418,15 @@ export default function LeaderMembersPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       <Navbar />
       
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8 pt-24">
-        <div className="px-4 py-6 sm:px-0">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Team Members</h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">Manage your team members and their shift assignments.</p>
+      <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12">
+        {/* Header Section - Enhanced */}
+        <div className="mb-8 fade-in">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">Team Members</h1>
+          <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400">Manage your team members and their shift assignments</p>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-100 dark:border-gray-800">
-          <div className="px-4 py-5 sm:p-6">
+        <div className="card">
+          <div className="p-5 sm:p-6">
             {/* Filter Section */}
             {members.length > 0 && (
               <div className="mb-6 space-y-4 border-b border-gray-200 dark:border-gray-800 pb-4">
@@ -577,7 +578,7 @@ export default function LeaderMembersPage() {
                     <button
                       onClick={handleSaveGroupNames}
                       disabled={savingGroupNames}
-                      className="bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {savingGroupNames ? 'Saving...' : 'Save Names'}
                     </button>
