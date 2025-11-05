@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import { Team } from '@/types';
-import { useNotification } from '@/hooks/useNotification';
+import { useToast } from '@/contexts/ToastContext';
+import { MinusIcon, PlusIcon } from '@heroicons/react/24/outline';
 
 export default function TeamSettingsPage() {
-  const { showSuccess, showError } = useNotification();
+  const { showSuccess, showError } = useToast();
   const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -249,61 +250,50 @@ export default function TeamSettingsPage() {
                     <label htmlFor="concurrentLeave" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                       Maximum Concurrent Leave
                     </label>
-                    <div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const current = settings.concurrentLeave ?? 2;
+                          if (current > 1) {
+                            setSettings({
+                              ...settings,
+                              concurrentLeave: current - 1
+                            });
+                          }
+                        }}
+                        disabled={settings.concurrentLeave <= 1}
+                        className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        aria-label="Decrease"
+                      >
+                        <MinusIcon className="h-5 w-5" />
+                      </button>
                       <input
                         type="number"
                         id="concurrentLeave"
                         min="1"
                         max="10"
                         value={settings.concurrentLeave ?? 2}
-                        onChange={(e) => {
-                          const inputValue = e.target.value.trim();
-                          if (inputValue === '') {
-                            // Allow clearing the field - don't update state yet
-                            e.target.value = '';
-                            return;
-                          }
-                          const value = parseInt(inputValue, 10);
-                          if (!isNaN(value) && value >= 1 && value <= 10) {
-                            setSettings({
-                              ...settings,
-                              concurrentLeave: value
-                            });
-                          }
-                        }}
-                        onBlur={(e) => {
-                          const inputValue = e.target.value.trim();
-                          if (inputValue === '' || isNaN(parseInt(inputValue, 10))) {
-                            setSettings({
-                              ...settings,
-                              concurrentLeave: 2
-                            });
-                          } else {
-                            const value = parseInt(inputValue, 10);
-                            if (value >= 1 && value <= 10) {
-                              setSettings({
-                                ...settings,
-                                concurrentLeave: value
-                              });
-                            } else {
-                              setSettings({
-                                ...settings,
-                                concurrentLeave: 2
-                              });
-                            }
-                          }
-                        }}
-                        onKeyDown={(e) => {
-                          // Allow clearing with Delete/Backspace
-                          if (e.key === 'Delete' || e.key === 'Backspace') {
-                            const target = e.target as HTMLInputElement;
-                            if (target.value && target.selectionStart === 0 && target.selectionEnd === target.value.length) {
-                              target.value = '';
-                            }
-                          }
-                        }}
-                        className="input-modern w-full"
+                        readOnly
+                        className="input-modern text-center w-20"
                       />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const current = settings.concurrentLeave ?? 2;
+                          if (current < 10) {
+                            setSettings({
+                              ...settings,
+                              concurrentLeave: current + 1
+                            });
+                          }
+                        }}
+                        disabled={settings.concurrentLeave >= 10}
+                        className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        aria-label="Increase"
+                      >
+                        <PlusIcon className="h-5 w-5" />
+                      </button>
                     </div>
                     <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                       Maximum number of team members who can be on leave at the same time.

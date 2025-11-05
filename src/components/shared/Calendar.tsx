@@ -322,7 +322,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
         }
       });
     }
-  }, [isMember, selectionMode, currentUser, normalizeDate, isSameDay]);
+  }, [isMember, selectionMode, currentUser, normalizeDate, isSameDay, showInfo]);
 
   // Style getter for highlighting working days and selected dates (only for members)
   const dayPropGetter = useCallback((date: Date) => {
