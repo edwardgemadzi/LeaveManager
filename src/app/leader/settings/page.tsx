@@ -244,10 +244,10 @@ export default function TeamSettingsPage() {
                 
                 <div className="grid grid-cols-1 gap-6">
                   <div>
-                    <label htmlFor="concurrentLeave" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label htmlFor="concurrentLeave" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                       Maximum Concurrent Leave
                     </label>
-                    <div className="mt-1">
+                    <div>
                       <input
                         type="number"
                         id="concurrentLeave"
@@ -255,13 +255,52 @@ export default function TeamSettingsPage() {
                         max="10"
                         value={settings.concurrentLeave ?? 2}
                         onChange={(e) => {
-                          const value = parseInt(e.target.value, 10);
-                          setSettings({
-                            ...settings,
-                            concurrentLeave: isNaN(value) ? 2 : value
-                          });
+                          const inputValue = e.target.value.trim();
+                          if (inputValue === '') {
+                            // Allow clearing the field - don't update state yet
+                            e.target.value = '';
+                            return;
+                          }
+                          const value = parseInt(inputValue, 10);
+                          if (!isNaN(value) && value >= 1 && value <= 10) {
+                            setSettings({
+                              ...settings,
+                              concurrentLeave: value
+                            });
+                          }
                         }}
-                        className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
+                        onBlur={(e) => {
+                          const inputValue = e.target.value.trim();
+                          if (inputValue === '' || isNaN(parseInt(inputValue, 10))) {
+                            setSettings({
+                              ...settings,
+                              concurrentLeave: 2
+                            });
+                          } else {
+                            const value = parseInt(inputValue, 10);
+                            if (value >= 1 && value <= 10) {
+                              setSettings({
+                                ...settings,
+                                concurrentLeave: value
+                              });
+                            } else {
+                              setSettings({
+                                ...settings,
+                                concurrentLeave: 2
+                              });
+                            }
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          // Allow clearing with Delete/Backspace
+                          if (e.key === 'Delete' || e.key === 'Backspace') {
+                            const target = e.target as HTMLInputElement;
+                            if (target.value && target.selectionStart === 0 && target.selectionEnd === target.value.length) {
+                              target.value = '';
+                            }
+                          }
+                        }}
+                        className="input-modern w-full"
                       />
                     </div>
                     <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
@@ -270,10 +309,10 @@ export default function TeamSettingsPage() {
                   </div>
 
                   <div>
-                    <label htmlFor="maxLeavePerYear" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label htmlFor="maxLeavePerYear" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                       Maximum Leave Days Per Year
                     </label>
-                    <div className="mt-1">
+                    <div>
                       <input
                         type="number"
                         id="maxLeavePerYear"
@@ -281,13 +320,52 @@ export default function TeamSettingsPage() {
                         max="50"
                         value={settings.maxLeavePerYear ?? 20}
                         onChange={(e) => {
-                          const value = parseInt(e.target.value, 10);
-                          setSettings({
-                            ...settings,
-                            maxLeavePerYear: isNaN(value) ? 20 : value
-                          });
+                          const inputValue = e.target.value.trim();
+                          if (inputValue === '') {
+                            // Allow clearing the field - don't update state yet
+                            e.target.value = '';
+                            return;
+                          }
+                          const value = parseInt(inputValue, 10);
+                          if (!isNaN(value) && value >= 1 && value <= 50) {
+                            setSettings({
+                              ...settings,
+                              maxLeavePerYear: value
+                            });
+                          }
                         }}
-                        className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
+                        onBlur={(e) => {
+                          const inputValue = e.target.value.trim();
+                          if (inputValue === '' || isNaN(parseInt(inputValue, 10))) {
+                            setSettings({
+                              ...settings,
+                              maxLeavePerYear: 20
+                            });
+                          } else {
+                            const value = parseInt(inputValue, 10);
+                            if (value >= 1 && value <= 50) {
+                              setSettings({
+                                ...settings,
+                                maxLeavePerYear: value
+                              });
+                            } else {
+                              setSettings({
+                                ...settings,
+                                maxLeavePerYear: 20
+                              });
+                            }
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          // Allow clearing with Delete/Backspace
+                          if (e.key === 'Delete' || e.key === 'Backspace') {
+                            const target = e.target as HTMLInputElement;
+                            if (target.value && target.selectionStart === 0 && target.selectionEnd === target.value.length) {
+                              target.value = '';
+                            }
+                          }
+                        }}
+                        className="input-modern w-full"
                       />
                     </div>
                     <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
@@ -296,10 +374,10 @@ export default function TeamSettingsPage() {
                   </div>
 
                   <div>
-                    <label htmlFor="minimumNoticePeriod" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label htmlFor="minimumNoticePeriod" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                       Minimum Notice Period (Days)
                     </label>
-                    <div className="mt-1">
+                    <div>
                       <input
                         type="number"
                         id="minimumNoticePeriod"
@@ -307,13 +385,52 @@ export default function TeamSettingsPage() {
                         max="30"
                         value={settings.minimumNoticePeriod ?? 1}
                         onChange={(e) => {
-                          const value = parseInt(e.target.value, 10);
-                          setSettings({
-                            ...settings,
-                            minimumNoticePeriod: isNaN(value) ? 1 : value
-                          });
+                          const inputValue = e.target.value.trim();
+                          if (inputValue === '') {
+                            // Allow clearing the field - don't update state yet
+                            e.target.value = '';
+                            return;
+                          }
+                          const value = parseInt(inputValue, 10);
+                          if (!isNaN(value) && value >= 0 && value <= 30) {
+                            setSettings({
+                              ...settings,
+                              minimumNoticePeriod: value
+                            });
+                          }
                         }}
-                        className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
+                        onBlur={(e) => {
+                          const inputValue = e.target.value.trim();
+                          if (inputValue === '' || isNaN(parseInt(inputValue, 10))) {
+                            setSettings({
+                              ...settings,
+                              minimumNoticePeriod: 1
+                            });
+                          } else {
+                            const value = parseInt(inputValue, 10);
+                            if (value >= 0 && value <= 30) {
+                              setSettings({
+                                ...settings,
+                                minimumNoticePeriod: value
+                              });
+                            } else {
+                              setSettings({
+                                ...settings,
+                                minimumNoticePeriod: 1
+                              });
+                            }
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          // Allow clearing with Delete/Backspace
+                          if (e.key === 'Delete' || e.key === 'Backspace') {
+                            const target = e.target as HTMLInputElement;
+                            if (target.value && target.selectionStart === 0 && target.selectionEnd === target.value.length) {
+                              target.value = '';
+                            }
+                          }
+                        }}
+                        className="input-modern w-full"
                       />
                     </div>
                     <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
@@ -434,10 +551,10 @@ export default function TeamSettingsPage() {
                     
                     <div className="space-y-4">
                       <div>
-                        <label htmlFor="maternityMaxDays" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <label htmlFor="maternityMaxDays" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                           Maximum Maternity Leave Days
                         </label>
-                        <div className="mt-1">
+                        <div>
                           <input
                             type="number"
                             id="maternityMaxDays"
@@ -445,17 +562,68 @@ export default function TeamSettingsPage() {
                             max="365"
                             value={settings.maternityLeave?.maxDays ?? 90}
                             onChange={(e) => {
-                              const value = parseInt(e.target.value, 10);
-                              setSettings({
-                                ...settings,
-                                maternityLeave: {
-                                  ...settings.maternityLeave,
-                                  maxDays: isNaN(value) ? 90 : value,
-                                  countingMethod: settings.maternityLeave?.countingMethod || 'working',
-                                }
-                              });
+                              const inputValue = e.target.value.trim();
+                              if (inputValue === '') {
+                                // Allow clearing the field - don't update state yet
+                                e.target.value = '';
+                                return;
+                              }
+                              const value = parseInt(inputValue, 10);
+                              if (!isNaN(value) && value >= 1 && value <= 365) {
+                                setSettings({
+                                  ...settings,
+                                  maternityLeave: {
+                                    ...settings.maternityLeave,
+                                    maxDays: value,
+                                    countingMethod: settings.maternityLeave?.countingMethod || 'working',
+                                  }
+                                });
+                              }
                             }}
-                            className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
+                            onBlur={(e) => {
+                              const inputValue = e.target.value.trim();
+                              if (inputValue === '' || isNaN(parseInt(inputValue, 10))) {
+                                setSettings({
+                                  ...settings,
+                                  maternityLeave: {
+                                    ...settings.maternityLeave,
+                                    maxDays: 90,
+                                    countingMethod: settings.maternityLeave?.countingMethod || 'working',
+                                  }
+                                });
+                              } else {
+                                const value = parseInt(inputValue, 10);
+                                if (value >= 1 && value <= 365) {
+                                  setSettings({
+                                    ...settings,
+                                    maternityLeave: {
+                                      ...settings.maternityLeave,
+                                      maxDays: value,
+                                      countingMethod: settings.maternityLeave?.countingMethod || 'working',
+                                    }
+                                  });
+                                } else {
+                                  setSettings({
+                                    ...settings,
+                                    maternityLeave: {
+                                      ...settings.maternityLeave,
+                                      maxDays: 90,
+                                      countingMethod: settings.maternityLeave?.countingMethod || 'working',
+                                    }
+                                  });
+                                }
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              // Allow clearing with Delete/Backspace
+                              if (e.key === 'Delete' || e.key === 'Backspace') {
+                                const target = e.target as HTMLInputElement;
+                                if (target.value && target.selectionStart === 0 && target.selectionEnd === target.value.length) {
+                                  target.value = '';
+                                }
+                              }
+                            }}
+                            className="input-modern w-full"
                           />
                         </div>
                         <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
