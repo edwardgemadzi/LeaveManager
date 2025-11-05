@@ -6,8 +6,10 @@ import MigrationCalendar from '@/components/shared/MigrationCalendar';
 import { LeaveRequest, User } from '@/types';
 import { LEAVE_REASONS, EMERGENCY_REASONS, isEmergencyReason } from '@/lib/leaveReasons';
 import { ExclamationTriangleIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
+import { useNotification } from '@/hooks/useNotification';
 
 export default function LeaderRequestsPage() {
+  const { showSuccess, showError, showInfo } = useNotification();
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [members, setMembers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -155,14 +157,14 @@ export default function LeaderRequestsPage() {
         setRequests(requests.filter(req => req._id !== requestId));
         // Dispatch custom event to trigger refresh on other pages
         window.dispatchEvent(new CustomEvent('leaveRequestDeleted'));
-        alert('Request deleted successfully');
+        showSuccess('Request deleted successfully');
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to delete request');
+        showError(error.error || 'Failed to delete request');
       }
     } catch (error) {
       console.error('Error deleting request:', error);
-      alert('Network error. Please try again.');
+      showError('Network error. Please try again.');
     } finally {
       setDeleting(null);
     }
@@ -199,13 +201,13 @@ export default function LeaderRequestsPage() {
           password: ''
         });
         setShowEmergencyForm(false);
-        alert('Emergency leave request created and auto-approved!');
+        showSuccess('Emergency leave request created and auto-approved!');
       } else {
-        alert(data.error || 'Failed to create emergency request');
+        showError(data.error || 'Failed to create emergency request');
       }
     } catch (error) {
       console.error('Error creating emergency request:', error);
-      alert('Network error. Please try again.');
+      showError('Network error. Please try again.');
     } finally {
       setSubmittingEmergency(false);
     }
@@ -252,17 +254,17 @@ export default function LeaderRequestsPage() {
     e.preventDefault();
     
     if (selectedRanges.length === 0) {
-      alert('Please select at least one date range on the calendar');
+      showInfo('Please select at least one date range on the calendar');
       return;
     }
 
     if (!migrationForm.memberId || !selectedReasonType) {
-      alert('Please select a member and choose a reason');
+      showInfo('Please select a member and choose a reason');
       return;
     }
 
     if (selectedReasonType === 'other' && !migrationForm.customReason.trim()) {
-      alert('Please provide details for the leave reason');
+      showInfo('Please provide details for the leave reason');
       return;
     }
 
@@ -317,9 +319,9 @@ export default function LeaderRequestsPage() {
         }
 
         if (errorCount === 0) {
-          alert(`Successfully created ${successCount} historical leave ${successCount === 1 ? 'entry' : 'entries'}!`);
+          showSuccess(`Successfully created ${successCount} historical leave ${successCount === 1 ? 'entry' : 'entries'}!`);
         } else {
-          alert(`Created ${successCount} entries. ${errorCount} failed.`);
+          showSuccess(`Created ${successCount} entries. ${errorCount} failed.`);
         }
         
         setMigrationForm({
@@ -331,11 +333,11 @@ export default function LeaderRequestsPage() {
         setSelectedRanges([]);
         setShowMigrationForm(false);
       } else {
-        alert(`Failed to create historical requests. ${errorCount} error(s).`);
+        showError(`Failed to create historical requests. ${errorCount} error(s).`);
       }
     } catch (error) {
       console.error('Error creating historical requests:', error);
-      alert('Network error. Please try again.');
+      showError('Network error. Please try again.');
     } finally {
       setSubmittingMigration(false);
     }

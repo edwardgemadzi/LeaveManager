@@ -5,8 +5,10 @@ import Navbar from '@/components/shared/Navbar';
 import { LeaveRequest } from '@/types';
 import { LEAVE_REASONS } from '@/lib/leaveReasons';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { useNotification } from '@/hooks/useNotification';
 
 export default function MemberRequestsPage() {
+  const { showSuccess, showError, showInfo } = useNotification();
   const [myRequests, setMyRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -85,12 +87,12 @@ export default function MemberRequestsPage() {
     
     // Validate form
     if (!selectedReasonType) {
-      alert('Please select a reason for your leave request.');
+      showInfo('Please select a reason for your leave request.');
       return;
     }
     
     if (selectedReasonType === 'other' && !formData.customReason.trim()) {
-      alert('Please provide details for your leave request.');
+      showInfo('Please provide details for your leave request.');
       return;
     }
     
@@ -104,7 +106,7 @@ export default function MemberRequestsPage() {
       const daysDifference = Math.ceil((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       
       if (daysDifference < teamSettings.minimumNoticePeriod) {
-        alert(`Leave requests must be submitted at least ${teamSettings.minimumNoticePeriod} day(s) in advance. Please select a start date ${teamSettings.minimumNoticePeriod} or more days from today.`);
+        showInfo(`Leave requests must be submitted at least ${teamSettings.minimumNoticePeriod} day(s) in advance. Please select a start date ${teamSettings.minimumNoticePeriod} or more days from today.`);
         return;
       }
     }
@@ -131,14 +133,14 @@ export default function MemberRequestsPage() {
         setFormData({ startDate: '', endDate: '', reason: '', customReason: '' });
         setSelectedReasonType('');
         setShowForm(false);
-        alert('Leave request submitted successfully!');
+        showSuccess('Leave request submitted successfully!');
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to submit request');
+        showError(error.error || 'Failed to submit request');
       }
     } catch (error) {
       console.error('Error submitting request:', error);
-      alert('Error submitting request');
+      showError('Error submitting request');
     } finally {
       setSubmitting(false);
     }
@@ -161,14 +163,14 @@ export default function MemberRequestsPage() {
 
       if (response.ok) {
         setMyRequests(myRequests.filter(req => req._id !== requestId));
-        alert('Request cancelled successfully');
+        showSuccess('Request cancelled successfully');
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to cancel request');
+        showError(error.error || 'Failed to cancel request');
       }
     } catch (error) {
       console.error('Error deleting request:', error);
-      alert('Network error. Please try again.');
+      showError('Network error. Please try again.');
     } finally {
       setDeleting(null);
     }

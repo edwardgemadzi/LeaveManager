@@ -6,8 +6,10 @@ import ShiftScheduleBuilder from '@/components/ShiftScheduleBuilder';
 import { User, ShiftSchedule, Team } from '@/types';
 import { getWorkingDaysGroupDisplayName, getWorkingDaysGroupDisplayNameWithTag } from '@/lib/helpers';
 import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
+import { useNotification } from '@/hooks/useNotification';
 
 export default function LeaderMembersPage() {
+  const { showSuccess, showError } = useNotification();
   const [members, setMembers] = useState<User[]>([]);
   const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,14 +74,14 @@ export default function LeaderMembersPage() {
 
       if (response.ok) {
         setMembers(members.filter(member => member._id !== memberId));
-        alert(`${memberName} has been removed from the team.`);
+        showSuccess(`${memberName} has been removed from the team.`);
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to remove member');
+        showError(error.error || 'Failed to remove member');
       }
     } catch (error) {
       console.error('Error removing member:', error);
-      alert('Network error. Please try again.');
+      showError('Network error. Please try again.');
     } finally {
       setDeleting(null);
     }
@@ -106,11 +108,11 @@ export default function LeaderMembersPage() {
         ));
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to update shift tag');
+        showError(error.error || 'Failed to update shift tag');
       }
     } catch (error) {
       console.error('Error updating shift tag:', error);
-      alert('Network error. Please try again.');
+      showError('Network error. Please try again.');
     } finally {
       setUpdating(null);
     }
@@ -138,11 +140,11 @@ export default function LeaderMembersPage() {
       } else {
         const errorData = await response.json();
         console.error('Error updating subgroup:', errorData);
-        alert(errorData.error || 'Failed to update subgroup');
+        showError(errorData.error || 'Failed to update subgroup');
       }
     } catch (error) {
       console.error('Error updating subgroup:', error);
-      alert('Network error. Please try again.');
+      showError('Network error. Please try again.');
     } finally {
       setUpdating(null);
     }
@@ -189,11 +191,11 @@ export default function LeaderMembersPage() {
         setTempSchedule(null);
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to update shift schedule');
+        showError(error.error || 'Failed to update shift schedule');
       }
     } catch (error) {
       console.error('Error updating shift schedule:', error);
-      alert('Network error. Please try again.');
+      showError('Network error. Please try again.');
     } finally {
       setUpdating(null);
     }
@@ -386,15 +388,15 @@ export default function LeaderMembersPage() {
           const data = await teamResponse.json();
           setTeam(data.team);
           setEditingGroupNames({});
-          alert('Group names saved successfully!');
+          showSuccess('Group names saved successfully!');
         }
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to save group names');
+        showError(error.error || 'Failed to save group names');
       }
     } catch (error) {
       console.error('Error saving group names:', error);
-      alert('Network error. Please try again.');
+      showError('Network error. Please try again.');
     } finally {
       setSavingGroupNames(false);
     }

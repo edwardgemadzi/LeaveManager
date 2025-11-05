@@ -8,6 +8,7 @@ import { LeaveRequest, User } from '@/types';
 import { getWorkingDays, isWorkingDay } from '@/lib/leaveCalculations';
 import { LEAVE_REASONS, isEmergencyReason } from '@/lib/leaveReasons';
 import { CheckCircleIcon, ClockIcon, XCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { useNotification } from '@/hooks/useNotification';
 
 const localizer = momentLocalizer(moment);
 
@@ -35,6 +36,7 @@ interface CalendarProps {
 }
 
 export default function TeamCalendar({ teamId, members, currentUser, teamSettings: providedTeamSettings, initialRequests }: CalendarProps) {
+  const { showSuccess, showError, showInfo } = useNotification();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [currentView, setCurrentView] = useState<View>(Views.MONTH);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -282,13 +284,13 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
     const clickedDate = normalizeDate(slotInfo.start);
 
     // Only allow selection of working days
-    if (currentUser && currentUser.shiftSchedule) {
-      const isWorking = isWorkingDay(clickedDate, currentUser.shiftSchedule);
-      if (!isWorking) {
-        alert('You can only request leave for your scheduled working days.');
-        return;
+      if (currentUser && currentUser.shiftSchedule) {
+        const isWorking = isWorkingDay(clickedDate, currentUser.shiftSchedule);
+        if (!isWorking) {
+          showInfo('You can only request leave for your scheduled working days.');
+          return;
+        }
       }
-    }
 
     // If not in selection mode, enter selection mode
     if (!selectionMode) {
@@ -312,7 +314,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
           if (currentUser && currentUser.shiftSchedule) {
             const isWorking = isWorkingDay(clickedDate, currentUser.shiftSchedule);
             if (!isWorking) {
-              alert('You can only request leave for your scheduled working days.');
+              showInfo('You can only request leave for your scheduled working days.');
               return prev;
             }
           }
@@ -462,17 +464,17 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
 
   const handleSubmitLeaveRequest = useCallback(async () => {
     if (!selectedReasonType) {
-      alert('Please select a reason for your leave request.');
+      showInfo('Please select a reason for your leave request.');
       return;
     }
 
     if (selectedReasonType === 'other' && !customReason.trim()) {
-      alert('Please provide details for your leave request.');
+      showInfo('Please provide details for your leave request.');
       return;
     }
 
     if (selectedDates.length === 0) {
-      alert('Please select at least one date.');
+      showInfo('Please select at least one date.');
       return;
     }
 
@@ -484,7 +486,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
     if (currentUser && currentUser.shiftSchedule) {
       const nonWorkingDays = sortedDates.filter(date => !isWorkingDay(date, currentUser.shiftSchedule!));
       if (nonWorkingDays.length > 0) {
-        alert('You can only request leave for your scheduled working days. Please remove non-working days from your selection.');
+        showInfo('You can only request leave for your scheduled working days. Please remove non-working days from your selection.');
         return;
       }
     }
@@ -497,7 +499,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
       const daysDifference = Math.ceil((earliestDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
       if (daysDifference < teamSettings.minimumNoticePeriod) {
-        alert(`Leave requests must be submitted at least ${teamSettings.minimumNoticePeriod} day(s) in advance. Please select dates ${teamSettings.minimumNoticePeriod} or more days from today.`);
+        showInfo(`Leave requests must be submitted at least ${teamSettings.minimumNoticePeriod} day(s) in advance. Please select dates ${teamSettings.minimumNoticePeriod} or more days from today.`);
         return;
       }
     }
@@ -528,7 +530,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
         if (response.ok) {
           // Refresh calendar and show success
           await refreshCalendar();
-          alert('Leave request submitted successfully!');
+          showSuccess('Leave request submitted successfully!');
           clearSelectionMode();
           setShowRequestModal(false);
           setSelectedReasonType('');
@@ -536,7 +538,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
           setRequestAsRange(false);
         } else {
           const error = await response.json();
-          alert(error.error || 'Failed to submit request');
+          showError(error.error || 'Failed to submit request');
         }
       } else {
         // Request each date separately (default)
@@ -568,23 +570,23 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
         await refreshCalendar();
 
         if (failureCount === 0) {
-          alert(`Leave request submitted successfully! (${successCount} date${successCount !== 1 ? 's' : ''})`);
+          showSuccess(`Leave request submitted successfully! (${successCount} date${successCount !== 1 ? 's' : ''})`);
           clearSelectionMode();
           setShowRequestModal(false);
           setSelectedReasonType('');
           setCustomReason('');
           setRequestAsRange(false);
         } else {
-          alert(`Submitted ${successCount} request(s) successfully. ${failureCount} request(s) failed.`);
+          showSuccess(`Submitted ${successCount} request(s) successfully. ${failureCount} request(s) failed.`);
         }
       }
     } catch (error) {
       console.error('Error submitting request:', error);
-      alert('Error submitting request');
+      showError('Error submitting request');
     } finally {
       setSubmitting(false);
     }
-  }, [selectedDates, selectedReasonType, customReason, teamSettings, getFinalReason, requestAsRange, clearSelectionMode, refreshCalendar, currentUser]);
+  }, [selectedDates, selectedReasonType, customReason, teamSettings, getFinalReason, requestAsRange, clearSelectionMode, refreshCalendar, currentUser, showSuccess, showError, showInfo]);
 
   const closeRequestModal = useCallback(() => {
     setShowRequestModal(false);

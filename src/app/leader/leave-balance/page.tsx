@@ -7,8 +7,10 @@ import { Team, User, LeaveRequest } from '@/types';
 import { calculateLeaveBalance, countWorkingDays, calculateSurplusBalance, calculateMaternityLeaveBalance, calculateMaternitySurplusBalance, isMaternityLeave, countMaternityLeaveDays } from '@/lib/leaveCalculations';
 import { calculateUsableDays, calculateMembersSharingSameShift, GroupedTeamAnalytics, MemberAnalytics } from '@/lib/analyticsCalculations';
 import { UsersIcon, CalendarIcon, ChartBarIcon, ArrowTrendingUpIcon } from '@heroicons/react/24/outline';
+import { useNotification } from '@/hooks/useNotification';
 
 export default function LeaderLeaveBalancePage() {
+  const { showSuccess, showError, showInfo } = useNotification();
   const [team, setTeam] = useState<Team | null>(null);
   const [members, setMembers] = useState<User[]>([]);
   const [allRequests, setAllRequests] = useState<LeaveRequest[]>([]);
@@ -444,7 +446,7 @@ export default function LeaderLeaveBalancePage() {
 
     const balanceValue = Math.floor(parseFloat(tempBalance));
     if (isNaN(balanceValue) || balanceValue < 0) {
-      alert('Please enter a valid non-negative whole number');
+      showInfo('Please enter a valid non-negative whole number');
       return;
     }
 
@@ -522,11 +524,11 @@ export default function LeaderLeaveBalancePage() {
         setTempBalance('');
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to update leave balance');
+        showError(error.error || 'Failed to update leave balance');
       }
     } catch (error) {
       console.error('Error updating leave balance:', error);
-      alert('Network error. Please try again.');
+      showError('Network error. Please try again.');
     } finally {
       setUpdating(null);
     }
@@ -567,11 +569,11 @@ export default function LeaderLeaveBalancePage() {
         }));
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to reset leave balance');
+        showError(error.error || 'Failed to reset leave balance');
       }
     } catch (error) {
       console.error('Error resetting leave balance:', error);
-      alert('Network error. Please try again.');
+      showError('Network error. Please try again.');
     } finally {
       setUpdating(null);
     }
@@ -590,7 +592,7 @@ export default function LeaderLeaveBalancePage() {
 
     const daysTakenValue = Math.floor(parseFloat(tempDaysTaken));
     if (isNaN(daysTakenValue) || daysTakenValue < 0) {
-      alert('Please enter a valid non-negative whole number');
+      showInfo('Please enter a valid non-negative whole number');
       return;
     }
 
@@ -635,11 +637,11 @@ export default function LeaderLeaveBalancePage() {
         }
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to update days taken');
+        showError(error.error || 'Failed to update days taken');
       }
     } catch (error) {
       console.error('Error updating days taken:', error);
-      alert('Network error. Please try again.');
+      showError('Network error. Please try again.');
     } finally {
       setUpdating(null);
     }
@@ -662,7 +664,7 @@ export default function LeaderLeaveBalancePage() {
 
     const balanceValue = Math.floor(parseFloat(tempMaternityBalance));
     if (isNaN(balanceValue) || balanceValue < 0) {
-      alert('Please enter a valid non-negative whole number');
+      showInfo('Please enter a valid non-negative whole number');
       return;
     }
 
@@ -745,11 +747,11 @@ export default function LeaderLeaveBalancePage() {
         await fetchData(); // Refresh data
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to update maternity leave balance');
+        showError(error.error || 'Failed to update maternity leave balance');
       }
     } catch (error) {
       console.error('Error updating maternity leave balance:', error);
-      alert('Network error. Please try again.');
+      showError('Network error. Please try again.');
     } finally {
       setUpdating(null);
     }
@@ -772,7 +774,7 @@ export default function LeaderLeaveBalancePage() {
 
     const daysTakenValue = Math.floor(parseFloat(tempMaternityDaysTaken));
     if (isNaN(daysTakenValue) || daysTakenValue < 0) {
-      alert('Please enter a valid non-negative whole number');
+      showInfo('Please enter a valid non-negative whole number');
       return;
     }
 
@@ -801,11 +803,11 @@ export default function LeaderLeaveBalancePage() {
         await fetchData(); // Refresh data
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to update maternity days taken');
+        showError(error.error || 'Failed to update maternity days taken');
       }
     } catch (error) {
       console.error('Error updating maternity days taken:', error);
-      alert('Network error. Please try again.');
+      showError('Network error. Please try again.');
     } finally {
       setUpdating(null);
     }
@@ -863,11 +865,11 @@ export default function LeaderLeaveBalancePage() {
         }
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to reset days taken');
+        showError(error.error || 'Failed to reset days taken');
       }
     } catch (error) {
       console.error('Error resetting days taken:', error);
-      alert('Network error. Please try again.');
+      showError('Network error. Please try again.');
     } finally {
       setUpdating(null);
     }

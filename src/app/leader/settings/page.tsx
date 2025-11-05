@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import { Team } from '@/types';
+import { useNotification } from '@/hooks/useNotification';
 
 export default function TeamSettingsPage() {
+  const { showSuccess, showError } = useNotification();
   const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -145,7 +147,7 @@ export default function TeamSettingsPage() {
           });
         }
         
-        alert('Settings saved successfully!');
+        showSuccess('Settings saved successfully!');
         
         // Wait a moment to ensure database write completes and is committed
         // Increased delay to ensure MongoDB write is fully committed before other pages refetch
