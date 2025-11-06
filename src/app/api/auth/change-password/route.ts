@@ -5,6 +5,8 @@ import { ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
 import { validateRequest, schemas } from '@/lib/validation';
 import { apiRateLimit } from '@/lib/rateLimit';
+import { error as logError } from '@/lib/logger';
+import { internalServerError, unauthorizedError, badRequestError, notFoundError } from '@/lib/errors';
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,12 +18,12 @@ export async function POST(request: NextRequest) {
     
     const token = getTokenFromRequest(request);
     if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorizedError();
     }
 
     const user = verifyToken(token);
     if (!user) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+      return unauthorizedError('Invalid token');
     }
 
     const body = await request.json();
@@ -29,17 +31,14 @@ export async function POST(request: NextRequest) {
     // Validate input using schema
     const validation = validateRequest(schemas.changePassword, body);
     if (!validation.isValid) {
-      return NextResponse.json(
-        { error: 'Validation failed', details: validation.errors },
-        { status: 400 }
-      );
+      return badRequestError('Validation failed', validation.errors);
     }
 
     const { currentPassword, newPassword } = validation.data;
 
     // Validate ObjectId format
     if (!ObjectId.isValid(user.id)) {
-      return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 });
+      return badRequestError('Invalid user ID format');
     }
     
     // Get user from database to verify current password
@@ -48,16 +47,13 @@ export async function POST(request: NextRequest) {
     
     const userData = await users.findOne({ _id: new ObjectId(user.id) });
     if (!userData) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return notFoundError('User not found');
     }
 
     // Verify current password
     const isCurrentPasswordValid = await bcrypt.compare(currentPassword, userData.password);
     if (!isCurrentPasswordValid) {
-      return NextResponse.json(
-        { error: 'Current password is incorrect' },
-        { status: 400 }
-      );
+      return badRequestError('Current password is incorrect');
     }
 
     // Hash new password
@@ -70,7 +66,7 @@ export async function POST(request: NextRequest) {
     );
 
     if (result.matchedCount === 0) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return notFoundError('User not found');
     }
 
     return NextResponse.json({
@@ -78,10 +74,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Change password error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    logError('Change password error:', error);
+    return internalServerError();
   }
 }

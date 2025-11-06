@@ -6,6 +6,8 @@ import bcrypt from 'bcrypt';
 import { emergencyRateLimit } from '@/lib/rateLimit';
 import { validateRequest, schemas } from '@/lib/validation';
 import { teamIdsMatch } from '@/lib/helpers';
+import { error as logError } from '@/lib/logger';
+import { internalServerError, unauthorizedError, forbiddenError, badRequestError, notFoundError } from '@/lib/errors';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,12 +19,12 @@ export async function POST(request: NextRequest) {
 
     const token = getTokenFromRequest(request);
     if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorizedError();
     }
 
     const user = verifyToken(token);
     if (!user || user.role !== 'leader') {
-      return NextResponse.json({ error: 'Forbidden - Leaders only' }, { status: 403 });
+      return forbiddenError('Leaders only');
     }
 
     const body = await request.json();
@@ -30,10 +32,7 @@ export async function POST(request: NextRequest) {
     // Validate input
     const validation = validateRequest(schemas.emergencyRequest, body);
     if (!validation.isValid) {
-      return NextResponse.json(
-        { error: 'Invalid input', details: validation.errors },
-        { status: 400 }
-      );
+      return badRequestError('Invalid input', validation.errors);
     }
 
     const { memberId, startDate, endDate, reason, password } = validation.data;
@@ -41,23 +40,23 @@ export async function POST(request: NextRequest) {
     // Verify the leader's password
     const leader = await UserModel.findById(user.id);
     if (!leader) {
-      return NextResponse.json({ error: 'Leader not found' }, { status: 404 });
+      return notFoundError('Leader not found');
     }
 
     const isPasswordValid = await bcrypt.compare(password, leader.password);
     if (!isPasswordValid) {
-      return NextResponse.json({ error: 'Invalid password' }, { status: 401 });
+      return unauthorizedError('Invalid password');
     }
 
     // Verify the member exists and belongs to the same team
     const member = await UserModel.findById(memberId);
     if (!member) {
-      return NextResponse.json({ error: 'Member not found' }, { status: 404 });
+      return notFoundError('Member not found');
     }
 
     // Compare teamIds using consistent helper
     if (!teamIdsMatch(member.teamId, user.teamId)) {
-      return NextResponse.json({ error: 'Member does not belong to your team' }, { status: 403 });
+      return forbiddenError('Member does not belong to your team');
     }
 
     // Validate dates
@@ -65,7 +64,7 @@ export async function POST(request: NextRequest) {
     const end = new Date(endDate);
     
     if (start > end) {
-      return NextResponse.json({ error: 'Start date must be before end date' }, { status: 400 });
+      return badRequestError('Start date must be before end date');
     }
 
     // Create the emergency leave request (automatically approved)
@@ -94,10 +93,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Emergency request error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    logError('Emergency request error:', error);
+    return internalServerError();
   }
 }

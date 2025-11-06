@@ -5,6 +5,8 @@ import { generateToken } from '@/lib/auth';
 import { LoginRequest } from '@/types';
 import { authRateLimit } from '@/lib/rateLimit';
 import { validateRequest, schemas } from '@/lib/validation';
+import { error as logError } from '@/lib/logger';
+import { internalServerError, unauthorizedError, badRequestError } from '@/lib/errors';
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,10 +21,7 @@ export async function POST(request: NextRequest) {
     // Validate input
     const validation = validateRequest(schemas.login, body);
     if (!validation.isValid) {
-      return NextResponse.json(
-        { error: 'Invalid input', details: validation.errors },
-        { status: 400 }
-      );
+      return badRequestError('Invalid input', validation.errors);
     }
 
     const { username, password } = validation.data;
@@ -30,19 +29,13 @@ export async function POST(request: NextRequest) {
     const user = await UserModel.findByUsername(username);
     
     if (!user) {
-      return NextResponse.json(
-        { error: 'Invalid credentials' },
-        { status: 401 }
-      );
+      return unauthorizedError('Invalid credentials');
     }
 
     const isValidPassword = await bcrypt.compare(password, user.password);
     
     if (!isValidPassword) {
-      return NextResponse.json(
-        { error: 'Invalid credentials' },
-        { status: 401 }
-      );
+      return unauthorizedError('Invalid credentials');
     }
 
     // Build token data
@@ -73,10 +66,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Login error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    logError('Login error:', error);
+    return internalServerError();
   }
 }

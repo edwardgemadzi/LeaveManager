@@ -4,6 +4,8 @@ import { TeamModel } from '@/models/Team';
 import { UserModel } from '@/models/User';
 import { LeaveRequestModel } from '@/models/LeaveRequest';
 import { getMemberAnalytics, getGroupedTeamAnalytics } from '@/lib/analyticsCalculations';
+import { error as logError } from '@/lib/logger';
+import { internalServerError } from '@/lib/errors';
 
 export async function GET(request: NextRequest) {
   try {
@@ -113,14 +115,8 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json(response);
   } catch (error) {
-    console.error('Dashboard API error:', error);
-    if (error instanceof Error) {
-      console.error('Error details:', error.message, error.stack);
-    }
-    return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    logError('Dashboard API error:', error);
+    return internalServerError();
   }
 }
 

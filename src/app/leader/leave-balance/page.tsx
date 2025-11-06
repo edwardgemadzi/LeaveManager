@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { Team, User, LeaveRequest } from '@/types';
@@ -8,6 +8,7 @@ import { calculateLeaveBalance, countWorkingDays, calculateSurplusBalance, calcu
 import { calculateUsableDays, calculateMembersSharingSameShift, GroupedTeamAnalytics, MemberAnalytics } from '@/lib/analyticsCalculations';
 import { UsersIcon, CalendarIcon, ChartBarIcon, ArrowTrendingUpIcon } from '@heroicons/react/24/outline';
 import { useNotification } from '@/hooks/useNotification';
+import { useTeamEvents } from '@/hooks/useTeamEvents';
 
 export default function LeaderLeaveBalancePage() {
   const { showError, showInfo } = useNotification();
@@ -92,9 +93,28 @@ export default function LeaderLeaveBalancePage() {
     }
   };
 
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Real-time updates using SSE
+  useTeamEvents(team?._id || null, {
+    enabled: !loading && !!team,
+    onEvent: (event) => {
+      // Refresh data when leave requests are updated or deleted
+      if (event.type === 'leaveRequestUpdated' || event.type === 'leaveRequestDeleted' || event.type === 'settingsUpdated') {
+        // Debounce refresh to avoid excessive API calls
+        if (refreshTimeoutRef.current) {
+          clearTimeout(refreshTimeoutRef.current);
+        }
+        refreshTimeoutRef.current = setTimeout(() => {
+          fetchData();
+        }, 500);
+      }
+    },
+  });
 
   // Auto-refresh on window focus to get updated data after deletions
   useEffect(() => {

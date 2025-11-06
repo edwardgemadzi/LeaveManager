@@ -6,6 +6,9 @@ import { emailService } from '@/lib/email';
 import { UserModel } from '@/models/User';
 import { teamIdsMatch } from '@/lib/helpers';
 import { ObjectId } from 'mongodb';
+import { broadcastTeamUpdate } from '@/lib/teamEvents';
+import { error as logError } from '@/lib/logger';
+import { internalServerError } from '@/lib/errors';
 
 export async function PATCH(
   request: NextRequest,
@@ -83,14 +86,19 @@ export async function PATCH(
         );
       }
     }
+
+    // Broadcast event after status change
+    broadcastTeamUpdate(user.teamId!, 'leaveRequestUpdated', {
+      requestId: id,
+      userId: leaveRequest.userId,
+      newStatus: status,
+      updatedBy: user.id,
+    });
     
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Update leave request error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    logError('Update leave request error:', error);
+    return internalServerError();
   }
 }
 
@@ -186,12 +194,16 @@ export async function DELETE(
       );
     }
 
+    // Broadcast event after deletion
+    broadcastTeamUpdate(user.teamId!, 'leaveRequestDeleted', {
+      requestId: id,
+      userId: leaveRequest.userId,
+      deletedBy: user.id,
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Delete leave request error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    logError('Delete leave request error:', error);
+    return internalServerError();
   }
 }

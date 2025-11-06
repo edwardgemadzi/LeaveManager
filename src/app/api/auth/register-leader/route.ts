@@ -6,6 +6,8 @@ import { generateToken } from '@/lib/auth';
 import { getDatabase } from '@/lib/mongodb';
 import { RegisterLeaderRequest } from '@/types';
 import { ObjectId } from 'mongodb';
+import { error as logError } from '@/lib/logger';
+import { internalServerError, badRequestError } from '@/lib/errors';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,28 +15,19 @@ export async function POST(request: NextRequest) {
     const { username, fullName, password, teamName, teamUsername } = body;
 
     if (!username || !fullName || !password || !teamName || !teamUsername) {
-      return NextResponse.json(
-        { error: 'All fields are required' },
-        { status: 400 }
-      );
+      return badRequestError('All fields are required');
     }
 
     // Check if username already exists
     const existingUser = await UserModel.findByUsername(username);
     if (existingUser) {
-      return NextResponse.json(
-        { error: 'Username already exists' },
-        { status: 400 }
-      );
+      return badRequestError('Username already exists');
     }
 
     // Check if team username already exists
     const existingTeam = await TeamModel.findByTeamUsername(teamUsername);
     if (existingTeam) {
-      return NextResponse.json(
-        { error: 'Team username already exists' },
-        { status: 400 }
-      );
+      return badRequestError('Team username already exists');
     }
 
     // Hash password
@@ -53,10 +46,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!team._id) {
-      return NextResponse.json(
-        { error: 'Failed to create team' },
-        { status: 500 }
-      );
+      return internalServerError('Failed to create team');
     }
 
     // Create user
@@ -70,10 +60,7 @@ export async function POST(request: NextRequest) {
 
     // Validate ObjectId format before updating team
     if (!team._id || !ObjectId.isValid(team._id)) {
-      return NextResponse.json(
-        { error: 'Invalid team ID format' },
-        { status: 500 }
-      );
+      return internalServerError('Invalid team ID format');
     }
     
     // Update team with leader ID
@@ -114,10 +101,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Leader registration error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    logError('Leader registration error:', error);
+    return internalServerError();
   }
 }

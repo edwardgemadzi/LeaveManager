@@ -1,9 +1,12 @@
 import { getDatabase } from '@/lib/mongodb';
-import { ObjectId } from 'mongodb';
+import { ObjectId, ClientSession } from 'mongodb';
 import { LeaveRequest } from '@/types';
 
 export class LeaveRequestModel {
-  static async create(request: Omit<LeaveRequest, '_id' | 'createdAt' | 'updatedAt'>): Promise<LeaveRequest> {
+  static async create(
+    request: Omit<LeaveRequest, '_id' | 'createdAt' | 'updatedAt'>,
+    session?: ClientSession
+  ): Promise<LeaveRequest> {
     const db = await getDatabase();
     const requests = db.collection<LeaveRequest>('leaveRequests');
     
@@ -13,7 +16,8 @@ export class LeaveRequestModel {
       updatedAt: new Date(),
     };
     
-    const result = await requests.insertOne(newRequest);
+    const options = session ? { session } : {};
+    const result = await requests.insertOne(newRequest, options);
     return { ...newRequest, _id: result.insertedId.toString() };
   }
 
@@ -63,7 +67,8 @@ export class LeaveRequestModel {
     teamId: string,
     startDate: Date,
     endDate: Date,
-    excludeId?: string
+    excludeId?: string,
+    session?: ClientSession
   ): Promise<LeaveRequest[]> {
     const db = await getDatabase();
     const requests = db.collection<LeaveRequest>('leaveRequests');
@@ -83,7 +88,8 @@ export class LeaveRequestModel {
       query._id = { $ne: excludeId };
     }
 
-    return await requests.find(query).toArray();
+    const options = session ? { session } : {};
+    return await requests.find(query, options).toArray();
   }
 
   static async delete(id: string): Promise<boolean> {

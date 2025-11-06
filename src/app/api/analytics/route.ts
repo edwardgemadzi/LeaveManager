@@ -4,6 +4,8 @@ import { TeamModel } from '@/models/Team';
 import { UserModel } from '@/models/User';
 import { LeaveRequestModel } from '@/models/LeaveRequest';
 import { getMemberAnalytics, getTeamAnalytics, getGroupedTeamAnalytics } from '@/lib/analyticsCalculations';
+import { error as logError, debug } from '@/lib/logger';
+import { internalServerError } from '@/lib/errors';
 
 // Disable caching for this API route to ensure fresh data
 export const dynamic = 'force-dynamic';
@@ -46,7 +48,7 @@ export async function GET(request: NextRequest) {
     
     // CRITICAL: Verify we have the correct concurrent leave value
     // Log the exact value being used for calculations
-    console.log('[Analytics API] CRITICAL - Team fetched for calculations:', {
+    debug('[Analytics API] CRITICAL - Team fetched for calculations:', {
       teamId: team._id,
       concurrentLeave: team.settings?.concurrentLeave,
       concurrentLeaveType: typeof team.settings?.concurrentLeave,
@@ -56,21 +58,21 @@ export async function GET(request: NextRequest) {
     // Verify team.settings exists and has concurrentLeave - DO NOT override actual values
     // This validation ensures all calculation functions receive a valid team object with concurrent leave settings
     if (!team.settings) {
-      console.error('[Analytics API] ERROR: team.settings is missing! Team object:', {
+      logError('[Analytics API] ERROR: team.settings is missing! Team object:', {
         _id: team._id,
         name: team.name,
         hasSettings: false
       });
-      return NextResponse.json({ error: 'Team settings not found' }, { status: 500 });
+      return internalServerError('Team settings not found');
     }
     
     if (typeof team.settings.concurrentLeave !== 'number' || team.settings.concurrentLeave < 1) {
-      console.error('[Analytics API] ERROR: team.settings.concurrentLeave is invalid!', {
+      logError('[Analytics API] ERROR: team.settings.concurrentLeave is invalid!', {
         value: team.settings.concurrentLeave,
         type: typeof team.settings.concurrentLeave,
         settings: team.settings
       });
-      return NextResponse.json({ error: 'Invalid concurrent leave setting' }, { status: 500 });
+      return internalServerError('Invalid concurrent leave setting');
     }
     
 
@@ -118,12 +120,12 @@ export async function GET(request: NextRequest) {
       // Return grouped team analytics for leaders
       const members = await UserModel.findByTeamId(user.teamId);
       
-      console.log('Analytics API - Members found:', members.length);
-      console.log('Analytics API - All requests:', allRequests.length);
+      debug('Analytics API - Members found:', members.length);
+      debug('Analytics API - All requests:', allRequests.length);
       
       try {
-        console.log('[Analytics API] Before calculation - team.settings.concurrentLeave:', team.settings.concurrentLeave);
-        console.log('[Analytics API] Team object structure:', {
+        debug('[Analytics API] Before calculation - team.settings.concurrentLeave:', team.settings.concurrentLeave);
+        debug('[Analytics API] Team object structure:', {
           _id: team._id,
           hasSettings: !!team.settings,
           concurrentLeave: team.settings.concurrentLeave,
@@ -133,10 +135,10 @@ export async function GET(request: NextRequest) {
         
         const groupedAnalytics = getGroupedTeamAnalytics(members, team, allRequests);
         
-        console.log('[Analytics API] After calculation - Sample usable days:', groupedAnalytics.groups?.[0]?.members?.[0]?.analytics?.usableDays);
-        console.log('[Analytics API] After calculation - Total usable days:', groupedAnalytics.aggregate?.totalUsableDays);
-        console.log('[Analytics API] After calculation - Total realistic usable days:', groupedAnalytics.aggregate?.totalRealisticUsableDays);
-        console.log('Analytics API - Grouped analytics generated:', {
+        debug('[Analytics API] After calculation - Sample usable days:', groupedAnalytics.groups?.[0]?.members?.[0]?.analytics?.usableDays);
+        debug('[Analytics API] After calculation - Total usable days:', groupedAnalytics.aggregate?.totalUsableDays);
+        debug('[Analytics API] After calculation - Total realistic usable days:', groupedAnalytics.aggregate?.totalRealisticUsableDays);
+        debug('Analytics API - Grouped analytics generated:', {
           hasAggregate: !!groupedAnalytics.aggregate,
           hasGroups: !!groupedAnalytics.groups,
           groupsLength: groupedAnalytics.groups?.length || 0
@@ -145,7 +147,7 @@ export async function GET(request: NextRequest) {
         // Return both grouped and regular analytics for backward compatibility
         const regularAnalytics = getTeamAnalytics(members, team, allRequests);
         
-        console.log('[Analytics API] Returning analytics with concurrentLeave:', team.settings.concurrentLeave);
+        debug('[Analytics API] Returning analytics with concurrentLeave:', team.settings.concurrentLeave);
         
         return NextResponse.json({ 
           analytics: groupedAnalytics,
@@ -158,21 +160,15 @@ export async function GET(request: NextRequest) {
           }
         });
       } catch (calcError) {
-        console.error('Analytics API - Error calculating analytics:', calcError);
+        logError('Analytics API - Error calculating analytics:', calcError);
         throw calcError;
       }
     } else {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
     }
   } catch (error) {
-    console.error('Analytics API error:', error);
-    if (error instanceof Error) {
-      console.error('Error details:', error.message, error.stack);
-    }
-    return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    logError('Analytics API error:', error);
+    return internalServerError();
   }
 }
 

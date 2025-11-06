@@ -5,6 +5,8 @@ import { TeamModel } from '@/models/Team';
 import { generateToken } from '@/lib/auth';
 import { RegisterMemberRequest, ShiftSchedule } from '@/types';
 import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
+import { error as logError } from '@/lib/logger';
+import { internalServerError, badRequestError, notFoundError } from '@/lib/errors';
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,28 +14,19 @@ export async function POST(request: NextRequest) {
     const { username, fullName, password, teamUsername, shiftSchedule } = body;
 
     if (!username || !fullName || !password || !teamUsername || !shiftSchedule) {
-      return NextResponse.json(
-        { error: 'All fields are required' },
-        { status: 400 }
-      );
+      return badRequestError('All fields are required');
     }
 
     // Check if username already exists
     const existingUser = await UserModel.findByUsername(username);
     if (existingUser) {
-      return NextResponse.json(
-        { error: 'Username already exists' },
-        { status: 400 }
-      );
+      return badRequestError('Username already exists');
     }
 
     // Find team by team username
     const team = await TeamModel.findByTeamUsername(teamUsername);
     if (!team) {
-      return NextResponse.json(
-        { error: 'Team not found' },
-        { status: 404 }
-      );
+      return notFoundError('Team not found');
     }
 
     // Hash password
@@ -42,10 +35,7 @@ export async function POST(request: NextRequest) {
     // Only store tag for fixed schedules (tags are stable)
     // For rotating schedules, tags change daily and should be regenerated
     if (!team._id) {
-      return NextResponse.json(
-        { error: 'Team ID not found' },
-        { status: 500 }
-      );
+      return internalServerError('Team ID not found');
     }
 
     // Ensure shiftSchedule.startDate is a Date object (might come as string from JSON)
@@ -62,10 +52,7 @@ export async function POST(request: NextRequest) {
       
       // Validate that startDate is a valid date
       if (isNaN(startDate.getTime())) {
-        return NextResponse.json(
-          { error: 'Invalid start date in shift schedule' },
-          { status: 400 }
-        );
+        return badRequestError('Invalid start date in shift schedule');
       }
     } else {
       startDate = new Date();
@@ -98,7 +85,7 @@ export async function POST(request: NextRequest) {
       try {
         userData.workingDaysTag = generateWorkingDaysTag(shiftScheduleCopy);
       } catch (error) {
-        console.error('Error generating working days tag:', error);
+        logError('Error generating working days tag:', error);
         // Continue without tag rather than failing registration
       }
     }
@@ -136,16 +123,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Member registration error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const errorStack = error instanceof Error ? error.stack : undefined;
-    return NextResponse.json(
-      { 
-        error: 'Internal server error',
-        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined,
-        stack: process.env.NODE_ENV === 'development' ? errorStack : undefined
-      },
-      { status: 500 }
-    );
+    logError('Member registration error:', error);
+    return internalServerError();
   }
 }

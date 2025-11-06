@@ -2,22 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTokenFromRequest, verifyToken } from '@/lib/auth';
 import { getDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
+import { error as logError } from '@/lib/logger';
+import { internalServerError, unauthorizedError, badRequestError, notFoundError } from '@/lib/errors';
 
 export async function GET(request: NextRequest) {
   try {
     const token = getTokenFromRequest(request);
     if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorizedError();
     }
 
     const user = verifyToken(token);
     if (!user) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+      return unauthorizedError('Invalid token');
     }
 
     // Validate ObjectId format
     if (!ObjectId.isValid(user.id)) {
-      return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 });
+      return badRequestError('Invalid user ID format');
     }
     
     // Get fresh user data from database
@@ -26,7 +28,7 @@ export async function GET(request: NextRequest) {
     
     const userData = await users.findOne({ _id: new ObjectId(user.id) });
     if (!userData) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return notFoundError('User not found');
     }
 
     // Remove sensitive data
@@ -36,11 +38,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ user: safeUserData });
 
   } catch (error) {
-    console.error('Get profile error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    logError('Get profile error:', error);
+    return internalServerError();
   }
 }
 
@@ -48,26 +47,23 @@ export async function PATCH(request: NextRequest) {
   try {
     const token = getTokenFromRequest(request);
     if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorizedError();
     }
 
     const user = verifyToken(token);
     if (!user) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+      return unauthorizedError('Invalid token');
     }
 
     const { fullName } = await request.json();
 
     if (!fullName || fullName.trim().length === 0) {
-      return NextResponse.json(
-        { error: 'Full name is required' },
-        { status: 400 }
-      );
+      return badRequestError('Full name is required');
     }
 
     // Validate ObjectId format
     if (!ObjectId.isValid(user.id)) {
-      return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 });
+      return badRequestError('Invalid user ID format');
     }
     
     // Update user profile
@@ -80,7 +76,7 @@ export async function PATCH(request: NextRequest) {
     );
 
     if (result.matchedCount === 0) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return notFoundError('User not found');
     }
 
     // Get updated user data
@@ -95,10 +91,7 @@ export async function PATCH(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Update profile error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    logError('Update profile error:', error);
+    return internalServerError();
   }
 }

@@ -34,3 +34,7 @@ export const getDatabase = async (): Promise<Db> => {
   const client = await clientPromise;
   return client.db('leave-manager');
 };
+
+export const getClient = async (): Promise<MongoClient> => {
+  return await clientPromise;
+};

@@ -3,9 +3,13 @@ import { getTokenFromRequest, verifyToken } from '@/lib/auth';
 import { LeaveRequestModel } from '@/models/LeaveRequest';
 import { TeamModel } from '@/models/Team';
 import { UserModel } from '@/models/User';
-import { CreateLeaveRequest } from '@/types';
+import { CreateLeaveRequest, LeaveRequest } from '@/types';
 import { isBypassNoticePeriodActive } from '@/lib/analyticsCalculations';
 import { validateRequest, schemas } from '@/lib/validation';
+import { getClient } from '@/lib/mongodb';
+import { broadcastTeamUpdate } from '@/lib/teamEvents';
+import { error as logError } from '@/lib/logger';
+import { internalServerError } from '@/lib/errors';
 
 export async function GET(request: NextRequest) {
   try {
@@ -63,11 +67,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(requests);
   } catch (error) {
-    console.error('Get leave requests error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    logError('Get leave requests error:', error);
+    return internalServerError();
   }
 }
 
@@ -158,117 +159,164 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Check concurrent leave limit (skip for all historical requests)
-    // Historical requests are for migration purposes and should not be restricted
-    // Skip concurrent leave validation for all historical requests, regardless of date
-    if (!isHistorical) {
-      const overlappingRequests = await LeaveRequestModel.findOverlappingRequests(
-        user.teamId!,
-        start,
-        end
-      );
+    // Get the requesting user's shift tag and subgroup tag (needed for both transaction and historical)
+    const requestingUser = await UserModel.findById(requestUserId);
+    const requestingUserShiftTag = requestingUser?.shiftTag;
+    const requestingUserSubgroupTag = requestingUser?.subgroupTag;
 
-      // Get the requesting user's shift tag and subgroup tag
-      const requestingUser = await UserModel.findById(requestUserId);
-      const requestingUserShiftTag = requestingUser?.shiftTag;
-      const requestingUserSubgroupTag = requestingUser?.subgroupTag;
-
-      // Fetch all team members ONCE to avoid N+1 queries
-      const teamMembers = await UserModel.findByTeamId(user.teamId);
-      
-      // Create maps for O(1) lookups
-      const userSubgroupMap = new Map<string, string>();
-      const userShiftTagMap = new Map<string, string | undefined>();
-      teamMembers.forEach(member => {
-        if (member._id) {
-          userSubgroupMap.set(member._id, member.subgroupTag || 'Ungrouped');
-          userShiftTagMap.set(member._id, member.shiftTag);
-        }
-      });
-      
-      // Ensure requesting user is in the maps (in case they're not a member)
-      if (requestingUser?._id) {
-        userSubgroupMap.set(requestingUser._id, requestingUserSubgroupTag || 'Ungrouped');
-        userShiftTagMap.set(requestingUser._id, requestingUserShiftTag);
+    // Fetch all team members ONCE to avoid N+1 queries (needed for both transaction and historical)
+    const teamMembers = await UserModel.findByTeamId(user.teamId);
+    
+    // Create maps for O(1) lookups
+    const userSubgroupMap = new Map<string, string>();
+    const userShiftTagMap = new Map<string, string | undefined>();
+    teamMembers.forEach(member => {
+      if (member._id) {
+        userSubgroupMap.set(member._id, member.subgroupTag || 'Ungrouped');
+        userShiftTagMap.set(member._id, member.shiftTag);
       }
-
-      // If subgrouping is enabled, filter by subgroup first
-      // Each subgroup gets its own concurrent leave limit
-      let relevantOverlappingCount = 0;
-      
-      if (team.settings.enableSubgrouping) {
-        // Filter overlapping requests to only count those from the same subgroup
-        const requestingSubgroup = requestingUserSubgroupTag || 'Ungrouped';
-        
-        for (const req of overlappingRequests) {
-          const reqUserSubgroup = userSubgroupMap.get(req.userId) || 'Ungrouped';
-          const reqUserShiftTag = userShiftTagMap.get(req.userId);
-          
-          // Only count if they're in the same subgroup
-          if (requestingSubgroup !== reqUserSubgroup) continue;
-          
-          // Also check shift tag if applicable (existing logic)
-          if (requestingUserShiftTag !== undefined) {
-            if (reqUserShiftTag !== requestingUserShiftTag) continue;
-          } else {
-            // Requesting user has no shift tag - only count members with no shift tag
-            if (reqUserShiftTag !== undefined) continue;
-          }
-          
-          relevantOverlappingCount++;
-        }
-      } else {
-        // Subgrouping disabled - use existing shift tag logic
-        if (requestingUserShiftTag !== undefined) {
-          // Count overlapping requests from users with the same shift tag
-          for (const req of overlappingRequests) {
-            const reqUserShiftTag = userShiftTagMap.get(req.userId);
-            if (reqUserShiftTag === requestingUserShiftTag) {
-              relevantOverlappingCount++;
-            }
-          }
-        } else {
-          // User has no shift tag - count all overlapping requests
-          relevantOverlappingCount = overlappingRequests.length;
-        }
-      }
-
-      if (relevantOverlappingCount >= team.settings.concurrentLeave) {
-        let context = '';
-        if (team.settings.enableSubgrouping && requestingUserSubgroupTag) {
-          context = ` (${requestingUserSubgroupTag} subgroup)`;
-        } else if (team.settings.enableSubgrouping && !requestingUserSubgroupTag) {
-          context = ' (Ungrouped)';
-        } else if (requestingUserShiftTag) {
-          context = ` (${requestingUserShiftTag} shift)`;
-        }
-        return NextResponse.json(
-          { 
-            error: `Concurrent leave limit exceeded${context}. Maximum ${team.settings.concurrentLeave} team member(s) can be on leave simultaneously.` 
-          },
-          { status: 400 }
-        );
-      }
+    });
+    
+    // Ensure requesting user is in the maps (in case they're not a member)
+    if (requestingUser?._id) {
+      userSubgroupMap.set(requestingUser._id, requestingUserSubgroupTag || 'Ungrouped');
+      userShiftTagMap.set(requestingUser._id, requestingUserShiftTag);
     }
 
-    // Create the leave request
-    // Historical requests are auto-approved for migration purposes
-    const leaveRequest = await LeaveRequestModel.create({
-      userId: requestUserId,
-      teamId: user.teamId!,
-      startDate: start,
-      endDate: end,
-      reason,
-      status: isHistorical ? 'approved' : 'pending',
-      requestedBy: requestedFor ? user.id : undefined,
+    // Check concurrent leave limit and create request atomically using MongoDB transaction
+    // Historical requests are for migration purposes and should not be restricted
+    let leaveRequest: LeaveRequest;
+    
+    if (!isHistorical) {
+      // Use MongoDB transaction to ensure first-come-first-serve
+      const client = await getClient();
+      const session = client.startSession();
+
+      try {
+        await session.withTransaction(async () => {
+          // Check availability (read-locked query with session)
+          const overlappingRequests = await LeaveRequestModel.findOverlappingRequests(
+            user.teamId!,
+            start,
+            end,
+            undefined,
+            session
+          );
+
+          // Count relevant overlapping requests (respecting shift/subgroup filters)
+          let relevantOverlappingCount = 0;
+          
+          if (team.settings.enableSubgrouping) {
+            // Filter overlapping requests to only count those from the same subgroup
+            const requestingSubgroup = requestingUserSubgroupTag || 'Ungrouped';
+            
+            for (const req of overlappingRequests) {
+              const reqUserSubgroup = userSubgroupMap.get(req.userId) || 'Ungrouped';
+              const reqUserShiftTag = userShiftTagMap.get(req.userId);
+              
+              // Only count if they're in the same subgroup
+              if (requestingSubgroup !== reqUserSubgroup) continue;
+              
+              // Also check shift tag if applicable (existing logic)
+              if (requestingUserShiftTag !== undefined) {
+                if (reqUserShiftTag !== requestingUserShiftTag) continue;
+              } else {
+                // Requesting user has no shift tag - only count members with no shift tag
+                if (reqUserShiftTag !== undefined) continue;
+              }
+              
+              relevantOverlappingCount++;
+            }
+          } else {
+            // Subgrouping disabled - use existing shift tag logic
+            if (requestingUserShiftTag !== undefined) {
+              // Count overlapping requests from users with the same shift tag
+              for (const req of overlappingRequests) {
+                const reqUserShiftTag = userShiftTagMap.get(req.userId);
+                if (reqUserShiftTag === requestingUserShiftTag) {
+                  relevantOverlappingCount++;
+                }
+              }
+            } else {
+              // User has no shift tag - count all overlapping requests
+              relevantOverlappingCount = overlappingRequests.length;
+            }
+          }
+
+          // If not available, throw error (409 Conflict)
+          if (relevantOverlappingCount >= team.settings.concurrentLeave) {
+            let context = '';
+            if (team.settings.enableSubgrouping && requestingUserSubgroupTag) {
+              context = ` (${requestingUserSubgroupTag} subgroup)`;
+            } else if (team.settings.enableSubgrouping && !requestingUserSubgroupTag) {
+              context = ' (Ungrouped)';
+            } else if (requestingUserShiftTag) {
+              context = ` (${requestingUserShiftTag} shift)`;
+            }
+            throw new Error(`SLOT_UNAVAILABLE: Concurrent leave limit exceeded${context}. Maximum ${team.settings.concurrentLeave} team member(s) can be on leave simultaneously.`);
+          }
+
+          // If available, create request (atomic write)
+          leaveRequest = await LeaveRequestModel.create({
+            userId: requestUserId,
+            teamId: user.teamId!,
+            startDate: start,
+            endDate: end,
+            reason,
+            status: 'pending',
+            requestedBy: requestedFor ? user.id : undefined,
+          }, session);
+        });
+      } catch (error) {
+        await session.endSession();
+        
+        // Handle slot unavailable error (409 Conflict)
+        if (error instanceof Error && error.message.startsWith('SLOT_UNAVAILABLE:')) {
+          return NextResponse.json(
+            { 
+              error: 'This time slot is no longer available. Please select different dates.',
+              details: error.message.replace('SLOT_UNAVAILABLE: ', '')
+            },
+            { status: 409 }
+          );
+        }
+        
+        // Re-throw other errors
+        throw error;
+      } finally {
+        await session.endSession();
+      }
+    } else {
+      // Historical requests are auto-approved for migration purposes
+      // Skip transaction for historical requests
+      leaveRequest = await LeaveRequestModel.create({
+        userId: requestUserId,
+        teamId: user.teamId!,
+        startDate: start,
+        endDate: end,
+        reason,
+        status: 'approved',
+        requestedBy: requestedFor ? user.id : undefined,
+      });
+    }
+
+    // Broadcast event after successful creation (outside transaction)
+    // leaveRequest is guaranteed to be assigned at this point (either in transaction or else block)
+    // Use definite assignment assertion to satisfy TypeScript
+    const createdRequest = leaveRequest!;
+    
+    broadcastTeamUpdate(user.teamId!, 'leaveRequestCreated', {
+      requestId: createdRequest._id,
+      userId: createdRequest.userId,
+      startDate: createdRequest.startDate,
+      endDate: createdRequest.endDate,
+      reason: createdRequest.reason,
+      status: createdRequest.status,
     });
 
-    return NextResponse.json(leaveRequest);
+    return NextResponse.json(createdRequest);
   } catch (error) {
-    console.error('Create leave request error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    logError('Create leave request error:', error);
+    return internalServerError();
   }
 }

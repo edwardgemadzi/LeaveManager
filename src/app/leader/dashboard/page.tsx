@@ -8,7 +8,7 @@ import { calculateLeaveBalance, calculateSurplusBalance, calculateMaternityLeave
 import { GroupedTeamAnalytics } from '@/lib/analyticsCalculations';
 import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
 import { useBrowserNotification } from '@/hooks/useBrowserNotification';
-import { usePolling } from '@/hooks/usePolling';
+import { useTeamEvents } from '@/hooks/useTeamEvents';
 import { 
   UsersIcon, 
   ClockIcon, 
@@ -153,56 +153,104 @@ export default function LeaderDashboard() {
     };
   }, []);
 
-  // Polling for new pending requests
-  usePolling(async () => {
-    if (!team) return;
-    
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/dashboard', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+  // Real-time updates using SSE with fallback to polling
+  useTeamEvents(team?._id || null, {
+    enabled: !loading && !!team,
+    fallbackToPolling: true,
+    pollingCallback: async () => {
+      if (!team) return;
+      
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/dashboard', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
 
-      if (response.ok) {
-        const data = await response.json();
-        const currentPending = (data.requests || []).filter((req: LeaveRequest) => req.status === 'pending');
-        
-        // Check for new requests
-        const previousIds = new Set(previousPendingRequestsRef.current.map(r => r._id));
-        const newRequests = currentPending.filter((req: LeaveRequest) => !previousIds.has(req._id));
-        
-        if (newRequests.length > 0) {
-          // Update state with new data
-          setAllRequests(data.requests || []);
-          setPendingRequests(currentPending);
-          setMembers(data.members || []);
-          if (data.analytics) {
-            setAnalytics(data.analytics);
+        if (response.ok) {
+          const data = await response.json();
+          const currentPending = (data.requests || []).filter((req: LeaveRequest) => req.status === 'pending');
+          
+          // Check for new requests
+          const previousIds = new Set(previousPendingRequestsRef.current.map(r => r._id));
+          const newRequests = currentPending.filter((req: LeaveRequest) => !previousIds.has(req._id));
+          
+          if (newRequests.length > 0) {
+            // Update state with new data
+            setAllRequests(data.requests || []);
+            setPendingRequests(currentPending);
+            setMembers(data.members || []);
+            if (data.analytics) {
+              setAnalytics(data.analytics);
+            }
+            
+            // Find member names for new requests
+            const currentMembers = data.members || members;
+            newRequests.forEach((req: LeaveRequest) => {
+              const member = currentMembers.find((m: User) => m._id === req.userId);
+              const memberName = member?.fullName || member?.username || 'A team member';
+              const startDate = new Date(req.startDate).toLocaleDateString();
+              const endDate = new Date(req.endDate).toLocaleDateString();
+              
+              showNotification(
+                'New Leave Request',
+                `${memberName} has submitted a leave request for ${startDate} to ${endDate}`
+              );
+            });
           }
           
-          // Find member names for new requests
-          const currentMembers = data.members || members;
-          newRequests.forEach((req: LeaveRequest) => {
-            const member = currentMembers.find((m: User) => m._id === req.userId);
-            const memberName = member?.fullName || member?.username || 'A team member';
-            const startDate = new Date(req.startDate).toLocaleDateString();
-            const endDate = new Date(req.endDate).toLocaleDateString();
-            
-            showNotification(
-              'New Leave Request',
-              `${memberName} has submitted a leave request for ${startDate} to ${endDate}`
-            );
-          });
+          previousPendingRequestsRef.current = currentPending;
         }
-        
-        previousPendingRequestsRef.current = currentPending;
+      } catch (error) {
+        console.error('Error polling for new requests:', error);
       }
-    } catch (error) {
-      console.error('Error polling for new requests:', error);
-    }
-  }, { interval: 30000, enabled: !loading && !!team });
+    },
+    pollingInterval: 30000,
+    onEvent: (event) => {
+      // Handle leaveRequestCreated
+      if (event.type === 'leaveRequestCreated') {
+        const data = event.data as { requestId: string; userId: string; startDate: string; endDate: string; reason: string; status: string };
+        if (data.status === 'pending') {
+          // Add to pending requests
+          refetchData();
+          
+          // Find member name for notification
+          const member = members.find(m => m._id === data.userId);
+          const memberName = member?.fullName || member?.username || 'A team member';
+          const startDate = new Date(data.startDate).toLocaleDateString();
+          const endDate = new Date(data.endDate).toLocaleDateString();
+          
+          showNotification(
+            'New Leave Request',
+            `${memberName} has submitted a leave request for ${startDate} to ${endDate}`
+          );
+        }
+      }
+      
+      // Handle leaveRequestUpdated
+      if (event.type === 'leaveRequestUpdated') {
+        const data = event.data as { requestId: string; newStatus: string };
+        if (data.newStatus === 'approved' || data.newStatus === 'rejected') {
+          // Remove from pending if approved/rejected
+          refetchData();
+        }
+      }
+      
+      // Handle leaveRequestDeleted
+      if (event.type === 'leaveRequestDeleted') {
+        refetchData();
+      }
+      
+      // Handle settingsUpdated
+      if (event.type === 'settingsUpdated') {
+        // Refresh all data when settings change
+        setTimeout(() => {
+          refetchData();
+        }, 200);
+      }
+    },
+  });
 
   // Check for members at risk
   useEffect(() => {
@@ -374,6 +422,124 @@ export default function LeaderDashboard() {
     return { totalRemaining, averageRemaining, totalUsed, membersCount };
   };
 
+  const getOnLeaveStats = () => {
+    if (!team || !members.length || !allRequests) {
+      return { 
+        currentlyOnLeave: 0, 
+        upcomingThisWeek: 0, 
+        thisMonth: 0, 
+        thisYear: 0,
+        byReason: {},
+        currentlyOnLeaveList: []
+      };
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const nextWeek = new Date(today);
+    nextWeek.setDate(today.getDate() + 7);
+    
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    monthStart.setHours(0, 0, 0, 0);
+    
+    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    monthEnd.setHours(23, 59, 59, 999);
+    
+    const yearStart = new Date(today.getFullYear(), 0, 1);
+    yearStart.setHours(0, 0, 0, 0);
+    
+    const yearEnd = new Date(today.getFullYear(), 11, 31);
+    yearEnd.setHours(23, 59, 59, 999);
+
+    // Get ALL approved requests (including maternity)
+    const approvedRequests = allRequests.filter(req => req.status === 'approved');
+
+    // Helper function to categorize reason
+    const categorizeReason = (reason: string | undefined): string => {
+      if (!reason) return 'Other';
+      const lowerReason = reason.toLowerCase();
+      
+      if (isMaternityLeave(reason)) return 'Maternity/Paternity';
+      if (lowerReason.includes('sick') || lowerReason.includes('illness')) return 'Sick Leave';
+      if (lowerReason.includes('vacation') || lowerReason.includes('holiday')) return 'Vacation';
+      if (lowerReason.includes('personal')) return 'Personal';
+      if (lowerReason.includes('family') || lowerReason.includes('emergency')) return 'Family Emergency';
+      if (lowerReason.includes('medical') || lowerReason.includes('doctor') || lowerReason.includes('hospital')) return 'Medical';
+      if (lowerReason.includes('bereavement') || lowerReason.includes('death') || lowerReason.includes('funeral')) return 'Bereavement';
+      if (lowerReason.includes('study') || lowerReason.includes('education')) return 'Study/Education';
+      if (lowerReason.includes('religious')) return 'Religious Holiday';
+      
+      return 'Other';
+    };
+
+    // Get unique member IDs for each category
+    const currentlyOnLeaveSet = new Set<string>();
+    const upcomingThisWeekSet = new Set<string>();
+    const thisMonthSet = new Set<string>();
+    const thisYearSet = new Set<string>();
+    
+    // Track breakdown by reason
+    const byReason: Record<string, number> = {};
+    const currentlyOnLeaveList: Array<{ memberId: string; memberName: string; reason: string; category: string }> = [];
+
+    approvedRequests.forEach(req => {
+      const reqStart = new Date(req.startDate);
+      const reqEnd = new Date(req.endDate);
+      reqStart.setHours(0, 0, 0, 0);
+      reqEnd.setHours(23, 59, 59, 999);
+      
+      const memberId = String(req.userId).trim();
+      const reason = req.reason || 'Other';
+      const category = categorizeReason(req.reason);
+
+      // Currently on leave: request includes today
+      if (reqStart <= today && reqEnd >= today) {
+        currentlyOnLeaveSet.add(memberId);
+        
+        // Add to list if not already added (avoid duplicates if member has multiple overlapping requests)
+        if (!currentlyOnLeaveList.find(item => item.memberId === memberId)) {
+          const member = members.find(m => String(m._id).trim() === memberId);
+          currentlyOnLeaveList.push({
+            memberId,
+            memberName: member?.fullName || member?.username || 'Unknown',
+            reason,
+            category
+          });
+        }
+      }
+
+      // Upcoming this week: starts within next 7 days
+      if (reqStart >= today && reqStart <= nextWeek && reqStart <= reqEnd) {
+        upcomingThisWeekSet.add(memberId);
+      }
+
+      // This month: overlaps with current month
+      if (reqStart <= monthEnd && reqEnd >= monthStart) {
+        thisMonthSet.add(memberId);
+      }
+
+      // This year: overlaps with current year
+      if (reqStart <= yearEnd && reqEnd >= yearStart) {
+        thisYearSet.add(memberId);
+      }
+    });
+
+    // Count unique members by reason category after building the list
+    currentlyOnLeaveList.forEach(item => {
+      byReason[item.category] = (byReason[item.category] || 0) + 1;
+    });
+
+    return {
+      currentlyOnLeave: currentlyOnLeaveSet.size,
+      upcomingThisWeek: upcomingThisWeekSet.size,
+      thisMonth: thisMonthSet.size,
+      thisYear: thisYearSet.size,
+      byReason,
+      currentlyOnLeaveList: currentlyOnLeaveList.sort((a, b) => a.memberName.localeCompare(b.memberName))
+    };
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen">
@@ -409,7 +575,6 @@ export default function LeaderDashboard() {
             const totalRemainingBalance = aggregate.totalRemainingLeaveBalance || 0;
             const totalRealisticUsableDays = aggregate.totalRealisticUsableDays || 0;
             const averageRemainingBalance = aggregate.averageRemainingBalance || 0;
-            const averageDaysPerMember = aggregate.averageDaysPerMemberAcrossTeam || 0;
             const maxLeavePerYear = team?.settings.maxLeavePerYear || 20;
             
             // Calculate team health metrics
@@ -481,6 +646,7 @@ export default function LeaderDashboard() {
               scoreLabel = 'Needs Attention';
             } else {
               // Critical: High risk situation
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
               score = 'critical';
               gradientColors = 'from-red-600 via-rose-600 to-pink-600';
               bgGradient = 'bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20';
@@ -560,107 +726,211 @@ export default function LeaderDashboard() {
             );
           })()}
 
-          {/* Stats Cards - Enhanced with Gradients and Better Layout */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 mb-8">
-            {/* Team Members Card */}
-            <div className="stat-card group">
-              <div className="p-5 sm:p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Team Members</p>
-                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
-                      {members?.filter(m => m.role === 'member').length || 0}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Active members</p>
-                  </div>
-                  <div className="flex-shrink-0 ml-4">
-                    <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
-                      <UsersIcon className="h-6 w-6 text-blue-700 dark:text-blue-400" />
+          {/* Stats Cards and On Leave Section - Side by Side Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6">
+            {/* Left: 2x2 Stats Grid */}
+            <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Team Members Card */}
+              <div className="stat-card group">
+                <div className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Team Members</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white fade-in">
+                        {members?.filter(m => m.role === 'member').length || 0}
+                      </p>
+                    </div>
+                    <div className="flex-shrink-0 ml-2">
+                      <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                        <UsersIcon className="h-4 w-4 text-blue-700 dark:text-blue-400" />
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Pending Requests Card */}
-            <div className={`stat-card group ${pendingRequests?.length > 0 ? 'border-yellow-300 dark:border-yellow-700' : ''}`}>
-              <div className="p-5 sm:p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Pending Requests</p>
-                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
-                      {pendingRequests?.length || 0}
-                    </p>
-                    {pendingRequests?.length > 0 && (
-                      <p className="text-xs text-yellow-600 dark:text-yellow-400 font-medium mt-1">Requires attention</p>
-                    )}
-                    {pendingRequests?.length === 0 && (
-                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">All clear</p>
-                    )}
-                  </div>
-                  <div className="flex-shrink-0 ml-4">
-                    <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/30 rounded-xl flex items-center justify-center">
-                      <ClockIcon className="h-6 w-6 text-yellow-700 dark:text-yellow-400" />
+              {/* Pending Requests Card */}
+              <div className={`stat-card group ${pendingRequests?.length > 0 ? 'border-yellow-300 dark:border-yellow-700' : ''}`}>
+                <div className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Pending</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white fade-in">
+                        {pendingRequests?.length || 0}
+                      </p>
+                      {pendingRequests?.length > 0 && (
+                        <p className="text-[10px] text-yellow-600 dark:text-yellow-400 font-medium mt-0.5">Needs attention</p>
+                      )}
+                    </div>
+                    <div className="flex-shrink-0 ml-2">
+                      <div className="w-8 h-8 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg flex items-center justify-center">
+                        <ClockIcon className="h-4 w-4 text-yellow-700 dark:text-yellow-400" />
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Avg Leave Balance Card */}
-            <div className="stat-card group">
-              <div className="p-5 sm:p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Avg Leave Balance</p>
-                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
-                      {Math.round(getLeaveBalanceSummary().averageRemaining)}
-                    </p>
-                    <div className="mt-2 space-y-1">
+              {/* Avg Leave Balance Card */}
+              <div className="stat-card group">
+                <div className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Avg Balance</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white fade-in">
+                        {Math.round(getLeaveBalanceSummary().averageRemaining)}
+                      </p>
                       {getLeaveBalanceSummary().membersWithLowBalance > 0 && (
-                        <p className="text-xs text-red-600 dark:text-red-400 font-medium">
-                          {getLeaveBalanceSummary().membersWithLowBalance} with low balance
-                        </p>
-                      )}
-                      {getLeaveBalanceSummary().totalSurplus > 0 && (
-                        <p className="text-xs text-green-600 dark:text-green-400 font-medium">
-                          +{Math.round(getLeaveBalanceSummary().totalSurplus)} surplus
+                        <p className="text-[10px] text-red-600 dark:text-red-400 font-medium mt-0.5">
+                          {getLeaveBalanceSummary().membersWithLowBalance} low
                         </p>
                       )}
                     </div>
-                  </div>
-                  <div className="flex-shrink-0 ml-4">
-                    <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center">
-                      <ChartBarIcon className="h-6 w-6 text-green-700 dark:text-green-400" />
+                    <div className="flex-shrink-0 ml-2">
+                      <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                        <ChartBarIcon className="h-4 w-4 text-green-700 dark:text-green-400" />
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Maternity Leave Summary Card */}
-            <div className="stat-card group">
-              <div className="p-5 sm:p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Maternity/Paternity</p>
-                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
-                      {Math.round(getMaternityLeaveSummary().averageRemaining)}
-                    </p>
-                    <div className="mt-2 space-y-1">
-                      <p className="text-xs text-gray-600 dark:text-gray-400">
+              {/* Maternity Leave Summary Card */}
+              <div className="stat-card group">
+                <div className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Maternity</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white fade-in">
+                        {Math.round(getMaternityLeaveSummary().averageRemaining)}
+                      </p>
+                      <p className="text-[10px] text-gray-600 dark:text-gray-400 mt-0.5">
                         {Math.round(getMaternityLeaveSummary().totalUsed)} used
                       </p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">
-                        {Math.round(getMaternityLeaveSummary().totalRemaining)} remaining
+                    </div>
+                    <div className="flex-shrink-0 ml-2">
+                      <div className="w-8 h-8 bg-pink-100 dark:bg-pink-900/30 rounded-lg flex items-center justify-center">
+                        <CalendarIcon className="h-4 w-4 text-pink-700 dark:text-pink-400" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Currently On Leave Section */}
+            <div className="lg:col-span-3 card">
+              <div className="p-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Main Stat - On Leave */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <UserIcon className="h-4 w-4 text-indigo-700 dark:text-indigo-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                          On Leave
+                        </h3>
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                          Current status
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
+                      {getOnLeaveStats().currentlyOnLeave}
+                    </p>
+                    <p className="text-[10px] text-gray-600 dark:text-gray-400">
+                      Currently today
+                    </p>
+                  </div>
+
+                  {/* Upcoming Stats */}
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                      Upcoming
+                    </p>
+                    <div className="space-y-1.5">
+                      {getOnLeaveStats().upcomingThisWeek > 0 && (
+                        <div className="flex items-center justify-between bg-indigo-50 dark:bg-indigo-900/20 rounded p-1.5 border border-indigo-200 dark:border-indigo-800">
+                          <span className="text-xs text-indigo-700 dark:text-indigo-300 font-medium">
+                            Next 7 days
+                          </span>
+                          <span className="text-xs font-bold text-indigo-900 dark:text-indigo-100">
+                            {getOnLeaveStats().upcomingThisWeek}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-900/50 rounded p-1.5">
+                        <span className="text-xs text-gray-600 dark:text-gray-400">
+                          This month
+                        </span>
+                        <span className="text-xs font-semibold text-gray-900 dark:text-white">
+                          {getOnLeaveStats().thisMonth}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Breakdown by Reason */}
+                  {Object.keys(getOnLeaveStats().byReason).length > 0 ? (
+                    <div>
+                      <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                        By Reason
                       </p>
+                      <div className="space-y-1">
+                        {Object.entries(getOnLeaveStats().byReason)
+                          .sort(([, a], [, b]) => b - a)
+                          .slice(0, 4)
+                          .map(([reason, count]) => (
+                            <div key={reason} className="flex items-center justify-between">
+                              <span className="text-xs text-gray-700 dark:text-gray-300 truncate">{reason}</span>
+                              <span className="text-xs font-semibold text-gray-900 dark:text-white ml-2">{count}</span>
+                            </div>
+                          ))}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex-shrink-0 ml-4">
-                    <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900/30 rounded-xl flex items-center justify-center">
-                      <CalendarIcon className="h-6 w-6 text-pink-700 dark:text-pink-400" />
+                  ) : (
+                    <div>
+                      <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                        By Reason
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">No one on leave</p>
                     </div>
-                  </div>
+                  )}
+
+                  {/* Currently On Leave List - People */}
+                  {getOnLeaveStats().currentlyOnLeaveList.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                        People ({getOnLeaveStats().currentlyOnLeaveList.length})
+                      </p>
+                      <div className="space-y-1 max-h-[150px] overflow-y-auto pr-2 scrollbar-thin">
+                        {getOnLeaveStats().currentlyOnLeaveList.map((item) => (
+                          <div 
+                            key={item.memberId}
+                            className="flex items-start justify-between bg-gray-50/50 dark:bg-gray-900/50 rounded p-1.5 border border-gray-200 dark:border-gray-800"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">
+                                {item.memberName}
+                              </p>
+                              <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                                <span className="inline-flex items-center px-1 py-0.5 rounded text-[10px] font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300">
+                                  {item.category}
+                                </span>
+                                {item.reason && item.reason !== item.category && (
+                                  <p className="text-[10px] text-gray-600 dark:text-gray-400 truncate">
+                                    {item.reason}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -840,7 +1110,6 @@ export default function LeaderDashboard() {
                           if (!item) return null;
                           const { member, willLose, remainingBalance, realisticUsableDays } = item;
                           const maxLeavePerYear = team.settings.maxLeavePerYear;
-                          const isLowBalance = remainingBalance < maxLeavePerYear * 0.25;
                           
                           return (
                             <div 

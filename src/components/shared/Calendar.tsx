@@ -546,7 +546,12 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
           setRequestAsRange(false);
         } else {
           const error = await response.json();
-          showError(error.error || 'Failed to submit request');
+          // Handle 409 Conflict specifically (slot no longer available)
+          if (response.status === 409) {
+            showError(`This time slot is no longer available. ${error.error || 'Please select different dates.'}`);
+          } else {
+            showError(error.error || 'Failed to submit request');
+          }
         }
       } else {
         // Request each date separately (default)
@@ -571,6 +576,12 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
             successCount++;
           } else {
             failureCount++;
+            // Handle 409 Conflict specifically (slot no longer available)
+            if (response.status === 409) {
+              const errorData = await response.json();
+              const dateStr = date.toLocaleDateString();
+              showError(`Time slot no longer available for ${dateStr}. ${errorData.error || 'Please select different dates.'}`);
+            }
           }
         }
 

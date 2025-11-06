@@ -3,22 +3,25 @@ import { getTokenFromRequest, verifyToken } from '@/lib/auth';
 import { TeamModel } from '@/models/Team';
 import { UserModel } from '@/models/User';
 import { apiRateLimit } from '@/lib/rateLimit';
+import { broadcastTeamUpdate } from '@/lib/teamEvents';
+import { error as logError, info } from '@/lib/logger';
+import { internalServerError, unauthorizedError, forbiddenError, badRequestError, notFoundError } from '@/lib/errors';
 
 export async function GET(request: NextRequest) {
   try {
     const token = getTokenFromRequest(request);
     
     if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorizedError();
     }
 
     const user = verifyToken(token);
     if (!user) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+      return unauthorizedError('Invalid token');
     }
 
     if (!user.teamId) {
-      return NextResponse.json({ error: 'No team assigned' }, { status: 400 });
+      return badRequestError('No team assigned');
     }
     
     // Fetch team, members, and currentUser in parallel
@@ -29,7 +32,7 @@ export async function GET(request: NextRequest) {
     ]);
 
     if (!team) {
-      return NextResponse.json({ error: 'Team not found' }, { status: 404 });
+      return notFoundError('Team not found');
     }
 
     // Use members as-is, no need to add current user separately
@@ -85,11 +88,8 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json(response);
   } catch (error) {
-    console.error('Get team error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    logError('Get team error:', error);
+    return internalServerError();
   }
 }
 
@@ -103,12 +103,12 @@ export async function PATCH(request: NextRequest) {
     
     const token = getTokenFromRequest(request);
     if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorizedError();
     }
 
     const user = verifyToken(token);
     if (!user || user.role !== 'leader') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return forbiddenError();
     }
 
     let { settings } = await request.json();
@@ -117,44 +117,29 @@ export async function PATCH(request: NextRequest) {
         typeof settings.concurrentLeave !== 'number' || 
         typeof settings.maxLeavePerYear !== 'number' ||
         typeof settings.minimumNoticePeriod !== 'number') {
-      return NextResponse.json(
-        { error: 'Invalid settings' },
-        { status: 400 }
-      );
+      return badRequestError('Invalid settings');
     }
 
     // allowCarryover is optional boolean, ensure it's set if provided
     if (settings.allowCarryover !== undefined && typeof settings.allowCarryover !== 'boolean') {
-      return NextResponse.json(
-        { error: 'Invalid settings' },
-        { status: 400 }
-      );
+      return badRequestError('Invalid settings');
     }
 
     // enableSubgrouping is optional boolean, ensure it's set if provided
     if (settings.enableSubgrouping !== undefined && typeof settings.enableSubgrouping !== 'boolean') {
-      return NextResponse.json(
-        { error: 'Invalid settings' },
-        { status: 400 }
-      );
+      return badRequestError('Invalid settings');
     }
 
     // Validate workingDaysGroupNames if provided
     if (settings.workingDaysGroupNames !== undefined) {
       if (typeof settings.workingDaysGroupNames !== 'object' || Array.isArray(settings.workingDaysGroupNames) || settings.workingDaysGroupNames === null) {
-        return NextResponse.json(
-          { error: 'workingDaysGroupNames must be an object' },
-          { status: 400 }
-        );
+        return badRequestError('workingDaysGroupNames must be an object');
       }
       
       // Validate all values are strings
       for (const [key, value] of Object.entries(settings.workingDaysGroupNames)) {
         if (typeof key !== 'string' || typeof value !== 'string') {
-          return NextResponse.json(
-            { error: 'workingDaysGroupNames must have string keys and string values' },
-            { status: 400 }
-          );
+          return badRequestError('workingDaysGroupNames must have string keys and string values');
         }
         // Trim empty values and remove them
         if (!value.trim()) {
@@ -168,10 +153,7 @@ export async function PATCH(request: NextRequest) {
     // Validate bypass notice period if provided
     if (settings.bypassNoticePeriod !== undefined) {
       if (typeof settings.bypassNoticePeriod !== 'object' || Array.isArray(settings.bypassNoticePeriod) || settings.bypassNoticePeriod === null) {
-        return NextResponse.json(
-          { error: 'bypassNoticePeriod must be an object' },
-          { status: 400 }
-        );
+        return badRequestError('bypassNoticePeriod must be an object');
       }
       
       // If enabled is false, clear dates
@@ -184,10 +166,7 @@ export async function PATCH(request: NextRequest) {
       } else if (settings.bypassNoticePeriod.enabled === true) {
         // If enabled, validate dates are provided and valid
         if (!settings.bypassNoticePeriod.startDate || !settings.bypassNoticePeriod.endDate) {
-          return NextResponse.json(
-            { error: 'Both start date and end date are required when bypass notice period is enabled' },
-            { status: 400 }
-          );
+          return badRequestError('Both start date and end date are required when bypass notice period is enabled');
         }
         
         // Convert string dates to Date objects
@@ -195,17 +174,11 @@ export async function PATCH(request: NextRequest) {
         const endDate = new Date(settings.bypassNoticePeriod.endDate);
         
         if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-          return NextResponse.json(
-            { error: 'Invalid date format for bypass notice period' },
-            { status: 400 }
-          );
+          return badRequestError('Invalid date format for bypass notice period');
         }
         
         if (endDate < startDate) {
-          return NextResponse.json(
-            { error: 'End date must be on or after start date' },
-            { status: 400 }
-          );
+          return badRequestError('End date must be on or after start date');
         }
         
         // Store dates as Date objects
@@ -217,35 +190,23 @@ export async function PATCH(request: NextRequest) {
     // Validate maternity leave settings if provided
     if (settings.maternityLeave !== undefined) {
       if (typeof settings.maternityLeave !== 'object' || Array.isArray(settings.maternityLeave) || settings.maternityLeave === null) {
-        return NextResponse.json(
-          { error: 'maternityLeave must be an object' },
-          { status: 400 }
-        );
+        return badRequestError('maternityLeave must be an object');
       }
       
       // Validate maxDays if provided
       if (settings.maternityLeave.maxDays !== undefined) {
         if (typeof settings.maternityLeave.maxDays !== 'number' || !Number.isInteger(settings.maternityLeave.maxDays)) {
-          return NextResponse.json(
-            { error: 'maternityLeave.maxDays must be an integer' },
-            { status: 400 }
-          );
+          return badRequestError('maternityLeave.maxDays must be an integer');
         }
         if (settings.maternityLeave.maxDays < 1 || settings.maternityLeave.maxDays > 365) {
-          return NextResponse.json(
-            { error: 'maternityLeave.maxDays must be between 1 and 365' },
-            { status: 400 }
-          );
+          return badRequestError('maternityLeave.maxDays must be between 1 and 365');
         }
       }
       
       // Validate countingMethod if provided
       if (settings.maternityLeave.countingMethod !== undefined) {
         if (settings.maternityLeave.countingMethod !== 'calendar' && settings.maternityLeave.countingMethod !== 'working') {
-          return NextResponse.json(
-            { error: 'maternityLeave.countingMethod must be either "calendar" or "working"' },
-            { status: 400 }
-          );
+          return badRequestError('maternityLeave.countingMethod must be either "calendar" or "working"');
         }
       }
     }
@@ -257,10 +218,7 @@ export async function PATCH(request: NextRequest) {
         settings.subgroups = [];
       }
       if (!Array.isArray(settings.subgroups)) {
-        return NextResponse.json(
-          { error: 'Subgroups must be an array' },
-          { status: 400 }
-        );
+        return badRequestError('Subgroups must be an array');
       }
       
       // Filter out empty subgroup names
@@ -268,10 +226,7 @@ export async function PATCH(request: NextRequest) {
       
       // Require at least 2 subgroups (one subgroup is just the team itself)
       if (validSubgroups.length < 2) {
-        return NextResponse.json(
-          { error: 'At least 2 subgroups are required when subgrouping is enabled' },
-          { status: 400 }
-        );
+        return badRequestError('At least 2 subgroups are required when subgrouping is enabled');
       }
       
       // Remove duplicates and trim
@@ -308,13 +263,20 @@ export async function PATCH(request: NextRequest) {
     // Verify the update by fetching the updated team
     const updatedTeam = await TeamModel.findById(user.teamId);
     if (!updatedTeam) {
-      return NextResponse.json({ error: 'Team not found after update' }, { status: 500 });
+      return internalServerError('Team not found after update');
     }
     
-    console.log('[Team API] Settings updated successfully:', {
+    info('[Team API] Settings updated successfully:', {
       concurrentLeave: updatedTeam.settings.concurrentLeave,
       maxLeavePerYear: updatedTeam.settings.maxLeavePerYear,
       minimumNoticePeriod: updatedTeam.settings.minimumNoticePeriod
+    });
+
+    // Broadcast event after settings change
+    broadcastTeamUpdate(user.teamId!, 'settingsUpdated', {
+      teamId: user.teamId,
+      updatedSettings: updatedTeam.settings,
+      updatedBy: user.id,
     });
     
     return NextResponse.json({ 
@@ -322,10 +284,7 @@ export async function PATCH(request: NextRequest) {
       settings: updatedTeam.settings // Return updated settings for verification
     });
   } catch (error) {
-    console.error('Update team settings error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    logError('Update team settings error:', error);
+    return internalServerError();
   }
 }

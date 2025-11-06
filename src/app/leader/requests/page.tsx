@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import MigrationCalendar from '@/components/shared/MigrationCalendar';
 import { LeaveRequest, User } from '@/types';
 import { LEAVE_REASONS, EMERGENCY_REASONS, isEmergencyReason } from '@/lib/leaveReasons';
 import { ExclamationTriangleIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import { useNotification } from '@/hooks/useNotification';
+import { useTeamEvents } from '@/hooks/useTeamEvents';
 
 export default function LeaderRequestsPage() {
   const { showSuccess, showError, showInfo } = useNotification();
@@ -56,9 +57,10 @@ export default function LeaderRequestsPage() {
   };
   
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [teamId, setTeamId] = useState<string | null>(null);
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
+  const fetchData = async () => {
       try {
         const token = localStorage.getItem('token');
         const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -80,6 +82,9 @@ export default function LeaderRequestsPage() {
         // Process team response
         const teamData = await teamResponse.json();
         setMembers(teamData.members);
+        if (teamData.team?._id) {
+          setTeamId(teamData.team._id);
+        }
 
         // Process requests response
         const allRequests = await requestsResponse.json();
@@ -91,8 +96,26 @@ export default function LeaderRequestsPage() {
       }
     };
 
+  useEffect(() => {
     fetchData();
   }, []);
+
+  // Real-time updates using SSE
+  useTeamEvents(teamId, {
+    enabled: !loading && !!teamId,
+    onEvent: (event) => {
+      // Refresh requests list when events received
+      if (event.type === 'leaveRequestCreated' || event.type === 'leaveRequestUpdated' || event.type === 'leaveRequestDeleted') {
+        // Debounce refresh to avoid excessive API calls
+        if (refreshTimeoutRef.current) {
+          clearTimeout(refreshTimeoutRef.current);
+        }
+        refreshTimeoutRef.current = setTimeout(() => {
+          fetchData();
+        }, 300);
+      }
+    },
+  });
 
   const handleApprove = async (requestId: string) => {
     try {

@@ -1,22 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTokenFromRequest, verifyToken } from '@/lib/auth';
 import { AuditLogModel } from '@/models/AuditLog';
+import { error as logError } from '@/lib/logger';
+import { internalServerError, unauthorizedError, forbiddenError } from '@/lib/errors';
 
 export async function GET(request: NextRequest) {
   try {
     const token = getTokenFromRequest(request);
     if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorizedError();
     }
 
     const user = verifyToken(token);
     if (!user) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+      return unauthorizedError('Invalid token');
     }
 
     // Only leaders can view audit logs
     if (user.role !== 'leader') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return forbiddenError();
     }
 
     const { searchParams } = new URL(request.url);
@@ -34,10 +36,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ auditLogs });
   } catch (error) {
-    console.error('Get audit logs error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    logError('Get audit logs error:', error);
+    return internalServerError();
   }
 }

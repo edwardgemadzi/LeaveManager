@@ -7,7 +7,7 @@ import { LeaveRequest, Team, User } from '@/types';
 import { calculateLeaveBalance, countWorkingDays, calculateSurplusBalance, calculateMaternityLeaveBalance, calculateMaternitySurplusBalance, isMaternityLeave, countMaternityLeaveDays } from '@/lib/leaveCalculations';
 import { MemberAnalytics } from '@/lib/analyticsCalculations';
 import { useBrowserNotification } from '@/hooks/useBrowserNotification';
-import { usePolling } from '@/hooks/usePolling';
+import { useTeamEvents } from '@/hooks/useTeamEvents';
 import { 
   ClockIcon, 
   CalendarIcon, 
@@ -118,71 +118,168 @@ export default function MemberDashboard() {
     };
   }, [showNotification]);
 
-  // Polling for request status changes
-  usePolling(async () => {
-    if (!user) return;
-    
+  // Real-time updates using SSE with fallback to polling
+  const refetchData = async () => {
     try {
       const token = localStorage.getItem('token');
+      const userData = JSON.parse(localStorage.getItem('user') || '{}');
+      setUser(userData);
+
       const response = await fetch('/api/dashboard', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (Array.isArray(data.requests)) {
-          // Use ObjectId comparison to handle both string and ObjectId formats
-          // Prefer currentUser._id from API response as it's more reliable
-          const userIdToMatch = data.currentUser?._id || user._id;
-          const currentRequests = userIdToMatch ? data.requests.filter((req: LeaveRequest) => {
+      if (!response.ok) {
+        console.error('Failed to fetch dashboard data:', response.status, response.statusText);
+        return;
+      }
+
+      const data = await response.json();
+      
+      setTeam(data.team);
+      if (data.currentUser) {
+        setUser(data.currentUser);
+      }
+      
+      if (Array.isArray(data.requests)) {
+        const userIdToMatch = data.currentUser?._id || userData._id;
+        if (!userIdToMatch) {
+          setMyRequests([]);
+        } else {
+          const myRequests = data.requests.filter((req: LeaveRequest) => {
             const reqUserId = String(req.userId).trim();
             const currentUserId = String(userIdToMatch).trim();
             return reqUserId === currentUserId;
-          }) : [];
-          
-          // Check for status changes
-          previousRequestsRef.current.forEach((prevRequest) => {
-            const currentRequest = currentRequests.find((r: LeaveRequest) => r._id === prevRequest._id);
-            if (currentRequest && prevRequest.status === 'pending' && currentRequest.status !== 'pending') {
-              const startDate = new Date(currentRequest.startDate).toLocaleDateString();
-              const endDate = new Date(currentRequest.endDate).toLocaleDateString();
-              
-              if (currentRequest.status === 'approved') {
-                showNotification(
-                  'Leave Request Approved',
-                  `Your leave request for ${startDate} to ${endDate} has been approved!`
-                );
-              } else if (currentRequest.status === 'rejected') {
-                showNotification(
-                  'Leave Request Rejected',
-                  `Your leave request for ${startDate} to ${endDate} has been rejected.`
-                );
-              }
-            }
           });
-          
-          // Update state if requests changed
-          if (currentRequests.length !== myRequests.length || 
-              currentRequests.some((req: LeaveRequest, idx: number) => req._id !== myRequests[idx]?._id || req.status !== myRequests[idx]?.status)) {
-            setMyRequests(currentRequests);
-            setTeam(data.team);
-            if (data.currentUser) {
-              setUser(data.currentUser);
-            }
-            if (data.analytics && data.analytics.analytics) {
-              setAnalytics(data.analytics.analytics);
-            }
-          }
-          
-          previousRequestsRef.current = currentRequests;
+          setMyRequests(myRequests);
+          previousRequestsRef.current = myRequests;
         }
       }
+      
+      if (data.analytics && data.analytics.analytics) {
+        setAnalytics(data.analytics.analytics);
+      }
     } catch (error) {
-      console.error('Error polling for request status:', error);
+      console.error('Error fetching data:', error);
     }
-  }, { interval: 30000, enabled: !loading && !!user });
+  };
+
+  useTeamEvents(team?._id || null, {
+    enabled: !loading && !!user && !!team,
+    fallbackToPolling: true,
+    pollingCallback: async () => {
+      if (!user) return;
+      
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/dashboard', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data.requests)) {
+            const userIdToMatch = data.currentUser?._id || user._id;
+            const currentRequests = userIdToMatch ? data.requests.filter((req: LeaveRequest) => {
+              const reqUserId = String(req.userId).trim();
+              const currentUserId = String(userIdToMatch).trim();
+              return reqUserId === currentUserId;
+            }) : [];
+            
+            // Check for status changes
+            previousRequestsRef.current.forEach((prevRequest) => {
+              const currentRequest = currentRequests.find((r: LeaveRequest) => r._id === prevRequest._id);
+              if (currentRequest && prevRequest.status === 'pending' && currentRequest.status !== 'pending') {
+                const startDate = new Date(currentRequest.startDate).toLocaleDateString();
+                const endDate = new Date(currentRequest.endDate).toLocaleDateString();
+                
+                if (currentRequest.status === 'approved') {
+                  showNotification(
+                    'Leave Request Approved',
+                    `Your leave request for ${startDate} to ${endDate} has been approved!`
+                  );
+                } else if (currentRequest.status === 'rejected') {
+                  showNotification(
+                    'Leave Request Rejected',
+                    `Your leave request for ${startDate} to ${endDate} has been rejected.`
+                  );
+                }
+              }
+            });
+            
+            // Update state if requests changed
+            if (currentRequests.length !== myRequests.length || 
+                currentRequests.some((req: LeaveRequest, idx: number) => req._id !== myRequests[idx]?._id || req.status !== myRequests[idx]?.status)) {
+              setMyRequests(currentRequests);
+              setTeam(data.team);
+              if (data.currentUser) {
+                setUser(data.currentUser);
+              }
+              if (data.analytics && data.analytics.analytics) {
+                setAnalytics(data.analytics.analytics);
+              }
+            }
+            
+            previousRequestsRef.current = currentRequests;
+          }
+        }
+      } catch (error) {
+        console.error('Error polling for request status:', error);
+      }
+    },
+    pollingInterval: 30000,
+    onEvent: (event) => {
+      // Handle leaveRequestCreated (if it's for this user)
+      if (event.type === 'leaveRequestCreated') {
+        const data = event.data as { requestId: string; userId: string; startDate: string; endDate: string; reason: string; status: string };
+        if (user && String(data.userId).trim() === String(user._id).trim()) {
+          // Add to my requests
+          refetchData();
+        }
+      }
+      
+      // Handle leaveRequestUpdated (if it's for this user)
+      if (event.type === 'leaveRequestUpdated') {
+        const data = event.data as { requestId: string; userId: string; newStatus: string };
+        if (user && String(data.userId).trim() === String(user._id).trim()) {
+          // Update request status
+          refetchData();
+          
+          // Show notification for status changes
+          if (data.newStatus === 'approved') {
+            showNotification(
+              'Leave Request Approved',
+              'Your leave request has been approved!'
+            );
+          } else if (data.newStatus === 'rejected') {
+            showNotification(
+              'Leave Request Rejected',
+              'Your leave request has been rejected.'
+            );
+          }
+        }
+      }
+      
+      // Handle leaveRequestDeleted (if it's for this user)
+      if (event.type === 'leaveRequestDeleted') {
+        const data = event.data as { requestId: string; userId: string };
+        if (user && String(data.userId).trim() === String(user._id).trim()) {
+          refetchData();
+        }
+      }
+      
+      // Handle settingsUpdated
+      if (event.type === 'settingsUpdated') {
+        setTimeout(() => {
+          refetchData();
+        }, 200);
+      }
+    },
+  });
 
   // Check for high competition warning
   useEffect(() => {
@@ -785,6 +882,7 @@ export default function MemberDashboard() {
               scoreLabel = 'Needs Attention';
             } else {
               // Critical: No days available
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
               score = 'critical';
               gradientColors = 'from-red-600 via-rose-600 to-pink-600';
               bgGradient = 'bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20';

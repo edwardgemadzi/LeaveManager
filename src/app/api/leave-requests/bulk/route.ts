@@ -5,6 +5,8 @@ import { AuditLogModel } from '@/models/AuditLog';
 import { emailService } from '@/lib/email';
 import { UserModel } from '@/models/User';
 import { teamIdsMatch } from '@/lib/helpers';
+import { error as logError } from '@/lib/logger';
+import { internalServerError, unauthorizedError, forbiddenError, badRequestError } from '@/lib/errors';
 
 interface BulkActionRequest {
   action: 'approve' | 'reject';
@@ -16,29 +18,23 @@ export async function PATCH(request: NextRequest) {
   try {
     const token = getTokenFromRequest(request);
     if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return unauthorizedError();
     }
 
     const user = verifyToken(token);
     if (!user || user.role !== 'leader') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return forbiddenError();
     }
 
     const body: BulkActionRequest = await request.json();
     const { action, requestIds, reason } = body;
 
     if (!action || !requestIds || !Array.isArray(requestIds) || requestIds.length === 0) {
-      return NextResponse.json(
-        { error: 'Action and request IDs are required' },
-        { status: 400 }
-      );
+      return badRequestError('Action and request IDs are required');
     }
 
     if (!['approve', 'reject'].includes(action)) {
-      return NextResponse.json(
-        { error: 'Invalid action. Must be approve or reject' },
-        { status: 400 }
-      );
+      return badRequestError('Invalid action. Must be approve or reject');
     }
 
     const results = {
@@ -116,7 +112,7 @@ export async function PATCH(request: NextRequest) {
 
         results.successful.push(requestId);
       } catch (error) {
-        console.error(`Error processing request ${requestId}:`, error);
+        logError(`Error processing request ${requestId}:`, error);
         results.failed.push({ 
           id: requestId, 
           error: error instanceof Error ? error.message : 'Unknown error' 
@@ -134,10 +130,7 @@ export async function PATCH(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Bulk action error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    logError('Bulk action error:', error);
+    return internalServerError();
   }
 }
