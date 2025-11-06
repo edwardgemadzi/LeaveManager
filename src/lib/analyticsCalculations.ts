@@ -829,8 +829,9 @@ export const getMemberAnalytics = (
   const membersSharingSameShift = calculateMembersSharingSameShift(user, membersWithNonZeroBase);
   
   // Calculate realistic usable days - factors in members sharing same schedule
-  // This divides usable days by members sharing the same shift, capped by remaining leave balance
-  // Use floor division to get whole days, remainder is calculated separately
+  // This accounts for concurrent leave limit - if members <= concurrentLeave,
+  // each member can use all usableDays (enough slots per day for all members)
+  // If members > concurrentLeave, slots are divided proportionally
   // IMPORTANT: All members in the same group should get the same base allocation
   // Only then should it be capped by individual remaining balance
   const allowCarryover = team.settings.allowCarryover || false;
@@ -838,22 +839,38 @@ export const getMemberAnalytics = (
   
   // Calculate base allocation per member (same for all members in the group)
   // This is for the CURRENT YEAR only - not affected by carryover limitations
-  const baseAllocationPerMember = membersSharingSameShift > 0
-    ? Math.floor(usableDays / membersSharingSameShift)
-    : usableDays;
+  // IMPORTANT: Account for concurrent leave limit - if members <= concurrentLeave,
+  // each member can use all usableDays (enough slots per day for all members)
+  const concurrentLeave = team.settings.concurrentLeave || 1;
+  let baseAllocationPerMember: number;
+  
+  if (membersSharingSameShift <= concurrentLeave) {
+    // Enough slots per day for all members - each can use all usable days
+    baseAllocationPerMember = usableDays;
+  } else {
+    // More members than slots - divide slots proportionally
+    // Formula: usableDays * (concurrentLeave / membersSharingSameShift)
+    baseAllocationPerMember = Math.floor((usableDays * concurrentLeave) / membersSharingSameShift);
+  }
   
   // Cap by remaining leave balance (this is the only member-specific constraint)
   // Realistic usable days for current year - NOT adjusted for carryover limitations
   const realisticUsableDays = Math.min(baseAllocationPerMember, remainingLeaveBalance);
   
-  // Calculate remainder days - extra days that need allocation decisions
-  // Remainder is the leftover days after dividing usableDays by membersSharingSameShift
-  // Example: 25 usable days, 10 members = 25 / 10 = 2 remainder 5
-  // Each gets 2 days, 5 days need allocation (can't be split equally among 10 people)
-  // Example: 20 usable days, 10 members = 20 / 10 = 2 remainder 0
-  // Each gets 2 days, 0 remainder (can be allocated equally)
-  const remainderDays = membersSharingSameShift > 0
-    ? usableDays % membersSharingSameShift
+  // Calculate remainder days - extra slots that need allocation decisions
+  // Remainder is the leftover slots after allocating slots proportionally
+  // If members <= concurrentLeave: no remainder (each gets all usable days)
+  // If members > concurrentLeave: remainder = leftover slots that can't be split equally
+  // Example: 100 usable days, 6 concurrent leave, 10 members
+  //   Total slots = 100 * 6 = 600
+  //   Each member gets floor(600 / 10) = 60 slots
+  //   Remainder = 600 % 10 = 0 (no leftover)
+  // Example: 100 usable days, 6 concurrent leave, 7 members
+  //   Total slots = 100 * 6 = 600
+  //   Each member gets floor(600 / 7) = 85 slots
+  //   Remainder = 600 % 7 = 5 slots (leftover that can't be split equally)
+  const remainderDays = membersSharingSameShift > 0 && membersSharingSameShift > concurrentLeave
+    ? (usableDays * concurrentLeave) % membersSharingSameShift
     : 0;
   
   const averageDaysPerMember = calculateAverageDaysPerMember(usableDays, membersSharingSameShift);
