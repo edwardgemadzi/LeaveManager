@@ -1422,27 +1422,41 @@ export default function LeaderLeaveBalancePage() {
                                   )}
                                 </div>
                                 <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2 mt-1">
-                                  <div
-                                    className={`h-2 rounded-full ${
-                                      leaveData.realisticUsableDays >= leaveData.remainingBalance
-                                        ? 'bg-green-500' // Good - can use all days
-                                        : (() => {
-                                            const realisticPercentage = leaveData.remainingBalance > 0
-                                              ? (leaveData.realisticUsableDays / leaveData.remainingBalance) * 100
-                                              : 0;
-                                            if (realisticPercentage < 30) {
-                                              return 'bg-red-600'; // Very bad - will lose most days
-                                            } else if (realisticPercentage < 70) {
-                                              return 'bg-yellow-500'; // Moderate - will lose some days
-                                            } else {
-                                              return 'bg-red-500'; // Bad - will lose some days
-                                            }
-                                          })()
-                                    }`}
-                                    style={{
-                                      width: `${Math.min((leaveData.remainingBalance / maxLeave) * 100, 100)}%`
-                                    }}
-                                  ></div>
+                                  {(() => {
+                                    // Calculate usage percentage (fills up as more leave is used)
+                                    const baseBalance = member.manualLeaveBalance !== undefined 
+                                      ? member.manualLeaveBalance 
+                                      : maxLeave;
+                                    const used = baseBalance > 0 ? baseBalance - leaveData.remainingBalance : 0;
+                                    const usagePercentage = baseBalance > 0 
+                                      ? Math.min(100, Math.max(0, (used / baseBalance) * 100)) 
+                                      : 0;
+                                    
+                                    // Color based on realistic usable days vs remaining balance
+                                    const colorClass = leaveData.realisticUsableDays >= leaveData.remainingBalance
+                                      ? 'bg-green-500' // Good - can use all days
+                                      : (() => {
+                                          const realisticPercentage = leaveData.remainingBalance > 0
+                                            ? (leaveData.realisticUsableDays / leaveData.remainingBalance) * 100
+                                            : 0;
+                                          if (realisticPercentage < 30) {
+                                            return 'bg-red-600'; // Very bad - will lose most days
+                                          } else if (realisticPercentage < 70) {
+                                            return 'bg-yellow-500'; // Moderate - will lose some days
+                                          } else {
+                                            return 'bg-red-500'; // Bad - will lose some days
+                                          }
+                                        })();
+                                    
+                                    return (
+                                      <div
+                                        className={`h-2 rounded-full ${colorClass}`}
+                                        style={{
+                                          width: `${usagePercentage}%`
+                                        }}
+                                      ></div>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                             )}
