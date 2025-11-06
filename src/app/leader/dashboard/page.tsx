@@ -278,9 +278,31 @@ export default function LeaderDashboard() {
     
     if (membersAtRisk > 0) {
       membersAtRiskNotifiedRef.current = true;
+      let notificationMessage = `${membersAtRisk} member(s) are at risk of losing leave days or have low balance.`;
+      
+      // Add carryover information if applicable
+      if (analytics.aggregate.totalWillCarryover > 0 && team?.settings.allowCarryover) {
+        notificationMessage += ` However, ${Math.round(analytics.aggregate.totalWillCarryover)} day(s) will carry over to next year.`;
+        
+        if (team.settings.carryoverSettings?.limitedToMonths && team.settings.carryoverSettings.limitedToMonths.length > 0) {
+          const monthNames = team.settings.carryoverSettings.limitedToMonths.map(m => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m]).join(', ');
+          notificationMessage += ` Note: Carryover days can only be used in ${monthNames} of next year.`;
+        }
+        
+        if (team.settings.carryoverSettings?.maxCarryoverDays && analytics.aggregate.totalWillCarryover > team.settings.carryoverSettings.maxCarryoverDays) {
+          const excessDays = Math.round(analytics.aggregate.totalWillCarryover - team.settings.carryoverSettings.maxCarryoverDays);
+          notificationMessage += ` Warning: Only ${team.settings.carryoverSettings.maxCarryoverDays} days can carry over. ${excessDays} day(s) will be lost.`;
+        }
+        
+        if (team.settings.carryoverSettings?.expiryDate) {
+          const expiryDate = new Date(team.settings.carryoverSettings.expiryDate);
+          notificationMessage += ` Important: Carryover days expire on ${expiryDate.toLocaleDateString()}.`;
+        }
+      }
+      
       showNotification(
         'Members at Risk Alert',
-        `${membersAtRisk} member(s) are at risk of losing leave days or have low balance.`
+        notificationMessage
       );
     }
   }, [analytics, members, team, showNotification]);
@@ -616,7 +638,10 @@ export default function LeaderDashboard() {
               totalRealisticUsableDays,
               membersAtRisk,
               totalWillLose,
-              totalWillCarryover
+              totalWillCarryover,
+              team?.settings.carryoverSettings?.limitedToMonths,
+              team?.settings.carryoverSettings?.maxCarryoverDays,
+              team?.settings.carryoverSettings?.expiryDate
             );
             
             // eslint-disable-next-line @typescript-eslint/no-unused-vars

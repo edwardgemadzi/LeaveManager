@@ -828,23 +828,29 @@ export default function LeaderMembersPage() {
                               </select>
                             </div>
                             
-                            {/* Maternity/Paternity Type Selector */}
-                            <div className="flex items-center space-x-2">
-                              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Parental:</label>
-                              <select
-                                value={member.maternityPaternityType || ''}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  handleUpdateMaternityPaternityType(member._id!, value === '' ? null : value as 'maternity' | 'paternity');
-                                }}
-                                disabled={updating === member._id}
-                                className="text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 disabled:opacity-50 min-w-0 flex-1"
-                              >
-                                <option value="">None</option>
-                                <option value="maternity">🤱 Maternity</option>
-                                <option value="paternity">👨‍👩‍👧 Paternity</option>
-                              </select>
-                            </div>
+                            {/* Maternity/Paternity Type Selector - Only show if at least one is enabled */}
+                            {(team?.settings.maternityLeave?.enabled || team?.settings.paternityLeave?.enabled) && (
+                              <div className="flex items-center space-x-2">
+                                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Parental:</label>
+                                <select
+                                  value={member.maternityPaternityType || ''}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    handleUpdateMaternityPaternityType(member._id!, value === '' ? null : value as 'maternity' | 'paternity');
+                                  }}
+                                  disabled={updating === member._id}
+                                  className="text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 disabled:opacity-50 min-w-0 flex-1"
+                                >
+                                  <option value="">None</option>
+                                  {team?.settings.maternityLeave?.enabled && (
+                                    <option value="maternity">🤱 Maternity</option>
+                                  )}
+                                  {team?.settings.paternityLeave?.enabled && (
+                                    <option value="paternity">👨‍👩‍👧 Paternity</option>
+                                  )}
+                                </select>
+                              </div>
+                            )}
                             
                             {/* Password Reset Button */}
                             <button

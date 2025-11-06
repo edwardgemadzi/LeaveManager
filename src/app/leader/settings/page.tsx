@@ -31,10 +31,12 @@ export default function TeamSettingsPage() {
       endDate: undefined as string | undefined,
     },
     maternityLeave: {
+      enabled: false,
       maxDays: 90,
       countingMethod: 'working' as 'calendar' | 'working',
     },
     paternityLeave: {
+      enabled: false,
       maxDays: 90,
       countingMethod: 'working' as 'calendar' | 'working',
     },
@@ -79,10 +81,12 @@ export default function TeamSettingsPage() {
             endDate: undefined as string | undefined,
           },
           maternityLeave: {
+            enabled: false,
             maxDays: 90,
             countingMethod: 'working' as 'calendar' | 'working',
           },
           paternityLeave: {
+            enabled: false,
             maxDays: 90,
             countingMethod: 'working' as 'calendar' | 'working',
           },
@@ -663,8 +667,31 @@ export default function TeamSettingsPage() {
                   
                   {/* Maternity Leave Settings */}
                   <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
-                    <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">🤱 Maternity Leave</h4>
+                    <div className="flex items-center mb-4">
+                      <input
+                        type="checkbox"
+                        id="maternityLeaveEnabled"
+                        checked={settings.maternityLeave?.enabled || false}
+                        onChange={(e) => setSettings({
+                          ...settings,
+                          maternityLeave: {
+                            ...settings.maternityLeave,
+                            enabled: e.target.checked,
+                            maxDays: settings.maternityLeave?.maxDays || 90,
+                            countingMethod: settings.maternityLeave?.countingMethod || 'working',
+                          }
+                        })}
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900"
+                      />
+                      <label htmlFor="maternityLeaveEnabled" className="ml-2 block text-md font-medium text-gray-900 dark:text-white">
+                        🤱 Enable Maternity Leave
+                      </label>
+                    </div>
+                    <p className="ml-6 mb-4 text-sm text-gray-500 dark:text-gray-400">
+                      Allow members to be assigned maternity leave and take maternity leave requests.
+                    </p>
                     
+                    {settings.maternityLeave?.enabled && (
                     <div className="space-y-4">
                       <div>
                         <label htmlFor="maternityMaxDays" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
@@ -798,12 +825,36 @@ export default function TeamSettingsPage() {
                         </p>
                       </div>
                     </div>
+                    )}
                   </div>
 
                   {/* Paternity Leave Settings */}
                   <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
-                    <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">👨‍👩‍👧 Paternity Leave</h4>
+                    <div className="flex items-center mb-4">
+                      <input
+                        type="checkbox"
+                        id="paternityLeaveEnabled"
+                        checked={settings.paternityLeave?.enabled || false}
+                        onChange={(e) => setSettings({
+                          ...settings,
+                          paternityLeave: {
+                            ...settings.paternityLeave,
+                            enabled: e.target.checked,
+                            maxDays: settings.paternityLeave?.maxDays || 90,
+                            countingMethod: settings.paternityLeave?.countingMethod || 'working',
+                          }
+                        })}
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900"
+                      />
+                      <label htmlFor="paternityLeaveEnabled" className="ml-2 block text-md font-medium text-gray-900 dark:text-white">
+                        👨‍👩‍👧 Enable Paternity Leave
+                      </label>
+                    </div>
+                    <p className="ml-6 mb-4 text-sm text-gray-500 dark:text-gray-400">
+                      Allow members to be assigned paternity leave and take paternity leave requests.
+                    </p>
                     
+                    {settings.paternityLeave?.enabled && (
                     <div className="space-y-4">
                       <div>
                         <label htmlFor="paternityMaxDays" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
@@ -937,6 +988,7 @@ export default function TeamSettingsPage() {
                         </p>
                       </div>
                     </div>
+                    )}
                   </div>
                   
                   <div className="flex items-center mt-4">

@@ -45,10 +45,12 @@ export interface TeamSettings {
     endDate?: Date;
   };
   maternityLeave?: {
+    enabled?: boolean; // Whether maternity leave is enabled for the team (default: false)
     maxDays?: number; // Maximum maternity leave days (configurable by leader, default: 90)
     countingMethod?: 'calendar' | 'working'; // How to count days: 'calendar' = count all calendar days, 'working' = count only working days (default: 'working')
   };
   paternityLeave?: {
+    enabled?: boolean; // Whether paternity leave is enabled for the team (default: false)
     maxDays?: number; // Maximum paternity leave days (configurable by leader, default: 90)
     countingMethod?: 'calendar' | 'working'; // How to count days: 'calendar' = count all calendar days, 'working' = count only working days (default: 'working')
   };

@@ -235,6 +235,13 @@ export async function PATCH(request: NextRequest) {
         return badRequestError('maternityLeave must be an object');
       }
       
+      // Validate enabled field if provided
+      if (settings.maternityLeave.enabled !== undefined) {
+        if (typeof settings.maternityLeave.enabled !== 'boolean') {
+          return badRequestError('maternityLeave.enabled must be a boolean');
+        }
+      }
+      
       // Validate maxDays if provided
       if (settings.maternityLeave.maxDays !== undefined) {
         if (typeof settings.maternityLeave.maxDays !== 'number' || !Number.isInteger(settings.maternityLeave.maxDays)) {
@@ -257,6 +264,13 @@ export async function PATCH(request: NextRequest) {
     if (settings.paternityLeave !== undefined) {
       if (typeof settings.paternityLeave !== 'object' || Array.isArray(settings.paternityLeave) || settings.paternityLeave === null) {
         return badRequestError('paternityLeave must be an object');
+      }
+      
+      // Validate enabled field if provided
+      if (settings.paternityLeave.enabled !== undefined) {
+        if (typeof settings.paternityLeave.enabled !== 'boolean') {
+          return badRequestError('paternityLeave.enabled must be a boolean');
+        }
       }
       
       // Validate maxDays if provided

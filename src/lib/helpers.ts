@@ -359,7 +359,10 @@ export function calculateTimeBasedTeamHealthScore(
   totalRealisticUsableDays: number,
   membersAtRisk: number,
   totalWillLose: number,
-  totalWillCarryover: number
+  totalWillCarryover: number,
+  carryoverLimitedToMonths?: number[],
+  carryoverMaxDays?: number,
+  carryoverExpiryDate?: Date
 ): {
   score: string;
   scoreLabel: string;
@@ -497,6 +500,22 @@ export function calculateTimeBasedTeamHealthScore(
   // Add messages about carryover
   if (totalWillCarryover > 0) {
     message += ` Great news: ${Math.round(totalWillCarryover)} days will carry over to next year!`;
+    
+    // Add carryover limitations if applicable
+    if (carryoverLimitedToMonths && carryoverLimitedToMonths.length > 0) {
+      const monthNames = carryoverLimitedToMonths.map(m => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m]).join(', ');
+      message += ` Note: These carryover days can only be used in ${monthNames} of next year.`;
+    }
+    
+    if (carryoverMaxDays && totalWillCarryover > carryoverMaxDays) {
+      const excessDays = Math.round(totalWillCarryover - carryoverMaxDays);
+      message += ` Warning: Only ${carryoverMaxDays} days can carry over. ${excessDays} day${excessDays !== 1 ? 's' : ''} will be lost.`;
+    }
+    
+    if (carryoverExpiryDate) {
+      const expiryDate = new Date(carryoverExpiryDate);
+      message += ` Important: Carryover days expire on ${expiryDate.toLocaleDateString()}.`;
+    }
   }
   
   return {
