@@ -1561,20 +1561,8 @@ export default function LeaderLeaveBalancePage() {
                               ? team?.settings.paternityLeave?.maxDays
                               : team?.settings.maternityLeave?.maxDays;
                             
-                            // Debug logging
-                            console.log('[Leave Balance] Rendering maternity data for member:', {
-                              memberId: member._id,
-                              memberName: member.fullName || member.username,
-                              userType,
-                              hasSettings: maternityData.hasSettings,
-                              maxLeaveDays,
-                              remainingBalance: maternityData.remainingBalance,
-                              daysUsed: maternityData.daysUsed
-                            });
-                            
                             // If no settings configured, show N/A
                             if (!maternityData.hasSettings || maxLeaveDays === undefined) {
-                              console.log('[Leave Balance] Showing N/A because:', { hasSettings: maternityData.hasSettings, maxLeaveDays });
                               return (
                                 <>
                                   <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
@@ -1591,12 +1579,6 @@ export default function LeaderLeaveBalancePage() {
                                 </>
                               );
                             }
-                            
-                            console.log('[Leave Balance] Showing balance data:', {
-                              remainingBalance: maternityData.remainingBalance,
-                              maxLeaveDays,
-                              daysUsed: maternityData.daysUsed
-                            });
                             
                             return (
                               <>

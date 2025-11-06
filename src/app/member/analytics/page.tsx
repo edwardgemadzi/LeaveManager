@@ -71,15 +71,24 @@ export default function MemberAnalyticsPage() {
       });
       setLeaveRequests(userRequests);
 
-      // Calculate maternity analytics if user has maternity/paternity type assigned
+      // Calculate maternity analytics if user has maternity/paternity type assigned and it's enabled
       if (data.currentUser?.maternityPaternityType && data.team) {
-        const approvedRequests = userRequests.filter((req: LeaveRequest) => req.status === 'approved');
-        const maternityAnalyticsData = getMaternityMemberAnalytics(
-          data.currentUser,
-          data.team,
-          approvedRequests
-        );
-        setMaternityAnalytics(maternityAnalyticsData);
+        const userType = data.currentUser.maternityPaternityType;
+        const isTypeEnabled = userType === 'paternity' 
+          ? data.team.settings.paternityLeave?.enabled 
+          : data.team.settings.maternityLeave?.enabled;
+        
+        if (isTypeEnabled) {
+          const approvedRequests = userRequests.filter((req: LeaveRequest) => req.status === 'approved');
+          const maternityAnalyticsData = getMaternityMemberAnalytics(
+            data.currentUser,
+            data.team,
+            approvedRequests
+          );
+          setMaternityAnalytics(maternityAnalyticsData);
+        } else {
+          setMaternityAnalytics(null);
+        }
       } else {
         setMaternityAnalytics(null);
       }
@@ -744,6 +753,25 @@ export default function MemberAnalyticsPage() {
                         </div>
                       )}
                       
+                      {/* Days Lost Due to Carryover Limits */}
+                      {(() => {
+                        const willCarryover = analytics.willCarryover ?? 0;
+                        const realisticUsable = analytics.realisticCarryoverUsableDays ?? 0;
+                        const daysLost = willCarryover - realisticUsable;
+                        
+                        if (daysLost > 0) {
+                          return (
+                            <div className="ml-16 mt-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                              <p className="text-xs font-semibold text-red-900 dark:text-red-300 mb-1">⚠️ Days That Will Be Lost:</p>
+                              <p className="text-xs text-red-800 dark:text-red-400">
+                                {Math.round(daysLost)} days will be lost due to carryover limitations, even though they will carry over.
+                              </p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+                      
                       {/* Carryover Limitations */}
                       {analytics.carryoverLimitedToMonths && analytics.carryoverLimitedToMonths.length > 0 && (
                         <div className="ml-16 mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
@@ -883,7 +911,42 @@ export default function MemberAnalyticsPage() {
           </div>
 
           {/* Maternity/Paternity Leave Section */}
-          {user?.maternityPaternityType && maternityAnalytics && (
+          {(() => {
+            const userType = user?.maternityPaternityType;
+            const hasTypeAssigned = !!userType;
+            const isTypeEnabled = userType === 'paternity' 
+              ? team?.settings.paternityLeave?.enabled 
+              : userType === 'maternity' 
+                ? team?.settings.maternityLeave?.enabled 
+                : false;
+            
+            // Show "Not available" if type is assigned but not enabled
+            if (hasTypeAssigned && !isTypeEnabled) {
+              return (
+                <div className="card mb-8 border-2 border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30 opacity-60">
+                  <div className="p-5 sm:p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <CalendarIcon className="h-6 w-6 text-gray-400 dark:text-gray-600" />
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                        {userType === 'maternity' ? '🤱 Maternity Leave' : '👨‍👩‍👧 Paternity Leave'}
+                      </h3>
+                    </div>
+                    <div className="text-center py-8">
+                      <p className="text-lg font-medium text-gray-400 dark:text-gray-500 italic mb-2">
+                        Not available
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-500">
+                        {userType === 'maternity' ? 'Maternity' : 'Paternity'} leave is not enabled for your team
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+            
+            // Show normal section if type is assigned, enabled, and analytics exist
+            if (hasTypeAssigned && isTypeEnabled && maternityAnalytics) {
+              return (
             <div className="card mb-8 border-2 border-pink-300 dark:border-pink-700 bg-pink-50 dark:bg-pink-900/30">
               <div className="p-5 sm:p-6">
                 <div className="flex items-center gap-3 mb-4">
@@ -1011,7 +1074,12 @@ export default function MemberAnalyticsPage() {
                 </div>
               </div>
             </div>
-          )}
+              );
+            }
+            
+            // Don't show anything if no type assigned
+            return null;
+          })()}
 
           {/* Monthly Usage Breakdown */}
           <div className="card mb-8">
