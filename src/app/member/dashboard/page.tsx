@@ -302,9 +302,55 @@ export default function MemberDashboard() {
     
     if (analytics.willLose > 0) {
       losingDaysNotifiedRef.current = true;
+      let message = `You will lose ${Math.round(analytics.willLose)} day(s) at year end if not used. Plan your leave accordingly.`;
+      
+      // Add carryover information if applicable
+      if (analytics.willCarryover > 0) {
+        message = `You will lose ${Math.round(analytics.willLose)} day(s) at year end. However, ${Math.round(analytics.willCarryover)} day(s) will carry over to next year.`;
+        
+        if (analytics.carryoverLimitedToMonths && analytics.carryoverLimitedToMonths.length > 0) {
+          const monthNames = analytics.carryoverLimitedToMonths.map(m => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m]).join(', ');
+          message += ` Note: Carryover days can only be used in ${monthNames} of next year.`;
+        }
+        
+        if (analytics.carryoverMaxDays && analytics.willCarryover > analytics.carryoverMaxDays) {
+          const excessDays = Math.round(analytics.willCarryover - analytics.carryoverMaxDays);
+          message += ` Warning: Only ${analytics.carryoverMaxDays} days can carry over. ${excessDays} day(s) will be lost.`;
+        }
+        
+        if (analytics.carryoverExpiryDate) {
+          const expiryDate = new Date(analytics.carryoverExpiryDate);
+          message += ` Important: Carryover days expire on ${expiryDate.toLocaleDateString()}.`;
+        }
+      }
+      
       showNotification(
         'Warning: Days Will Be Lost',
-        `You will lose ${Math.round(analytics.willLose)} day(s) at year end if not used. Plan your leave accordingly.`
+        message
+      );
+    } else if (analytics.willCarryover > 0 && !losingDaysNotifiedRef.current) {
+      // Also notify about carryover if there's no loss but carryover exists with limitations
+      let message = `Great news: ${Math.round(analytics.willCarryover)} day(s) will carry over to next year!`;
+      
+      if (analytics.carryoverLimitedToMonths && analytics.carryoverLimitedToMonths.length > 0) {
+        const monthNames = analytics.carryoverLimitedToMonths.map(m => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m]).join(', ');
+        message += ` Note: These carryover days can only be used in ${monthNames} of next year.`;
+      }
+      
+      if (analytics.carryoverMaxDays && analytics.willCarryover > analytics.carryoverMaxDays) {
+        const excessDays = Math.round(analytics.willCarryover - analytics.carryoverMaxDays);
+        message += ` Warning: Only ${analytics.carryoverMaxDays} days can carry over. ${excessDays} day(s) will be lost.`;
+      }
+      
+      if (analytics.carryoverExpiryDate) {
+        const expiryDate = new Date(analytics.carryoverExpiryDate);
+        message += ` Important: Carryover days expire on ${expiryDate.toLocaleDateString()}.`;
+      }
+      
+      losingDaysNotifiedRef.current = true;
+      showNotification(
+        'Carryover Information',
+        message
       );
     }
   }, [analytics, showNotification]);
@@ -798,6 +844,9 @@ export default function MemberDashboard() {
             const remainingBalance = analytics?.remainingLeaveBalance ?? 0;
             const willLoseDays = analytics?.willLose ?? 0;
             const willCarryoverDays = analytics?.willCarryover ?? 0;
+            const carryoverLimitedToMonths = analytics?.carryoverLimitedToMonths;
+            const carryoverMaxDays = analytics?.carryoverMaxDays;
+            const carryoverExpiryDate = analytics?.carryoverExpiryDate;
             const isNegativeBalance = remainingBalance < 0;
             const negativeBalanceAmount = isNegativeBalance ? Math.abs(remainingBalance) : 0;
             
@@ -894,7 +943,10 @@ export default function MemberDashboard() {
                 realisticUsableDays,
                 willLoseDays,
                 willCarryoverDays,
-                hasManualBalance
+                hasManualBalance,
+                carryoverLimitedToMonths,
+                carryoverMaxDays,
+                carryoverExpiryDate
               );
               
               // eslint-disable-next-line @typescript-eslint/no-unused-vars
