@@ -70,7 +70,8 @@ export async function GET(request: NextRequest) {
       logError('[Analytics API] ERROR: team.settings.concurrentLeave is invalid!', {
         value: team.settings.concurrentLeave,
         type: typeof team.settings.concurrentLeave,
-        settings: team.settings
+        // Don't log full settings object to prevent data leakage
+        hasSettings: !!team.settings
       });
       return internalServerError('Invalid concurrent leave setting');
     }
