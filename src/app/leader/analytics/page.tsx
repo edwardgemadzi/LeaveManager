@@ -220,6 +220,11 @@ export default function LeaderAnalyticsPage() {
     ? 0 
     : Math.max(0, totalRemainingBalance - projectionUsage);
 
+  // Calculate total realistic carryover usable days (considering limitations)
+  const totalRealisticCarryoverUsableDays = allMembers.reduce((sum, m) => 
+    sum + (m.analytics.realisticCarryoverUsableDays || 0), 0
+  );
+
   return (
     <ProtectedRoute requiredRole="leader">
       <div className="min-h-screen bg-gray-50 dark:bg-black">
@@ -349,13 +354,28 @@ export default function LeaderAnalyticsPage() {
                 </div>
                 
                 {team.settings.allowCarryover ? (
-                  <div className="bg-green-50/50 dark:bg-green-900/20 rounded-xl p-5 border border-green-200 dark:border-green-800">
-                    <p className="text-xs font-semibold text-green-700 dark:text-green-400 uppercase tracking-wider mb-2">Will Carryover</p>
-                    <p className="text-3xl sm:text-4xl font-bold text-green-900 dark:text-green-300 mb-2">{Math.round(willCarryover)}</p>
-                    <p className="text-xs text-green-600 dark:text-green-400">
-                      Unused days carried to next year
-                    </p>
-                  </div>
+                  <>
+                    <div className="bg-green-50/50 dark:bg-green-900/20 rounded-xl p-5 border border-green-200 dark:border-green-800">
+                      <p className="text-xs font-semibold text-green-700 dark:text-green-400 uppercase tracking-wider mb-2">Will Carryover</p>
+                      <p className="text-3xl sm:text-4xl font-bold text-green-900 dark:text-green-300 mb-2">{Math.round(willCarryover)}</p>
+                      <p className="text-xs text-green-600 dark:text-green-400">
+                        Unused days carried to next year
+                      </p>
+                    </div>
+                    {willCarryover > 0 && totalRealisticCarryoverUsableDays > 0 && (
+                      <div className="bg-teal-50/50 dark:bg-teal-900/20 rounded-xl p-5 border border-teal-200 dark:border-teal-800">
+                        <p className="text-xs font-semibold text-teal-700 dark:text-teal-400 uppercase tracking-wider mb-2">Realistic Carryover Usage</p>
+                        <p className="text-3xl sm:text-4xl font-bold text-teal-900 dark:text-teal-300 mb-2">{Math.round(totalRealisticCarryoverUsableDays)}</p>
+                        <p className="text-xs text-teal-600 dark:text-teal-400">
+                          {team.settings.carryoverSettings?.limitedToMonths && team.settings.carryoverSettings.limitedToMonths.length > 0 ? (
+                            `Effective days considering month limitations`
+                          ) : (
+                            `Usable carryover days`
+                          )}
+                        </p>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="bg-red-50/50 dark:bg-red-900/20 rounded-xl p-5 border border-red-200 dark:border-red-800">
                     <p className="text-xs font-semibold text-red-700 dark:text-red-400 uppercase tracking-wider mb-2">Will Be Lost</p>

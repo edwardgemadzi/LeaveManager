@@ -312,9 +312,24 @@ export default function MemberAnalyticsPage() {
     const planningEfficiency = avgAdvanceNotice >= team?.settings.minimumNoticePeriod ? 100 : (avgAdvanceNotice / (team?.settings.minimumNoticePeriod || 1)) * 100;
     
     // Balance efficiency (distribution throughout year)
+    // Measures how well leave is distributed across elapsed months
     const monthlyUsage = getMonthlyUsage();
-    const monthsWithUsage = Object.keys(monthlyUsage).length;
-    const balanceEfficiency = (monthsWithUsage / 12) * 100;
+    // Count only months with actual usage (> 0 days)
+    const monthsWithUsage = Object.values(monthlyUsage).filter(days => days > 0).length;
+    
+    // Calculate elapsed months (how many months have passed in the current year)
+    const today = new Date();
+    const currentMonth = today.getMonth(); // 0-11 (January = 0)
+    const elapsedMonths = currentMonth + 1; // +1 because we're in the current month
+    
+    // Balance efficiency = (months with usage / elapsed months) * 100
+    // This measures how well leave is distributed across the elapsed period
+    // Example: If we're in June (6 months elapsed) and user has used leave in 4 months, efficiency = 4/6 = 66.7%
+    // If user has used leave in all 6 months, efficiency = 100%
+    // Cap at 100% (can't exceed 100% efficiency)
+    const balanceEfficiency = elapsedMonths > 0 
+      ? Math.min(100, (monthsWithUsage / elapsedMonths) * 100)
+      : 0;
     
     return {
       usageEfficiency: Math.round(usageEfficiency * 10) / 10,
@@ -696,6 +711,39 @@ export default function MemberAnalyticsPage() {
                           <p className="text-sm text-green-600 dark:text-green-400">will carry over to next year</p>
                         </div>
                       </div>
+                      {/* Realistic Carryover Usage */}
+                      {analytics.realisticCarryoverUsableDays !== undefined && analytics.realisticCarryoverUsableDays > 0 && (
+                        <div className="ml-16 mt-3 p-4 bg-teal-50 dark:bg-teal-900/30 rounded-lg border border-teal-200 dark:border-teal-800">
+                          <div className="flex items-start space-x-3">
+                            <div className="w-10 h-10 rounded-full bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center flex-shrink-0">
+                              <LightBulbIcon className="h-5 w-5 text-teal-700 dark:text-teal-400" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-teal-900 dark:text-teal-300 mb-1">
+                                Realistic Carryover Usage
+                              </p>
+                              <p className="text-2xl font-bold text-teal-700 dark:text-teal-400 mb-2">
+                                {Math.round(analytics.realisticCarryoverUsableDays)} days
+                              </p>
+                              <p className="text-xs text-teal-700 dark:text-teal-400 leading-relaxed">
+                                {analytics.carryoverLimitedToMonths && analytics.carryoverLimitedToMonths.length > 0 ? (
+                                  <>
+                                    Effective days you can realistically use from your carryover balance, considering the limited usage period. 
+                                    Since carryover days can only be used in{' '}
+                                    {analytics.carryoverLimitedToMonths.map(m => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m]).join(', ')}, 
+                                    the effective value is reduced.
+                                  </>
+                                ) : (
+                                  <>
+                                    Effective days you can realistically use from your carryover balance next year.
+                                  </>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
                       {/* Carryover Limitations */}
                       {analytics.carryoverLimitedToMonths && analytics.carryoverLimitedToMonths.length > 0 && (
                         <div className="ml-16 mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">

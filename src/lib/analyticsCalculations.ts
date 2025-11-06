@@ -601,6 +601,7 @@ export interface MemberAnalytics {
   averageDaysPerMember: number; // Average realistic days per member in same shift (whole days)
   surplusBalance: number; // Surplus balance when manual balance exceeds team max
   remainderDays: number; // Extra days that need allocation decisions (remainder from usableDays / membersSharingSameShift)
+  realisticCarryoverUsableDays?: number; // Realistic usable days for carryover balance, considering limitations (if any)
 }
 
 // Analytics data structure for maternity leave (simpler, no competition metrics)
@@ -744,10 +745,16 @@ export const getMemberAnalytics = (
       (global as any)[logKey] = now;
     }
   }
+  // Filter out maternity/paternity leave requests from regular leave calculations
+  // Maternity/paternity leave uses a separate pool and shouldn't affect regular leave availability
+  const regularApprovedRequests = allApprovedRequests.filter(req => 
+    !req.reason || !isMaternityLeave(req.reason)
+  );
+  
   const usableDays = calculateUsableDays(
     user,
     team,
-    allApprovedRequests,
+    regularApprovedRequests, // Only regular leave requests (exclude maternity/paternity)
     membersWithNonZeroBase, // Use members with non-zero base balance
     shiftSchedule
   );
@@ -824,44 +831,20 @@ export const getMemberAnalytics = (
   // Calculate realistic usable days - factors in members sharing same schedule
   // This divides usable days by members sharing the same shift, capped by remaining leave balance
   // Use floor division to get whole days, remainder is calculated separately
-  // Also account for carryover limitations if set (limited months reduce effective usable period)
-  const baseRealisticUsableDays = membersSharingSameShift > 0
-    ? Math.min(
-        Math.floor(usableDays / membersSharingSameShift),
-        remainingLeaveBalance
-      )
-    : Math.min(usableDays, remainingLeaveBalance);
-
-  // If carryover is limited to specific months, adjust realistic usable days
-  // Days that will carry over but can only be used in limited months have a narrower window
-  // This reduces the effective realistic usable days because those days have a constrained usage period
+  // IMPORTANT: All members in the same group should get the same base allocation
+  // Only then should it be capped by individual remaining balance
   const allowCarryover = team.settings.allowCarryover || false;
   const carryoverSettings = team.settings.carryoverSettings;
-  let realisticUsableDays = baseRealisticUsableDays;
   
-  if (allowCarryover && carryoverSettings?.limitedToMonths && carryoverSettings.limitedToMonths.length > 0) {
-    // Calculate days that will carry over (unused days)
-    const unusedDays = Math.max(0, remainingLeaveBalance - baseRealisticUsableDays);
-    
-    // If there are days that will carry over and they're limited to specific months,
-    // those days have a more constrained usage window (only in those months of next year)
-    // This means the effective realistic usable days should account for this limitation
-    // We reduce realistic usable days proportionally based on the limitation
-    if (unusedDays > 0) {
-      // Calculate the proportion of the year that carryover days can be used
-      // If limited to January only (1 month), that's 1/12 of the year
-      const limitedMonthsCount = carryoverSettings.limitedToMonths.length;
-      const monthsInYear = 12;
-      const carryoverUsageWindow = limitedMonthsCount / monthsInYear;
-      
-      // Adjust realistic usable days: days that will carry over have a narrower window
-      // This effectively reduces the realistic usable days because those days can only be used in limited months
-      // We apply a reduction factor based on the carryover limitation
-      const carryoverDays = Math.min(unusedDays, carryoverSettings.maxCarryoverDays || unusedDays);
-      const adjustedForCarryoverLimitation = baseRealisticUsableDays - (carryoverDays * (1 - carryoverUsageWindow));
-      realisticUsableDays = Math.max(0, Math.min(adjustedForCarryoverLimitation, remainingLeaveBalance));
-    }
-  }
+  // Calculate base allocation per member (same for all members in the group)
+  // This is for the CURRENT YEAR only - not affected by carryover limitations
+  const baseAllocationPerMember = membersSharingSameShift > 0
+    ? Math.floor(usableDays / membersSharingSameShift)
+    : usableDays;
+  
+  // Cap by remaining leave balance (this is the only member-specific constraint)
+  // Realistic usable days for current year - NOT adjusted for carryover limitations
+  const realisticUsableDays = Math.min(baseAllocationPerMember, remainingLeaveBalance);
   
   // Calculate remainder days - extra days that need allocation decisions
   // Remainder is the leftover days after dividing usableDays by membersSharingSameShift
@@ -876,13 +859,39 @@ export const getMemberAnalytics = (
   const averageDaysPerMember = calculateAverageDaysPerMember(usableDays, membersSharingSameShift);
   
   // Calculate carryover/loss using realistic usable days (not theoretical)
-  // Note: realisticUsableDays already accounts for carryover limitations above
   const carryoverResult = calculateCarryoverDays(
     remainingLeaveBalance,
     realisticUsableDays,
     allowCarryover,
     carryoverSettings
   );
+  
+  // Calculate realistic usable days for carryover balance (if any will carry over)
+  // This considers carryover limitations (limited months, max days, expiry)
+  let realisticCarryoverUsableDays: number | undefined = undefined;
+  
+  if (allowCarryover && carryoverResult.willCarryover > 0) {
+    // If carryover is limited to specific months, calculate realistic usage
+    // Days that can only be used in limited months have a narrower window
+    if (carryoverSettings?.limitedToMonths && carryoverSettings.limitedToMonths.length > 0) {
+      // Calculate the proportion of the year that carryover days can be used
+      // If limited to January only (1 month), that's 1/12 of the year
+      const limitedMonthsCount = carryoverSettings.limitedToMonths.length;
+      const monthsInYear = 12;
+      const carryoverUsageWindow = limitedMonthsCount / monthsInYear;
+      
+      // The carryover limitation reduces the effective value of carryover days
+      // Since they can only be used in limited months, they're less valuable
+      // Formula: realistic = carryoverDays * usageWindow
+      // Example: 10 carryover days, limited to January (1/12) → 10 * 1/12 = 0.83 days
+      const effectiveCarryoverDays = carryoverResult.willCarryover * carryoverUsageWindow;
+      realisticCarryoverUsableDays = Math.max(0, effectiveCarryoverDays);
+    } else {
+      // No month limitations - carryover days can be used throughout the year
+      // But still consider max carryover days and expiry if set
+      realisticCarryoverUsableDays = carryoverResult.willCarryover;
+    }
+  }
   
   return {
     remainingWorkingDays: theoreticalWorkingDays, // Keep for backward compatibility
@@ -902,7 +911,8 @@ export const getMemberAnalytics = (
     membersSharingSameShift,
     averageDaysPerMember,
     surplusBalance,
-    remainderDays
+    remainderDays,
+    realisticCarryoverUsableDays
   };
 };
 
