@@ -1274,9 +1274,15 @@ export default function MemberDashboard() {
               </div>
 
               {/* Year-End Outlook Card - Enhanced */}
-              <div className={`card ${analytics.willLose > 0 ? 'border-2 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30' : analytics.willCarryover > 0 ? 'border-2 border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/30' : 'border-2 border-gray-300 dark:border-gray-700'}`}>
-                <div className="p-5 sm:p-6">
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Year-End Outlook</h3>
+              <Link href="/member/analytics" className="block">
+                <div className={`card ${analytics.willLose > 0 ? 'border-2 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30' : analytics.willCarryover > 0 ? 'border-2 border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/30' : 'border-2 border-gray-300 dark:border-gray-700'} hover:shadow-lg transition-shadow cursor-pointer`}>
+                  <div className="p-5 sm:p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white">Year-End Outlook</h3>
+                      <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
                   
                   {analytics.allowCarryover ? (
                     <div>
@@ -1369,7 +1375,7 @@ export default function MemberDashboard() {
                     </p>
                   </div>
                 </div>
-              </div>
+              </Link>
             </>
             ) : (
               <div className="card">
