@@ -409,7 +409,10 @@ export default function MemberAnalyticsPage() {
     
     // Year progress recommendations
     const yearProgress = daysElapsed / (daysElapsed + daysRemaining);
-    const usageProgress = (analytics.workingDaysUsed ?? 0) / (analytics.workingDaysInYear ?? 1);
+    // Calculate percentage of leave used (not working days)
+    const baseBalance = analytics.baseLeaveBalance ?? (team?.settings.maxLeavePerYear || 20);
+    const used = baseBalance - (analytics.remainingLeaveBalance ?? 0);
+    const usageProgress = baseBalance > 0 ? used / baseBalance : 0;
     if (yearProgress > 0.5 && usageProgress < yearProgress * 0.7) {
       recommendations.push(`📈 You're ${Math.round(yearProgress * 100)}% through the year but have only used ${Math.round(usageProgress * 100)}% of your leave. Consider planning more leave.`);
     }
