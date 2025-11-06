@@ -17,6 +17,11 @@ export default function TeamSettingsPage() {
     maxLeavePerYear: 20,
     minimumNoticePeriod: 1,
     allowCarryover: false,
+    carryoverSettings: {
+      limitedToMonths: [] as number[],
+      maxCarryoverDays: undefined as number | undefined,
+      expiryDate: undefined as string | undefined,
+    },
     enableSubgrouping: false,
     subgroups: [] as string[],
     workingDaysGroupNames: {} as Record<string, string>,
@@ -26,6 +31,10 @@ export default function TeamSettingsPage() {
       endDate: undefined as string | undefined,
     },
     maternityLeave: {
+      maxDays: 90,
+      countingMethod: 'working' as 'calendar' | 'working',
+    },
+    paternityLeave: {
       maxDays: 90,
       countingMethod: 'working' as 'calendar' | 'working',
     },
@@ -56,6 +65,11 @@ export default function TeamSettingsPage() {
           maxLeavePerYear: 20,
           minimumNoticePeriod: 1,
           allowCarryover: false,
+          carryoverSettings: {
+            limitedToMonths: [] as number[],
+            maxCarryoverDays: undefined as number | undefined,
+            expiryDate: undefined as string | undefined,
+          },
           enableSubgrouping: false,
           subgroups: [] as string[],
           workingDaysGroupNames: {} as Record<string, string>,
@@ -68,8 +82,18 @@ export default function TeamSettingsPage() {
             maxDays: 90,
             countingMethod: 'working' as 'calendar' | 'working',
           },
+          paternityLeave: {
+            maxDays: 90,
+            countingMethod: 'working' as 'calendar' | 'working',
+          },
         };
         const teamSettings = data.team?.settings || defaultSettings;
+        // Convert carryover expiry date from Date object to ISO string for input field
+        if (teamSettings.carryoverSettings?.expiryDate) {
+          teamSettings.carryoverSettings.expiryDate = typeof teamSettings.carryoverSettings.expiryDate === 'string' 
+            ? teamSettings.carryoverSettings.expiryDate.split('T')[0]
+            : new Date(teamSettings.carryoverSettings.expiryDate).toISOString().split('T')[0];
+        }
         // Convert bypass dates from Date objects to ISO strings for input fields
         if (teamSettings.bypassNoticePeriod?.startDate) {
           teamSettings.bypassNoticePeriod.startDate = typeof teamSettings.bypassNoticePeriod.startDate === 'string' 
@@ -525,7 +549,17 @@ export default function TeamSettingsPage() {
                       checked={settings.allowCarryover || false}
                       onChange={(e) => setSettings({
                         ...settings,
-                        allowCarryover: e.target.checked
+                        allowCarryover: e.target.checked,
+                        // Reset carryover settings if disabled
+                        carryoverSettings: e.target.checked ? (settings.carryoverSettings || {
+                          limitedToMonths: [],
+                          maxCarryoverDays: undefined,
+                          expiryDate: undefined,
+                        }) : {
+                          limitedToMonths: [],
+                          maxCarryoverDays: undefined,
+                          expiryDate: undefined,
+                        }
                       })}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900"
                     />
@@ -537,9 +571,99 @@ export default function TeamSettingsPage() {
                     If enabled, unused leave days will carry over to the next year. If disabled, unused days will be lost at year end.
                   </p>
                   
+                  {/* Carryover Settings */}
+                  {settings.allowCarryover && (
+                    <div className="mt-4 ml-6 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-800">
+                      <h5 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Carryover Customization</h5>
+                      
+                      {/* Limited to Months */}
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Limited to Months (optional)
+                        </label>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                          Select months when carryover days can be used (e.g., January only). Leave empty to allow use anytime.
+                        </p>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                          {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month, index) => (
+                            <label key={index} className="flex items-center space-x-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={(settings.carryoverSettings?.limitedToMonths || []).includes(index)}
+                                onChange={(e) => {
+                                  const currentMonths = settings.carryoverSettings?.limitedToMonths || [];
+                                  const newMonths = e.target.checked
+                                    ? [...currentMonths, index]
+                                    : currentMonths.filter(m => m !== index);
+                                  setSettings({
+                                    ...settings,
+                                    carryoverSettings: {
+                                      ...settings.carryoverSettings,
+                                      limitedToMonths: newMonths.sort((a, b) => a - b)
+                                    }
+                                  });
+                                }}
+                                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900"
+                              />
+                              <span className="text-xs text-gray-700 dark:text-gray-300">{month}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      {/* Max Carryover Days */}
+                      <div className="mb-4">
+                        <label htmlFor="maxCarryoverDays" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Maximum Carryover Days (optional)
+                        </label>
+                        <input
+                          type="number"
+                          id="maxCarryoverDays"
+                          min="0"
+                          value={settings.carryoverSettings?.maxCarryoverDays || ''}
+                          onChange={(e) => setSettings({
+                            ...settings,
+                            carryoverSettings: {
+                              ...settings.carryoverSettings,
+                              maxCarryoverDays: e.target.value ? parseInt(e.target.value, 10) : undefined
+                            }
+                          })}
+                          placeholder="No limit"
+                          className="w-full sm:w-48 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-indigo-500 focus:border-indigo-500"
+                        />
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Maximum number of days that can carry over. Leave empty for no limit.
+                        </p>
+                      </div>
+                      
+                      {/* Expiry Date */}
+                      <div>
+                        <label htmlFor="carryoverExpiryDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Expiry Date (optional)
+                        </label>
+                        <input
+                          type="date"
+                          id="carryoverExpiryDate"
+                          value={settings.carryoverSettings?.expiryDate || ''}
+                          onChange={(e) => setSettings({
+                            ...settings,
+                            carryoverSettings: {
+                              ...settings.carryoverSettings,
+                              expiryDate: e.target.value || undefined
+                            }
+                          })}
+                          className="w-full sm:w-48 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-indigo-500 focus:border-indigo-500"
+                        />
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Date when carryover days expire. Leave empty for no expiry.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  
                   {/* Maternity Leave Settings */}
                   <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
-                    <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">Maternity/Paternity Leave</h4>
+                    <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">🤱 Maternity Leave</h4>
                     
                     <div className="space-y-4">
                       <div>
@@ -556,7 +680,6 @@ export default function TeamSettingsPage() {
                             onChange={(e) => {
                               const inputValue = e.target.value.trim();
                               if (inputValue === '') {
-                                // Allow clearing the field - don't update state yet
                                 e.target.value = '';
                                 return;
                               }
@@ -607,7 +730,6 @@ export default function TeamSettingsPage() {
                               }
                             }}
                             onKeyDown={(e) => {
-                              // Allow clearing with Delete/Backspace
                               if (e.key === 'Delete' || e.key === 'Backspace') {
                                 const target = e.target as HTMLInputElement;
                                 if (target.value && target.selectionStart === 0 && target.selectionEnd === target.value.length) {
@@ -619,7 +741,7 @@ export default function TeamSettingsPage() {
                           />
                         </div>
                         <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                          Maximum number of maternity/paternity leave days each team member can take per year.
+                          Maximum number of maternity leave days members assigned maternity leave can take per year.
                         </p>
                       </div>
 
@@ -672,7 +794,146 @@ export default function TeamSettingsPage() {
                           </div>
                         </div>
                         <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                          Choose how maternity/paternity leave days are counted. Working days counts only days when the member is scheduled to work. Calendar days counts all days in the leave period, including weekends and holidays.
+                          Choose how maternity leave days are counted. Working days counts only days when the member is scheduled to work. Calendar days counts all days in the leave period, including weekends and holidays.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Paternity Leave Settings */}
+                  <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
+                    <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">👨‍👩‍👧 Paternity Leave</h4>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <label htmlFor="paternityMaxDays" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                          Maximum Paternity Leave Days
+                        </label>
+                        <div>
+                          <input
+                            type="number"
+                            id="paternityMaxDays"
+                            min="1"
+                            max="365"
+                            value={settings.paternityLeave?.maxDays ?? 90}
+                            onChange={(e) => {
+                              const inputValue = e.target.value.trim();
+                              if (inputValue === '') {
+                                e.target.value = '';
+                                return;
+                              }
+                              const value = parseInt(inputValue, 10);
+                              if (!isNaN(value) && value >= 1 && value <= 365) {
+                                setSettings({
+                                  ...settings,
+                                  paternityLeave: {
+                                    ...settings.paternityLeave,
+                                    maxDays: value,
+                                    countingMethod: settings.paternityLeave?.countingMethod || 'working',
+                                  }
+                                });
+                              }
+                            }}
+                            onBlur={(e) => {
+                              const inputValue = e.target.value.trim();
+                              if (inputValue === '' || isNaN(parseInt(inputValue, 10))) {
+                                setSettings({
+                                  ...settings,
+                                  paternityLeave: {
+                                    ...settings.paternityLeave,
+                                    maxDays: 90,
+                                    countingMethod: settings.paternityLeave?.countingMethod || 'working',
+                                  }
+                                });
+                              } else {
+                                const value = parseInt(inputValue, 10);
+                                if (value >= 1 && value <= 365) {
+                                  setSettings({
+                                    ...settings,
+                                    paternityLeave: {
+                                      ...settings.paternityLeave,
+                                      maxDays: value,
+                                      countingMethod: settings.paternityLeave?.countingMethod || 'working',
+                                    }
+                                  });
+                                } else {
+                                  setSettings({
+                                    ...settings,
+                                    paternityLeave: {
+                                      ...settings.paternityLeave,
+                                      maxDays: 90,
+                                      countingMethod: settings.paternityLeave?.countingMethod || 'working',
+                                    }
+                                  });
+                                }
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Delete' || e.key === 'Backspace') {
+                                const target = e.target as HTMLInputElement;
+                                if (target.value && target.selectionStart === 0 && target.selectionEnd === target.value.length) {
+                                  target.value = '';
+                                }
+                              }
+                            }}
+                            className="input-modern w-full"
+                          />
+                        </div>
+                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                          Maximum number of paternity leave days members assigned paternity leave can take per year.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Counting Method
+                        </label>
+                        <div className="space-y-2">
+                          <div className="flex items-center">
+                            <input
+                              type="radio"
+                              id="paternityCountingWorking"
+                              name="paternityCountingMethod"
+                              value="working"
+                              checked={settings.paternityLeave?.countingMethod === 'working'}
+                              onChange={() => setSettings({
+                                ...settings,
+                                paternityLeave: {
+                                  ...settings.paternityLeave,
+                                  maxDays: settings.paternityLeave?.maxDays || 90,
+                                  countingMethod: 'working',
+                                }
+                              })}
+                              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700"
+                            />
+                            <label htmlFor="paternityCountingWorking" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                              Working Days (count only working days based on shift schedule)
+                            </label>
+                          </div>
+                          <div className="flex items-center">
+                            <input
+                              type="radio"
+                              id="paternityCountingCalendar"
+                              name="paternityCountingMethod"
+                              value="calendar"
+                              checked={settings.paternityLeave?.countingMethod === 'calendar'}
+                              onChange={() => setSettings({
+                                ...settings,
+                                paternityLeave: {
+                                  ...settings.paternityLeave,
+                                  maxDays: settings.paternityLeave?.maxDays || 90,
+                                  countingMethod: 'calendar',
+                                }
+                              })}
+                              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700"
+                            />
+                            <label htmlFor="paternityCountingCalendar" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                              Calendar Days (count all days, ignores working days)
+                            </label>
+                          </div>
+                        </div>
+                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                          Choose how paternity leave days are counted. Working days counts only days when the member is scheduled to work. Calendar days counts all days in the leave period, including weekends and holidays.
                         </p>
                       </div>
                     </div>

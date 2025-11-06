@@ -305,13 +305,38 @@ export default function LeaderLeaveBalancePage() {
   };
 
   const getMemberMaternityLeaveData = (member: User) => {
-    const maxMaternityLeaveDays = team?.settings.maternityLeave?.maxDays || 90;
-    const countingMethod = team?.settings.maternityLeave?.countingMethod || 'working';
+    // Determine which type of leave the member is assigned
+    const userType = member.maternityPaternityType;
+    
+    // Get appropriate leave settings based on member's assigned type
+    // Default to maternity if type is not assigned (backward compatibility)
+    let maxLeaveDays: number;
+    let countingMethod: 'calendar' | 'working';
+    
+    if (userType === 'paternity') {
+      maxLeaveDays = team?.settings.paternityLeave?.maxDays || 90;
+      countingMethod = team?.settings.paternityLeave?.countingMethod || 'working';
+    } else {
+      // Default to maternity (for backward compatibility or if type is 'maternity' or null)
+      maxLeaveDays = team?.settings.maternityLeave?.maxDays || 90;
+      countingMethod = team?.settings.maternityLeave?.countingMethod || 'working';
+    }
     
     const memberRequests = allRequests.filter(req => req.userId === member._id);
-    const approvedMaternityRequests = memberRequests.filter(req => 
-      req.status === 'approved' && req.reason && isMaternityLeave(req.reason)
-    );
+    
+    // Filter requests based on member's assigned type
+    const approvedMaternityRequests = memberRequests.filter(req => {
+      if (req.status !== 'approved' || !req.reason) return false;
+      const lowerReason = req.reason.toLowerCase();
+      
+      if (userType === 'paternity') {
+        // For paternity users, only count paternity requests
+        return lowerReason.includes('paternity') && !lowerReason.includes('maternity');
+      } else {
+        // For maternity users (or unassigned), only count maternity requests
+        return lowerReason.includes('maternity') || (isMaternityLeave(req.reason) && !lowerReason.includes('paternity'));
+      }
+    });
     
     const shiftSchedule = member.shiftSchedule || {
       pattern: [true, true, true, true, true, false, false],
@@ -359,7 +384,7 @@ export default function LeaderLeaveBalancePage() {
     }));
 
     const remainingMaternityBalance = calculateMaternityLeaveBalance(
-      maxMaternityLeaveDays,
+      maxLeaveDays,
       approvedMaternityRequestsForCalculation,
       countingMethod,
       shiftSchedule,
@@ -369,11 +394,11 @@ export default function LeaderLeaveBalancePage() {
 
     const baseMaternityBalance = member.manualMaternityLeaveBalance !== undefined 
       ? member.manualMaternityLeaveBalance 
-      : maxMaternityLeaveDays;
+      : maxLeaveDays;
     
     const surplusMaternityBalance = calculateMaternitySurplusBalance(
       member.manualMaternityLeaveBalance,
-      maxMaternityLeaveDays
+      maxLeaveDays
     );
 
     // Calculate percentage used - if base is 0, percentage should be null (display as "-")
@@ -679,12 +704,28 @@ export default function LeaderLeaveBalancePage() {
           req.status === 'approved' && req.reason && isMaternityLeave(req.reason)
         );
         
-        const countingMethod = team?.settings.maternityLeave?.countingMethod || 'working';
+        // Determine which type of leave the member is assigned
+        const userType = member.maternityPaternityType;
+        const countingMethod = userType === 'paternity'
+          ? (team?.settings.paternityLeave?.countingMethod || 'working')
+          : (team?.settings.maternityLeave?.countingMethod || 'working');
         const shiftSchedule = member.shiftSchedule || {
           pattern: [true, true, true, true, true, false, false],
           startDate: new Date(),
           type: 'fixed'
         };
+        
+        // Filter requests based on member's assigned type
+        const filteredMaternityRequests = approvedMaternityRequests.filter(req => {
+          if (!req.reason) return false;
+          const lowerReason = req.reason.toLowerCase();
+          
+          if (userType === 'paternity') {
+            return lowerReason.includes('paternity') && !lowerReason.includes('maternity');
+          } else {
+            return lowerReason.includes('maternity') || (isMaternityLeave(req.reason) && !lowerReason.includes('paternity'));
+          }
+        });
         
         const currentYear = new Date().getFullYear();
         const yearStart = new Date(currentYear, 0, 1);
@@ -694,7 +735,7 @@ export default function LeaderLeaveBalancePage() {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
-        daysUsed = approvedMaternityRequests.reduce((total, req) => {
+        daysUsed = filteredMaternityRequests.reduce((total, req) => {
           const reqStart = new Date(req.startDate);
           const reqEnd = new Date(req.endDate);
           reqStart.setHours(0, 0, 0, 0);
@@ -1453,10 +1494,17 @@ export default function LeaderLeaveBalancePage() {
                               )}
                             </div>
                           </td>
-                          {/* Maternity Leave Columns */}
+                          {/* Maternity/Paternity Leave Columns */}
                           {(() => {
                             const maternityData = getMemberMaternityLeaveData(member);
-                            const maxMaternityDays = team?.settings.maternityLeave?.maxDays || 90;
+                            const userType = member.maternityPaternityType;
+                            const maxLeaveDays = userType === 'paternity'
+                              ? (team?.settings.paternityLeave?.maxDays || 90)
+                              : (team?.settings.maternityLeave?.maxDays || 90);
+                            
+                            // Only show maternity/paternity columns if member has type assigned
+                            if (!userType) return null;
+                            
                             return (
                               <>
                                 <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
@@ -1480,7 +1528,7 @@ export default function LeaderLeaveBalancePage() {
                                           }}
                                           autoFocus
                                         />
-                                        <span className="text-sm text-gray-500 dark:text-gray-400">/ {maxMaternityDays}</span>
+                                        <span className="text-sm text-gray-500 dark:text-gray-400">/ {maxLeaveDays}</span>
                                       </div>
                                       <div className="flex items-center space-x-2">
                                         <button
@@ -1504,13 +1552,18 @@ export default function LeaderLeaveBalancePage() {
                                       <div 
                                         className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer hover:text-pink-600 dark:hover:text-pink-400"
                                         onClick={() => handleEditMaternityBalance(member)}
-                                        title="Click to edit maternity leave balance"
+                                        title={`Click to edit ${userType === 'maternity' ? 'maternity' : 'paternity'} leave balance`}
                                       >
+                                        <div className="flex items-center gap-1 mb-1">
+                                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                                            {userType === 'maternity' ? '🤱' : '👨‍👩‍👧'}
+                                          </span>
+                                        </div>
                                         {(() => {
                                           if (maternityData.baseBalance === 0) {
                                             return <>0 / 0</>;
                                           }
-                                          return <>{Math.round(maternityData.remainingBalance)} / {maxMaternityDays}</>;
+                                          return <>{Math.round(maternityData.remainingBalance)} / {maxLeaveDays}</>;
                                         })()}
                                         <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">(remaining)</span>
                                         {maternityData.surplusBalance > 0 && (
@@ -1561,7 +1614,7 @@ export default function LeaderLeaveBalancePage() {
                                     <div 
                                       className="text-sm text-gray-900 dark:text-white cursor-pointer hover:text-pink-600 dark:hover:text-pink-400"
                                       onClick={() => handleEditMaternityDaysTaken(member)}
-                                      title="Click to edit maternity days taken"
+                                      title={`Click to edit ${userType === 'maternity' ? 'maternity' : 'paternity'} days taken`}
                                     >
                                       {Math.round(maternityData.daysUsed)}
                                     </div>

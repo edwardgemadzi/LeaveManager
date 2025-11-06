@@ -17,6 +17,9 @@ export default function LeaderMembersPage() {
   const [updating, setUpdating] = useState<string | null>(null);
   const [editingSchedule, setEditingSchedule] = useState<string | null>(null);
   const [tempSchedule, setTempSchedule] = useState<ShiftSchedule | null>(null);
+  const [resettingPassword, setResettingPassword] = useState<string | null>(null);
+  const [passwordResetModal, setPasswordResetModal] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState('');
   
   // Group name management
   const [editingGroupNames, setEditingGroupNames] = useState<Record<string, string>>({});
@@ -150,6 +153,39 @@ export default function LeaderMembersPage() {
     }
   };
 
+  const handleUpdateMaternityPaternityType = async (memberId: string, newType: 'maternity' | 'paternity' | null) => {
+    setUpdating(memberId);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/users/${memberId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ maternityPaternityType: newType }),
+      });
+
+      if (response.ok) {
+        setMembers(members.map(member => 
+          member._id === memberId 
+            ? { ...member, maternityPaternityType: newType }
+            : member
+        ));
+        showSuccess('Maternity/Paternity type updated successfully');
+      } else {
+        const errorData = await response.json();
+        console.error('Error updating maternity/paternity type:', errorData);
+        showError(errorData.error || 'Failed to update maternity/paternity type');
+      }
+    } catch (error) {
+      console.error('Error updating maternity/paternity type:', error);
+      showError('Network error. Please try again.');
+    } finally {
+      setUpdating(null);
+    }
+  };
+
   const handleEditSchedule = (member: User) => {
     setEditingSchedule(member._id!);
     setTempSchedule(member.shiftSchedule || {
@@ -204,6 +240,50 @@ export default function LeaderMembersPage() {
   const handleCancelEdit = () => {
     setEditingSchedule(null);
     setTempSchedule(null);
+  };
+
+  const handleOpenPasswordReset = (memberId: string) => {
+    setPasswordResetModal(memberId);
+    setNewPassword('');
+  };
+
+  const handleClosePasswordReset = () => {
+    setPasswordResetModal(null);
+    setNewPassword('');
+  };
+
+  const handleResetPassword = async (memberId: string) => {
+    if (!newPassword || newPassword.trim().length < 6) {
+      showError('Password must be at least 6 characters long');
+      return;
+    }
+
+    setResettingPassword(memberId);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/users/${memberId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ newPassword: newPassword.trim() }),
+      });
+
+      if (response.ok) {
+        showSuccess('Password reset successfully');
+        handleClosePasswordReset();
+      } else {
+        const errorData = await response.json();
+        console.error('Error resetting password:', errorData);
+        showError(errorData.error || 'Failed to reset password');
+      }
+    } catch (error) {
+      console.error('Error resetting password:', error);
+      showError('Network error. Please try again.');
+    } finally {
+      setResettingPassword(null);
+    }
   };
 
   const getShiftTagColor = (shiftTag?: string) => {
@@ -712,6 +792,18 @@ export default function LeaderMembersPage() {
                               </span>
                             </div>
                           )}
+                          {member.maternityPaternityType && (
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-xs text-gray-500 dark:text-gray-400">Parental Leave:</span>
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                                member.maternityPaternityType === 'maternity'
+                                  ? 'bg-pink-50 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400'
+                                  : 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                              }`}>
+                                {member.maternityPaternityType === 'maternity' ? '🤱 Maternity' : '👨‍👩‍👧 Paternity'}
+                              </span>
+                            </div>
+                          )}
                           <p className="text-sm text-gray-600 dark:text-gray-400">
                             Joined: {member.createdAt ? new Date(member.createdAt).toLocaleDateString() : 'Unknown'}
                           </p>
@@ -735,6 +827,33 @@ export default function LeaderMembersPage() {
                                 <option value="mixed">🔄 Mixed Shifts</option>
                               </select>
                             </div>
+                            
+                            {/* Maternity/Paternity Type Selector */}
+                            <div className="flex items-center space-x-2">
+                              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Parental:</label>
+                              <select
+                                value={member.maternityPaternityType || ''}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  handleUpdateMaternityPaternityType(member._id!, value === '' ? null : value as 'maternity' | 'paternity');
+                                }}
+                                disabled={updating === member._id}
+                                className="text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 disabled:opacity-50 min-w-0 flex-1"
+                              >
+                                <option value="">None</option>
+                                <option value="maternity">🤱 Maternity</option>
+                                <option value="paternity">👨‍👩‍👧 Paternity</option>
+                              </select>
+                            </div>
+                            
+                            {/* Password Reset Button */}
+                            <button
+                              onClick={() => handleOpenPasswordReset(member._id!)}
+                              disabled={resettingPassword === member._id}
+                              className="bg-indigo-500 hover:bg-indigo-600 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                            >
+                              🔑 Reset Password
+                            </button>
                             
                             {/* Delete Button */}
                             <button
@@ -854,6 +973,57 @@ export default function LeaderMembersPage() {
           </div>
         </div>
       </div>
+
+      {/* Password Reset Modal */}
+      {passwordResetModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Reset Password
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Enter a new password for this member. The password must be at least 6 characters long.
+            </p>
+            <div className="mb-4">
+              <label htmlFor="new-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                New Password
+              </label>
+              <input
+                type="password"
+                id="new-password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password..."
+                className="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleResetPassword(passwordResetModal);
+                  } else if (e.key === 'Escape') {
+                    handleClosePasswordReset();
+                  }
+                }}
+              />
+            </div>
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 sm:justify-end">
+              <button
+                onClick={handleClosePasswordReset}
+                disabled={resettingPassword === passwordResetModal}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleResetPassword(passwordResetModal)}
+                disabled={resettingPassword === passwordResetModal || !newPassword || newPassword.trim().length < 6}
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {resettingPassword === passwordResetModal ? 'Resetting...' : 'Reset Password'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

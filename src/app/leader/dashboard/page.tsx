@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { LeaveRequest, Team, User } from '@/types';
@@ -9,6 +10,7 @@ import { GroupedTeamAnalytics } from '@/lib/analyticsCalculations';
 import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
 import { useBrowserNotification } from '@/hooks/useBrowserNotification';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
+import { calculateTimeBasedTeamHealthScore } from '@/lib/helpers';
 import { 
   UsersIcon, 
   ClockIcon, 
@@ -352,21 +354,36 @@ export default function LeaderDashboard() {
     if (!team || !members.length) return { totalRemaining: 0, averageRemaining: 0, totalUsed: 0, membersCount: 0 };
 
     const maxMaternityLeaveDays = team.settings.maternityLeave?.maxDays || 90;
-    const countingMethod = team.settings.maternityLeave?.countingMethod || 'working';
+    const maxPaternityLeaveDays = team.settings.paternityLeave?.maxDays || 90;
+    const maternityCountingMethod = team.settings.maternityLeave?.countingMethod || 'working';
+    const paternityCountingMethod = team.settings.paternityLeave?.countingMethod || 'working';
     
     let totalRemaining = 0;
     let totalUsed = 0;
     let membersCount = 0;
     
     members.forEach(member => {
-      if (member.role === 'member') {
+      if (member.role === 'member' && member.maternityPaternityType) {
         const memberRequests = allRequests.filter(req => 
           req.userId === member._id && req.status === 'approved'
         );
         
-        const approvedMaternityRequests = memberRequests.filter(req => 
-          req.reason && isMaternityLeave(req.reason)
-        ).map(req => ({
+        // Determine which type of leave the member is assigned
+        const userType = member.maternityPaternityType;
+        const maxLeaveDays = userType === 'paternity' ? maxPaternityLeaveDays : maxMaternityLeaveDays;
+        const countingMethod = userType === 'paternity' ? paternityCountingMethod : maternityCountingMethod;
+        
+        // Filter requests based on member's assigned type
+        const approvedMaternityRequests = memberRequests.filter(req => {
+          if (!req.reason) return false;
+          const lowerReason = req.reason.toLowerCase();
+          
+          if (userType === 'paternity') {
+            return lowerReason.includes('paternity') && !lowerReason.includes('maternity');
+          } else {
+            return lowerReason.includes('maternity') || (isMaternityLeave(req.reason) && !lowerReason.includes('paternity'));
+          }
+        }).map(req => ({
           startDate: new Date(req.startDate),
           endDate: new Date(req.endDate),
           reason: req.reason
@@ -379,7 +396,7 @@ export default function LeaderDashboard() {
         };
 
         const remainingBalance = calculateMaternityLeaveBalance(
-          maxMaternityLeaveDays,
+          maxLeaveDays,
           approvedMaternityRequests,
           countingMethod,
           shiftSchedule,
@@ -591,80 +608,27 @@ export default function LeaderDashboard() {
               ? (totalRealisticUsableDays / totalRemainingBalance) * 100
               : 0;
             
-            // Determine score and status based on team health
-            let score = 'excellent';
-            let gradientColors = 'from-green-500 via-emerald-500 to-teal-500';
-            let bgGradient = 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20';
-            let borderColor = 'border-green-400 dark:border-green-600';
-            let textColor = 'text-green-700 dark:text-green-300';
-            let badgeColor = 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200';
-            let quote = '';
-            let message = '';
-            let scoreLabel = 'Excellent';
+            // Use time-based team health scoring that accounts for time of year and usage patterns
+            const teamHealthScore = calculateTimeBasedTeamHealthScore(
+              totalMembers,
+              maxLeavePerYear,
+              totalRemainingBalance,
+              totalRealisticUsableDays,
+              membersAtRisk,
+              totalWillLose,
+              totalWillCarryover
+            );
             
-            // Score logic based on team leave situation
-            if (membersAtRisk === 0 && totalWillLose === 0 && efficiencyRate >= 80) {
-              // Excellent: No members at risk, good utilization
-              score = 'excellent';
-              gradientColors = 'from-green-500 via-emerald-500 to-teal-500';
-              bgGradient = 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20';
-              borderColor = 'border-green-400 dark:border-green-600';
-              textColor = 'text-green-700 dark:text-green-300';
-              badgeColor = 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200';
-              quote = 'A well-rested team is a productive team. Great leadership!';
-              message = 'Excellent! Your team has healthy leave utilization. No members are at risk of losing days, and the team has good access to usable leave days.';
-              scoreLabel = 'Excellent';
-            } else if (membersAtRisk <= totalMembers * 0.2 && efficiencyRate >= 60) {
-              // Good: Few members at risk, decent utilization
-              score = 'good';
-              gradientColors = 'from-blue-500 via-indigo-500 to-purple-500';
-              bgGradient = 'bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20';
-              borderColor = 'border-blue-400 dark:border-blue-600';
-              textColor = 'text-blue-700 dark:text-blue-300';
-              badgeColor = 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200';
-              quote = 'Proactive planning prevents leave conflicts. Keep it up!';
-              message = 'Good! Your team is managing leave well overall. A few members may need attention to ensure they can use their remaining days effectively.';
-              scoreLabel = 'Good';
-            } else if (membersAtRisk <= totalMembers * 0.4 && efficiencyRate >= 40) {
-              // Fair: Some members at risk, moderate utilization
-              score = 'fair';
-              gradientColors = 'from-yellow-500 via-amber-500 to-orange-500';
-              bgGradient = 'bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20';
-              borderColor = 'border-yellow-400 dark:border-yellow-600';
-              textColor = 'text-yellow-700 dark:text-yellow-300';
-              badgeColor = 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200';
-              quote = 'Team coordination is key to effective leave management.';
-              message = 'Fair. Some team members are at risk of losing leave days. Consider coordinating with members to help them plan their remaining time off effectively.';
-              scoreLabel = 'Fair';
-            } else if (membersAtRisk > 0 || totalWillLose > 0) {
-              // Needs attention: Members at risk or days will be lost
-              score = 'needs-attention';
-              gradientColors = 'from-orange-500 via-red-500 to-pink-500';
-              bgGradient = 'bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20';
-              borderColor = 'border-orange-400 dark:border-orange-600';
-              textColor = 'text-orange-700 dark:text-orange-300';
-              badgeColor = 'bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-200';
-              quote = 'Support your team by helping them use their entitled leave.';
-              message = `Needs attention. ${membersAtRisk} member${membersAtRisk !== 1 ? 's' : ''} ${membersAtRisk === 1 ? 'is' : 'are'} at risk of losing leave days. ${totalWillLose > 0 ? `Approximately ${Math.round(totalWillLose)} days will be lost at year end. ` : ''}Consider proactive planning to help members utilize their leave.`;
-              scoreLabel = 'Needs Attention';
-            } else {
-              // Critical: High risk situation
-              // eslint-disable-next-line @typescript-eslint/no-unused-vars
-              score = 'critical';
-              gradientColors = 'from-red-600 via-rose-600 to-pink-600';
-              bgGradient = 'bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20';
-              borderColor = 'border-red-400 dark:border-red-600';
-              textColor = 'text-red-700 dark:text-red-300';
-              badgeColor = 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200';
-              quote = 'Effective leave management supports team well-being and retention.';
-              message = 'Requires immediate attention. Many team members are at risk of losing leave days. Consider reviewing leave policies and coordinating with members to ensure they can take their entitled time off.';
-              scoreLabel = 'Requires Planning';
-            }
-            
-            // Add messages about carryover
-            if (totalWillCarryover > 0) {
-              message += ` Great news: ${Math.round(totalWillCarryover)} days will carry over to next year!`;
-            }
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const score = teamHealthScore.score;
+            const gradientColors = teamHealthScore.gradientColors;
+            const bgGradient = teamHealthScore.bgGradient;
+            const borderColor = teamHealthScore.borderColor;
+            const textColor = teamHealthScore.textColor;
+            const badgeColor = teamHealthScore.badgeColor;
+            const quote = teamHealthScore.quote;
+            const message = teamHealthScore.message;
+            const scoreLabel = teamHealthScore.scoreLabel;
             
             return (
               <div className={`relative overflow-hidden rounded-2xl ${bgGradient} border-2 ${borderColor} shadow-xl mb-12 fade-in`}>
@@ -677,8 +641,10 @@ export default function LeaderDashboard() {
                     {/* Left side - Score badge and title */}
                     <div className="flex-shrink-0">
                       <div className="flex items-center gap-4 mb-4">
-                        <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${gradientColors} flex items-center justify-center shadow-lg`}>
-                          <UsersIcon className="h-10 w-10 text-white" />
+                        <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${gradientColors} flex items-center justify-center shadow-lg relative overflow-hidden`}>
+                          {/* Dark overlay for better icon contrast */}
+                          <div className="absolute inset-0 bg-black/20 dark:bg-black/40"></div>
+                          <UsersIcon className="h-10 w-10 text-white relative z-10 drop-shadow-lg" />
                         </div>
                         <div>
                           <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Team Health Score</p>
@@ -734,7 +700,7 @@ export default function LeaderDashboard() {
             {/* Left: 2x2 Stats Grid */}
             <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Team Members Card */}
-              <div className="stat-card group">
+              <Link href="/leader/members" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
                 <div className="p-3">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
@@ -750,10 +716,10 @@ export default function LeaderDashboard() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </Link>
 
               {/* Pending Requests Card */}
-              <div className={`stat-card group ${pendingRequests?.length > 0 ? 'border-yellow-300 dark:border-yellow-700' : ''}`}>
+              <Link href="/leader/requests" className={`stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200 ${pendingRequests?.length > 0 ? 'border-yellow-300 dark:border-yellow-700' : ''}`}>
                 <div className="p-3">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
@@ -772,10 +738,10 @@ export default function LeaderDashboard() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </Link>
 
               {/* Avg Leave Balance Card */}
-              <div className="stat-card group">
+              <Link href="/leader/leave-balance" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
                 <div className="p-3">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
@@ -796,10 +762,10 @@ export default function LeaderDashboard() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </Link>
 
               {/* Maternity Leave Summary Card */}
-              <div className="stat-card group">
+              <Link href="/leader/leave-balance" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
                 <div className="p-3">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
@@ -818,11 +784,11 @@ export default function LeaderDashboard() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </Link>
             </div>
 
             {/* Right: Currently On Leave Section */}
-            <div className="lg:col-span-3 card">
+            <Link href="/leader/calendar" className="lg:col-span-3 card cursor-pointer hover:shadow-lg hover:scale-[1.01] transition-all duration-200">
               <div className="p-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Main Stat - On Leave */}
@@ -936,7 +902,7 @@ export default function LeaderDashboard() {
                   )}
                 </div>
               </div>
-            </div>
+            </Link>
           </div>
 
           {/* Main Content Area - Side by Side Layout for Desktop */}
@@ -1210,7 +1176,7 @@ export default function LeaderDashboard() {
               {/* Aggregate Stats - Enhanced Cards with Gradients - Better Horizontal Layout */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6 sm:gap-8 mb-8">
                 {/* Realistic Usable Days */}
-                <div className="stat-card group">
+                <Link href="/leader/analytics" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
                   <div className="p-5 sm:p-6">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0">
@@ -1225,10 +1191,10 @@ export default function LeaderDashboard() {
                       </div>
                     </div>
                   </div>
-                </div>
+                </Link>
 
                 {/* Theoretical Working Days */}
-                <div className="stat-card group">
+                <Link href="/leader/analytics" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
                   <div className="p-5 sm:p-6">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0">
@@ -1243,9 +1209,9 @@ export default function LeaderDashboard() {
                       </div>
                     </div>
                   </div>
-                </div>
+                </Link>
 
-                <div className="card card-hover">
+                <Link href="/leader/analytics" className="card card-hover cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
                   <div className="p-6">
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
@@ -1292,10 +1258,10 @@ export default function LeaderDashboard() {
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400">Leave days remaining</p>
                   </div>
-                </div>
+                </Link>
 
                 {/* Will Carry Over */}
-                <div className={`stat-card group ${analytics.aggregate.totalWillCarryover > 0 ? 'border-2 border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/30' : ''}`}>
+                <Link href="/leader/analytics" className={`stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200 ${analytics.aggregate.totalWillCarryover > 0 ? 'border-2 border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/30' : ''}`}>
                   <div className="p-5 sm:p-6">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0">
@@ -1310,10 +1276,10 @@ export default function LeaderDashboard() {
                       </div>
                     </div>
                   </div>
-                </div>
+                </Link>
 
                 {/* Will Be Lost */}
-                <div className={`stat-card group ${analytics.aggregate.totalWillLose > 0 ? 'border-2 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30' : ''}`}>
+                <Link href="/leader/analytics" className={`stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200 ${analytics.aggregate.totalWillLose > 0 ? 'border-2 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30' : ''}`}>
                   <div className="p-5 sm:p-6">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0">
@@ -1328,7 +1294,7 @@ export default function LeaderDashboard() {
                       </div>
                     </div>
                   </div>
-                </div>
+                </Link>
               </div>
 
               {/* Competition Context and Constraint Info - Side by Side */}

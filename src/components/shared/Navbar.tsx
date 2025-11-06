@@ -55,6 +55,7 @@ export default function Navbar() {
   // Navigation links for member
   const memberLinks = [
     { href: '/member/dashboard', label: 'Dashboard' },
+    { href: '/member/analytics', label: 'Analytics' },
     { href: '/member/requests', label: 'My Requests' },
     { href: '/member/calendar', label: 'Calendar' },
     { href: '/member/profile', label: 'Profile' },

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { LeaveRequest, Team, User } from '@/types';
@@ -8,6 +9,7 @@ import { calculateLeaveBalance, countWorkingDays, calculateSurplusBalance, calcu
 import { MemberAnalytics } from '@/lib/analyticsCalculations';
 import { useBrowserNotification } from '@/hooks/useBrowserNotification';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
+import { calculateTimeBasedLeaveScore } from '@/lib/helpers';
 import { 
   ClockIcon, 
   CalendarIcon, 
@@ -376,11 +378,37 @@ export default function MemberDashboard() {
       return { balance: 0, surplus: 0, daysUsed: 0 };
     }
     
-    const maxMaternityLeaveDays = team.settings.maternityLeave?.maxDays || 90;
-    const countingMethod = team.settings.maternityLeave?.countingMethod || 'working';
+    // Determine which type of leave the user is assigned
+    const userType = user.maternityPaternityType;
     
+    // Get appropriate leave settings based on user's assigned type
+    // Default to maternity if type is not assigned (backward compatibility)
+    let maxLeaveDays: number;
+    let countingMethod: 'calendar' | 'working';
+    
+    if (userType === 'paternity') {
+      maxLeaveDays = team.settings.paternityLeave?.maxDays || 90;
+      countingMethod = team.settings.paternityLeave?.countingMethod || 'working';
+    } else {
+      // Default to maternity (for backward compatibility or if type is 'maternity' or null)
+      maxLeaveDays = team.settings.maternityLeave?.maxDays || 90;
+      countingMethod = team.settings.maternityLeave?.countingMethod || 'working';
+    }
+    
+    // Filter requests based on user's assigned type
     const approvedMaternityRequests = myRequests
-      .filter(req => req.status === 'approved' && req.reason && isMaternityLeave(req.reason))
+      .filter(req => {
+        if (req.status !== 'approved' || !req.reason) return false;
+        const lowerReason = req.reason.toLowerCase();
+        
+        if (userType === 'paternity') {
+          // For paternity users, only count paternity requests
+          return lowerReason.includes('paternity') && !lowerReason.includes('maternity');
+        } else {
+          // For maternity users (or unassigned), only count maternity requests
+          return lowerReason.includes('maternity') || (isMaternityLeave(req.reason) && !lowerReason.includes('paternity'));
+        }
+      })
       .map(req => ({
         startDate: new Date(req.startDate),
         endDate: new Date(req.endDate),
@@ -388,7 +416,7 @@ export default function MemberDashboard() {
       }));
 
     const balance = calculateMaternityLeaveBalance(
-      maxMaternityLeaveDays,
+      maxLeaveDays,
       approvedMaternityRequests,
       countingMethod,
       user.shiftSchedule || { pattern: [true, true, true, true, true, false, false], startDate: new Date(), type: 'rotating' },
@@ -396,7 +424,7 @@ export default function MemberDashboard() {
       user.manualMaternityYearToDateUsed
     );
     
-    const surplus = calculateMaternitySurplusBalance(user.manualMaternityLeaveBalance, maxMaternityLeaveDays);
+    const surplus = calculateMaternitySurplusBalance(user.manualMaternityLeaveBalance, maxLeaveDays);
     
     // Calculate days used
     const currentYear = new Date().getFullYear();
@@ -497,7 +525,7 @@ export default function MemberDashboard() {
           {/* Stats Cards - Enhanced */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 mb-8">
             {/* Pending Requests Card */}
-            <div className="stat-card group">
+            <Link href="/member/requests" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
               <div className="p-5 sm:p-6">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
@@ -514,7 +542,7 @@ export default function MemberDashboard() {
                   </div>
                 </div>
               </div>
-            </div>
+            </Link>
 
             {/* Leave Balance Card */}
             {(() => {
@@ -535,7 +563,7 @@ export default function MemberDashboard() {
               );
               
               return (
-                <div className={`stat-card group ${isNegative ? (hasCompassionateLeave ? 'border-2 border-pink-300 dark:border-pink-700 bg-pink-50 dark:bg-pink-900/30' : 'border-2 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30') : ''}`}>
+                <Link href="/member/analytics" className={`stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200 ${isNegative ? (hasCompassionateLeave ? 'border-2 border-pink-300 dark:border-pink-700 bg-pink-50 dark:bg-pink-900/30' : 'border-2 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30') : ''}`}>
               <div className="p-5 sm:p-6">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
@@ -678,12 +706,12 @@ export default function MemberDashboard() {
                   </div>
                 </div>
               </div>
-            </div>
+            </Link>
               );
             })()}
 
             {/* Working Days Taken Card */}
-            <div className="stat-card group">
+            <Link href="/member/analytics" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
               <div className="p-5 sm:p-6">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
@@ -703,19 +731,25 @@ export default function MemberDashboard() {
                   </div>
                 </div>
               </div>
-            </div>
+            </Link>
 
             {/* Maternity Leave Card */}
-            <div className="stat-card group">
+            {user?.maternityPaternityType && (
+            <Link href="/member/analytics" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
               <div className="p-5 sm:p-6">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Maternity/Paternity</p>
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                      {user.maternityPaternityType === 'maternity' ? '🤱 Maternity Leave' : '👨‍👩‍👧 Paternity Leave'}
+                    </p>
                     <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
                       {(() => {
                         const maternityBalance = getMaternityLeaveBalance();
-                        const maxMaternityDays = team?.settings.maternityLeave?.maxDays || 90;
-                        return `${Math.round(maternityBalance.balance)} / ${maxMaternityDays}`;
+                        const userType = user.maternityPaternityType;
+                        const maxDays = userType === 'paternity' 
+                          ? (team?.settings.paternityLeave?.maxDays || 90)
+                          : (team?.settings.maternityLeave?.maxDays || 90);
+                        return `${Math.round(maternityBalance.balance)} / ${maxDays}`;
                       })()}
                     </p>
                     <div className="mt-2 space-y-1">
@@ -750,34 +784,47 @@ export default function MemberDashboard() {
                   </div>
                 </div>
               </div>
-            </div>
+            </Link>
+            )}
           </div>
 
           {/* Member Score Card - Hero Style */}
-          {analytics && (() => {
-            const baseBalance = analytics.baseLeaveBalance ?? (team?.settings.maxLeavePerYear || 20);
-            const used = baseBalance - (analytics.remainingLeaveBalance ?? 0);
+          {(() => {
+            // Use analytics if available, otherwise use fallback values
+            const baseBalance = analytics?.baseLeaveBalance ?? (team?.settings.maxLeavePerYear || 20);
+            const used = baseBalance - (analytics?.remainingLeaveBalance ?? 0);
             const usagePercentage = baseBalance > 0 ? (used / baseBalance) * 100 : 0;
-            const realisticUsableDays = analytics.realisticUsableDays ?? 0;
-            const remainingBalance = analytics.remainingLeaveBalance ?? 0;
-            const willLoseDays = analytics.willLose ?? 0;
-            const willCarryoverDays = analytics.willCarryover ?? 0;
+            const realisticUsableDays = analytics?.realisticUsableDays ?? 0;
+            const remainingBalance = analytics?.remainingLeaveBalance ?? 0;
+            const willLoseDays = analytics?.willLose ?? 0;
+            const willCarryoverDays = analytics?.willCarryover ?? 0;
             const isNegativeBalance = remainingBalance < 0;
             const negativeBalanceAmount = isNegativeBalance ? Math.abs(remainingBalance) : 0;
             
-            // Determine score and status
+            // Determine score and status - Negative balance takes highest priority
             let score = 'excellent';
             let gradientColors = 'from-green-500 via-emerald-500 to-teal-500';
-            let bgGradient = 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20';
-            let borderColor = 'border-green-400 dark:border-green-600';
+            let bgGradient = 'bg-gradient-to-br from-green-200 to-emerald-200 dark:from-green-900/50 dark:to-emerald-900/50';
+            let borderColor = 'border-green-500 dark:border-green-500';
             let textColor = 'text-green-700 dark:text-green-300';
             let badgeColor = 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200';
             let quote = '';
             let message = '';
             let scoreLabel = 'Excellent';
             
-            // Score logic based on leave situation - Negative balance takes highest priority
-            if (isNegativeBalance) {
+            // If no analytics, show loading state
+            if (!analytics) {
+              gradientColors = 'from-gray-500 via-gray-500 to-gray-500';
+              bgGradient = 'bg-gradient-to-br from-gray-200 to-gray-200 dark:from-gray-900/50 dark:to-gray-900/50';
+              borderColor = 'border-gray-500 dark:border-gray-500';
+              textColor = 'text-gray-700 dark:text-gray-300';
+              badgeColor = 'bg-gray-100 dark:bg-gray-900/50 text-gray-800 dark:text-gray-200';
+              quote = 'Loading your leave health score...';
+              message = 'Please wait while we calculate your leave analytics.';
+              scoreLabel = 'Loading...';
+            }
+            // Handle negative balance first (over-allocation)
+            else if (isNegativeBalance) {
               // Check if user has taken compassionate leave this year (maternity, sick, bereavement, medical, etc.)
               const maternityBalance = getMaternityLeaveBalance();
               const hasTakenMaternityLeave = maternityBalance.daysUsed > 0;
@@ -799,8 +846,8 @@ export default function MemberDashboard() {
                 // Softer colors (maternity/pink tones) for compassionate leave
                 score = 'critical';
                 gradientColors = 'from-pink-500 via-rose-500 to-pink-600';
-                bgGradient = 'bg-gradient-to-br from-pink-50 to-rose-50 dark:from-pink-900/20 dark:to-rose-900/20';
-                borderColor = 'border-pink-400 dark:border-pink-600';
+                bgGradient = 'bg-gradient-to-br from-pink-200 to-rose-200 dark:from-pink-900/50 dark:to-rose-900/50';
+                borderColor = 'border-pink-500 dark:border-pink-500';
                 textColor = 'text-pink-800 dark:text-pink-200';
                 badgeColor = 'bg-pink-200 dark:bg-pink-900/50 text-pink-900 dark:text-pink-100';
                 
@@ -827,7 +874,7 @@ export default function MemberDashboard() {
                 // Harsh red colors only when it's regular leave over-allocation
                 score = 'critical';
                 gradientColors = 'from-red-700 via-rose-700 to-pink-700';
-                bgGradient = 'bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/30 dark:to-rose-900/30';
+                bgGradient = 'bg-gradient-to-br from-red-200 to-rose-200 dark:from-red-900/50 dark:to-rose-900/50';
                 borderColor = 'border-red-500 dark:border-red-500';
                 textColor = 'text-red-800 dark:text-red-200';
                 badgeColor = 'bg-red-200 dark:bg-red-900/70 text-red-900 dark:text-red-100';
@@ -836,71 +883,30 @@ export default function MemberDashboard() {
                 message = `You've used ${Math.round(negativeBalanceAmount)} more day${negativeBalanceAmount !== 1 ? 's' : ''} than your allocated leave this year. This is understandable - sometimes leave is needed beyond what's allocated. This will be adjusted in your next year's leave allocation. Please coordinate with your team leader to discuss how this will be handled.`;
                 scoreLabel = 'Over Allocated';
               }
-            } else if (realisticUsableDays >= remainingBalance && remainingBalance > 0) {
-              // Excellent: Can use all remaining days
-              score = 'excellent';
-              gradientColors = 'from-green-500 via-emerald-500 to-teal-500';
-              bgGradient = 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20';
-              borderColor = 'border-green-400 dark:border-green-600';
-              textColor = 'text-green-700 dark:text-green-300';
-              badgeColor = 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200';
-              quote = 'Take time to recharge. Your well-being matters!';
-              message = 'Excellent! You have enough usable days to take all your remaining leave. Remember, taking time off is essential for your mental and physical health.';
-              scoreLabel = 'Excellent';
-            } else if (realisticUsableDays >= remainingBalance * 0.7) {
-              // Good: Can use most remaining days
-              score = 'good';
-              gradientColors = 'from-blue-500 via-indigo-500 to-purple-500';
-              bgGradient = 'bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20';
-              borderColor = 'border-blue-400 dark:border-blue-600';
-              textColor = 'text-blue-700 dark:text-blue-300';
-              badgeColor = 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200';
-              quote = 'Plan ahead to make the most of your leave days.';
-              message = 'Good! You can use most of your remaining leave days. Plan ahead and coordinate with your team to ensure you can take your well-deserved time off.';
-              scoreLabel = 'Good';
-            } else if (realisticUsableDays >= remainingBalance * 0.3) {
-              // Fair: Can use some remaining days
-              score = 'fair';
-              gradientColors = 'from-yellow-500 via-amber-500 to-orange-500';
-              bgGradient = 'bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20';
-              borderColor = 'border-yellow-400 dark:border-yellow-600';
-              textColor = 'text-yellow-700 dark:text-yellow-300';
-              badgeColor = 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200';
-              quote = 'Work-life balance is crucial. Use your leave wisely!';
-              message = 'Fair. You can use some of your remaining leave days. Coordinate early with your team to maximize your opportunities to take time off.';
-              scoreLabel = 'Fair';
-            } else if (realisticUsableDays > 0) {
-              // Needs attention: Limited days available
-              score = 'needs-attention';
-              gradientColors = 'from-orange-500 via-red-500 to-pink-500';
-              bgGradient = 'bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20';
-              borderColor = 'border-orange-400 dark:border-orange-600';
-              textColor = 'text-orange-700 dark:text-orange-300';
-              badgeColor = 'bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-200';
-              quote = 'Rest is not a reward for finishing everything. Rest is a vital part of the process.';
-              message = `Needs attention. You can realistically use ${Math.round(realisticUsableDays)} days out of ${Math.round(remainingBalance)} remaining. Plan carefully and communicate with your team early.`;
-              scoreLabel = 'Needs Attention';
-            } else {
-              // Critical: No days available
+            } else if (analytics) {
+              // Use time-based scoring that accounts for time of year and usage patterns
+              // Check if manual leave balance is set
+              const hasManualBalance = user?.manualLeaveBalance !== undefined || user?.manualYearToDateUsed !== undefined;
+              const timeBasedScore = calculateTimeBasedLeaveScore(
+                baseBalance,
+                used,
+                remainingBalance,
+                realisticUsableDays,
+                willLoseDays,
+                willCarryoverDays,
+                hasManualBalance
+              );
+              
               // eslint-disable-next-line @typescript-eslint/no-unused-vars
-              score = 'critical';
-              gradientColors = 'from-red-600 via-rose-600 to-pink-600';
-              bgGradient = 'bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20';
-              borderColor = 'border-red-400 dark:border-red-600';
-              textColor = 'text-red-700 dark:text-red-300';
-              badgeColor = 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200';
-              quote = 'Remember: Taking breaks is essential for productivity and well-being.';
-              message = 'Limited availability. All usable days are already booked. Consider discussing leave options with your team leader for better planning next year.';
-              scoreLabel = 'Requires Planning';
-            }
-            
-            // Add messages about carryover or loss (only if not negative balance)
-            if (!isNegativeBalance) {
-              if (willCarryoverDays > 0) {
-                message += ` Great news: ${Math.round(willCarryoverDays)} days will carry over to next year!`;
-              } else if (willLoseDays > 0) {
-                message += ` Note: ${Math.round(willLoseDays)} days will be lost at year end if not used.`;
-              }
+              score = timeBasedScore.score;
+              gradientColors = timeBasedScore.gradientColors;
+              bgGradient = timeBasedScore.bgGradient;
+              borderColor = timeBasedScore.borderColor;
+              textColor = timeBasedScore.textColor;
+              badgeColor = timeBasedScore.badgeColor;
+              quote = timeBasedScore.quote;
+              message = timeBasedScore.message;
+              scoreLabel = timeBasedScore.scoreLabel;
             }
             
             return (
@@ -914,8 +920,10 @@ export default function MemberDashboard() {
                     {/* Left side - Score badge and title */}
                     <div className="flex-shrink-0">
                       <div className="flex items-center gap-4 mb-4">
-                        <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${gradientColors} flex items-center justify-center shadow-lg`}>
-                          <CheckCircleIcon className="h-10 w-10 text-white" />
+                        <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${gradientColors} flex items-center justify-center shadow-lg relative overflow-hidden`}>
+                          {/* Dark overlay for better icon contrast */}
+                          <div className="absolute inset-0 bg-black/20 dark:bg-black/40"></div>
+                          <CheckCircleIcon className="h-10 w-10 text-white relative z-10 drop-shadow-lg" />
                         </div>
                         <div>
                           <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Leave Health Score</p>
@@ -923,9 +931,11 @@ export default function MemberDashboard() {
                         </div>
                       </div>
                       <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold ${badgeColor} shadow-md`}>
-                        {isNegativeBalance 
-                          ? `${Math.round(negativeBalanceAmount)} days over limit`
-                          : `${Math.round(realisticUsableDays)} / ${Math.round(remainingBalance)} days usable`
+                        {!analytics 
+                          ? 'Loading...'
+                          : isNegativeBalance 
+                            ? `${Math.round(negativeBalanceAmount)} days over limit`
+                            : `${Math.round(realisticUsableDays)} / ${Math.round(remainingBalance)} days usable`
                         }
                       </span>
                     </div>
@@ -942,20 +952,22 @@ export default function MemberDashboard() {
                       </div>
                       
                       {/* Quick stats */}
-                      <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">
-                            {Math.round(usagePercentage)}% leave used
-                          </span>
+                      {analytics && (
+                        <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                            <span className="text-sm text-gray-600 dark:text-gray-400">
+                              {Math.round(usagePercentage)}% leave used
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                            <span className="text-sm text-gray-600 dark:text-gray-400">
+                              {Math.round(remainingBalance)} days remaining
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">
-                            {Math.round(remainingBalance)} days remaining
-                          </span>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -964,16 +976,18 @@ export default function MemberDashboard() {
           })()}
 
           {/* Analytics Section - Enhanced */}
-          {analytics && (
-            <div className="mb-8 space-y-8 fade-in">
-              <div className="mb-6">
-                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-3">Year-End Analytics</h2>
-                <p className="text-base text-gray-500 dark:text-gray-400">Your leave performance and outlook</p>
-              </div>
+          <div className="mb-8 space-y-8 fade-in">
+            <div className="mb-6">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-3">Year-End Analytics</h2>
+              <p className="text-base text-gray-500 dark:text-gray-400">Your leave performance and outlook</p>
+            </div>
+            
+            {analytics ? (
+              <>
               
               {/* Analytics Cards - Enhanced */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 mb-8">
-                <div className="stat-card group">
+                <Link href="/member/analytics" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
                   <div className="p-5 sm:p-6">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0">
@@ -990,9 +1004,9 @@ export default function MemberDashboard() {
                       </div>
                     </div>
                   </div>
-                </div>
+                </Link>
 
-                <div className="stat-card group">
+                <Link href="/member/analytics" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
                   <div className="p-5 sm:p-6">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0">
@@ -1009,9 +1023,9 @@ export default function MemberDashboard() {
                       </div>
                     </div>
                   </div>
-                </div>
+                </Link>
 
-                <div className="stat-card group">
+                <Link href="/member/analytics" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
                   <div className="p-5 sm:p-6">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0">
@@ -1028,9 +1042,9 @@ export default function MemberDashboard() {
                       </div>
                     </div>
                   </div>
-                </div>
+                </Link>
 
-                <div className="stat-card group">
+                <Link href="/member/analytics" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
                   <div className="p-5 sm:p-6">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0">
@@ -1052,7 +1066,7 @@ export default function MemberDashboard() {
                       </div>
                     </div>
                   </div>
-                </div>
+                </Link>
 
               </div>
 
@@ -1219,8 +1233,16 @@ export default function MemberDashboard() {
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            </>
+            ) : (
+              <div className="card">
+                <div className="p-8 text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-indigo-600 dark:border-t-indigo-400 mx-auto mb-4"></div>
+                  <p className="text-gray-600 dark:text-gray-400">Loading analytics data...</p>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Recent Requests - Enhanced */}
           <div className="card">

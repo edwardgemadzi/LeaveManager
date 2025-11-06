@@ -125,6 +125,48 @@ export async function PATCH(request: NextRequest) {
       return badRequestError('Invalid settings');
     }
 
+    // Validate carryover settings if provided
+    if (settings.carryoverSettings !== undefined) {
+      if (typeof settings.carryoverSettings !== 'object' || Array.isArray(settings.carryoverSettings) || settings.carryoverSettings === null) {
+        return badRequestError('carryoverSettings must be an object');
+      }
+      
+      // Validate limitedToMonths if provided
+      if (settings.carryoverSettings.limitedToMonths !== undefined) {
+        if (!Array.isArray(settings.carryoverSettings.limitedToMonths)) {
+          return badRequestError('limitedToMonths must be an array');
+        }
+        // Validate all values are numbers between 0-11
+        for (const month of settings.carryoverSettings.limitedToMonths) {
+          if (typeof month !== 'number' || month < 0 || month > 11) {
+            return badRequestError('limitedToMonths must contain numbers between 0-11');
+          }
+        }
+        // Remove duplicates and sort
+        const monthsArray = settings.carryoverSettings.limitedToMonths as number[];
+        settings.carryoverSettings.limitedToMonths = [...new Set(monthsArray)].sort((a, b) => a - b);
+      }
+      
+      // Validate maxCarryoverDays if provided
+      if (settings.carryoverSettings.maxCarryoverDays !== undefined) {
+        if (typeof settings.carryoverSettings.maxCarryoverDays !== 'number' || settings.carryoverSettings.maxCarryoverDays < 0) {
+          return badRequestError('maxCarryoverDays must be a non-negative number');
+        }
+      }
+      
+      // Validate expiryDate if provided
+      if (settings.carryoverSettings.expiryDate !== undefined && settings.carryoverSettings.expiryDate !== null) {
+        const expiryDate = new Date(settings.carryoverSettings.expiryDate);
+        if (isNaN(expiryDate.getTime())) {
+          return badRequestError('Invalid date format for carryover expiry date');
+        }
+        // Store as Date object
+        settings.carryoverSettings.expiryDate = expiryDate;
+      } else if (settings.carryoverSettings.expiryDate === null) {
+        settings.carryoverSettings.expiryDate = undefined;
+      }
+    }
+
     // enableSubgrouping is optional boolean, ensure it's set if provided
     if (settings.enableSubgrouping !== undefined && typeof settings.enableSubgrouping !== 'boolean') {
       return badRequestError('Invalid settings');
@@ -207,6 +249,30 @@ export async function PATCH(request: NextRequest) {
       if (settings.maternityLeave.countingMethod !== undefined) {
         if (settings.maternityLeave.countingMethod !== 'calendar' && settings.maternityLeave.countingMethod !== 'working') {
           return badRequestError('maternityLeave.countingMethod must be either "calendar" or "working"');
+        }
+      }
+    }
+
+    // Validate paternity leave settings if provided
+    if (settings.paternityLeave !== undefined) {
+      if (typeof settings.paternityLeave !== 'object' || Array.isArray(settings.paternityLeave) || settings.paternityLeave === null) {
+        return badRequestError('paternityLeave must be an object');
+      }
+      
+      // Validate maxDays if provided
+      if (settings.paternityLeave.maxDays !== undefined) {
+        if (typeof settings.paternityLeave.maxDays !== 'number' || !Number.isInteger(settings.paternityLeave.maxDays)) {
+          return badRequestError('paternityLeave.maxDays must be an integer');
+        }
+        if (settings.paternityLeave.maxDays < 1 || settings.paternityLeave.maxDays > 365) {
+          return badRequestError('paternityLeave.maxDays must be between 1 and 365');
+        }
+      }
+      
+      // Validate countingMethod if provided
+      if (settings.paternityLeave.countingMethod !== undefined) {
+        if (settings.paternityLeave.countingMethod !== 'calendar' && settings.paternityLeave.countingMethod !== 'working') {
+          return badRequestError('paternityLeave.countingMethod must be either "calendar" or "working"');
         }
       }
     }

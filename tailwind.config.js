@@ -6,6 +6,34 @@ module.exports = {
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
+  safelist: [
+    // Score card background gradients
+    'bg-gradient-to-br',
+    'from-green-200', 'to-emerald-200', 'dark:from-green-900/50', 'dark:to-emerald-900/50',
+    'from-blue-200', 'to-indigo-200', 'dark:from-blue-900/50', 'dark:to-indigo-900/50',
+    'from-yellow-200', 'to-amber-200', 'dark:from-yellow-900/50', 'dark:to-amber-900/50',
+    'from-orange-200', 'to-red-200', 'dark:from-orange-900/50', 'dark:to-red-900/50',
+    'from-red-200', 'to-rose-200', 'dark:from-red-900/50', 'dark:to-rose-900/50',
+    'from-pink-200', 'to-rose-200', 'dark:from-pink-900/50', 'dark:to-rose-900/50',
+    'from-gray-200', 'to-gray-200', 'dark:from-gray-900/50', 'dark:to-gray-900/50',
+    // Score card border colors
+    'border-green-500', 'dark:border-green-500',
+    'border-blue-500', 'dark:border-blue-500',
+    'border-yellow-500', 'dark:border-yellow-500',
+    'border-orange-500', 'dark:border-orange-500',
+    'border-red-500', 'dark:border-red-500',
+    'border-pink-500', 'dark:border-pink-500',
+    'border-gray-500', 'dark:border-gray-500',
+    // Score card gradient colors for icon
+    'from-green-500', 'via-emerald-500', 'to-teal-500',
+    'from-blue-500', 'via-indigo-500', 'to-purple-500',
+    'from-yellow-500', 'via-amber-500', 'to-orange-500',
+    'from-orange-500', 'via-red-500', 'to-pink-500',
+    'from-red-600', 'via-rose-600', 'to-pink-600',
+    'from-red-700', 'via-rose-700', 'to-pink-700',
+    'from-pink-500', 'via-rose-500', 'to-pink-600',
+    'from-gray-500', 'via-gray-500', 'to-gray-500',
+  ],
   theme: {
     extend: {
       colors: {

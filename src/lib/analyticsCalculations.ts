@@ -540,24 +540,45 @@ export const calculateGroupRemainderDays = (
 export const calculateCarryoverDays = (
   remainingLeaveBalance: number,
   remainingWorkingDays: number,
-  allowCarryover: boolean
-): { willCarryover: number; willLose: number } => {
+  allowCarryover: boolean,
+  carryoverSettings?: {
+    limitedToMonths?: number[];
+    maxCarryoverDays?: number;
+    expiryDate?: Date;
+  }
+): { willCarryover: number; willLose: number; limitedToMonths?: number[]; maxCarryoverDays?: number; expiryDate?: Date } => {
   // Calculate days that cannot be used this year
   // If remaining leave > remaining working days, the excess will either carry over or be lost
   // If remaining leave <= remaining working days, nothing carries over (they can use all their leave)
-  const unusedDays = Math.max(0, remainingLeaveBalance - remainingWorkingDays);
+  let unusedDays = Math.max(0, remainingLeaveBalance - remainingWorkingDays);
   
-  if (allowCarryover) {
-    return {
-      willCarryover: unusedDays,
-      willLose: 0
-    };
-  } else {
+  if (!allowCarryover) {
     return {
       willCarryover: 0,
       willLose: unusedDays
     };
   }
+
+  // Apply max carryover days limit if set
+  if (carryoverSettings?.maxCarryoverDays !== undefined && unusedDays > carryoverSettings.maxCarryoverDays) {
+    const willLose = unusedDays - carryoverSettings.maxCarryoverDays;
+    unusedDays = carryoverSettings.maxCarryoverDays;
+    return {
+      willCarryover: unusedDays,
+      willLose,
+      limitedToMonths: carryoverSettings.limitedToMonths,
+      maxCarryoverDays: carryoverSettings.maxCarryoverDays,
+      expiryDate: carryoverSettings.expiryDate
+    };
+  }
+
+  return {
+    willCarryover: unusedDays,
+    willLose: 0,
+    limitedToMonths: carryoverSettings?.limitedToMonths,
+    maxCarryoverDays: carryoverSettings?.maxCarryoverDays,
+    expiryDate: carryoverSettings?.expiryDate
+  };
 };
 
 // Analytics data structure for a member
@@ -573,6 +594,9 @@ export interface MemberAnalytics {
   willCarryover: number;
   willLose: number;
   allowCarryover: boolean;
+  carryoverLimitedToMonths?: number[]; // Array of month indices (0-11) where carryover can be used
+  carryoverMaxDays?: number; // Maximum days that can carry over
+  carryoverExpiryDate?: Date; // Date when carryover days expire
   membersSharingSameShift: number; // Total members competing for same days
   averageDaysPerMember: number; // Average realistic days per member in same shift (whole days)
   surplusBalance: number; // Surplus balance when manual balance exceeds team max
@@ -800,12 +824,44 @@ export const getMemberAnalytics = (
   // Calculate realistic usable days - factors in members sharing same schedule
   // This divides usable days by members sharing the same shift, capped by remaining leave balance
   // Use floor division to get whole days, remainder is calculated separately
-  const realisticUsableDays = membersSharingSameShift > 0
+  // Also account for carryover limitations if set (limited months reduce effective usable period)
+  const baseRealisticUsableDays = membersSharingSameShift > 0
     ? Math.min(
         Math.floor(usableDays / membersSharingSameShift),
         remainingLeaveBalance
       )
     : Math.min(usableDays, remainingLeaveBalance);
+
+  // If carryover is limited to specific months, adjust realistic usable days
+  // Days that will carry over but can only be used in limited months have a narrower window
+  // This reduces the effective realistic usable days because those days have a constrained usage period
+  const allowCarryover = team.settings.allowCarryover || false;
+  const carryoverSettings = team.settings.carryoverSettings;
+  let realisticUsableDays = baseRealisticUsableDays;
+  
+  if (allowCarryover && carryoverSettings?.limitedToMonths && carryoverSettings.limitedToMonths.length > 0) {
+    // Calculate days that will carry over (unused days)
+    const unusedDays = Math.max(0, remainingLeaveBalance - baseRealisticUsableDays);
+    
+    // If there are days that will carry over and they're limited to specific months,
+    // those days have a more constrained usage window (only in those months of next year)
+    // This means the effective realistic usable days should account for this limitation
+    // We reduce realistic usable days proportionally based on the limitation
+    if (unusedDays > 0) {
+      // Calculate the proportion of the year that carryover days can be used
+      // If limited to January only (1 month), that's 1/12 of the year
+      const limitedMonthsCount = carryoverSettings.limitedToMonths.length;
+      const monthsInYear = 12;
+      const carryoverUsageWindow = limitedMonthsCount / monthsInYear;
+      
+      // Adjust realistic usable days: days that will carry over have a narrower window
+      // This effectively reduces the realistic usable days because those days can only be used in limited months
+      // We apply a reduction factor based on the carryover limitation
+      const carryoverDays = Math.min(unusedDays, carryoverSettings.maxCarryoverDays || unusedDays);
+      const adjustedForCarryoverLimitation = baseRealisticUsableDays - (carryoverDays * (1 - carryoverUsageWindow));
+      realisticUsableDays = Math.max(0, Math.min(adjustedForCarryoverLimitation, remainingLeaveBalance));
+    }
+  }
   
   // Calculate remainder days - extra days that need allocation decisions
   // Remainder is the leftover days after dividing usableDays by membersSharingSameShift
@@ -820,11 +876,12 @@ export const getMemberAnalytics = (
   const averageDaysPerMember = calculateAverageDaysPerMember(usableDays, membersSharingSameShift);
   
   // Calculate carryover/loss using realistic usable days (not theoretical)
-  const allowCarryover = team.settings.allowCarryover || false;
-  const { willCarryover, willLose } = calculateCarryoverDays(
+  // Note: realisticUsableDays already accounts for carryover limitations above
+  const carryoverResult = calculateCarryoverDays(
     remainingLeaveBalance,
     realisticUsableDays,
-    allowCarryover
+    allowCarryover,
+    carryoverSettings
   );
   
   return {
@@ -836,9 +893,12 @@ export const getMemberAnalytics = (
     baseLeaveBalance,
     workingDaysUsed,
     workingDaysInYear,
-    willCarryover,
-    willLose,
+    willCarryover: carryoverResult.willCarryover,
+    willLose: carryoverResult.willLose,
     allowCarryover,
+    carryoverLimitedToMonths: carryoverResult.limitedToMonths,
+    carryoverMaxDays: carryoverResult.maxCarryoverDays,
+    carryoverExpiryDate: carryoverResult.expiryDate,
     membersSharingSameShift,
     averageDaysPerMember,
     surplusBalance,
@@ -852,9 +912,22 @@ export const getMaternityMemberAnalytics = (
   team: Team,
   approvedMaternityRequests: LeaveRequest[]
 ): MaternityMemberAnalytics => {
-  // Get maternity leave settings (defaults if not set)
-  const maxMaternityLeaveDays = team.settings.maternityLeave?.maxDays || 90;
-  const countingMethod = team.settings.maternityLeave?.countingMethod || 'working';
+  // Determine which type of leave the user is assigned
+  const userType = user.maternityPaternityType;
+  
+  // Get appropriate leave settings based on user's assigned type
+  // Default to maternity if type is not assigned (backward compatibility)
+  let maxLeaveDays: number;
+  let countingMethod: 'calendar' | 'working';
+  
+  if (userType === 'paternity') {
+    maxLeaveDays = team.settings.paternityLeave?.maxDays || 90;
+    countingMethod = team.settings.paternityLeave?.countingMethod || 'working';
+  } else {
+    // Default to maternity (for backward compatibility or if type is 'maternity' or null)
+    maxLeaveDays = team.settings.maternityLeave?.maxDays || 90;
+    countingMethod = team.settings.maternityLeave?.countingMethod || 'working';
+  }
   
   const shiftSchedule = user.shiftSchedule || {
     pattern: [true, true, true, true, true, false, false],
@@ -862,10 +935,22 @@ export const getMaternityMemberAnalytics = (
     type: 'fixed'
   };
 
-  // Filter to only maternity leave requests
+  // Filter requests based on user's assigned type
+  // If user is assigned paternity, only count paternity requests
+  // If user is assigned maternity (or not assigned), only count maternity requests
   const maternityRequests = approvedMaternityRequests.filter(req => {
     if (!req.reason) return false;
-    return isMaternityLeave(req.reason);
+    const isMaternity = isMaternityLeave(req.reason);
+    
+    if (userType === 'paternity') {
+      // For paternity users, only count paternity requests
+      const lowerReason = req.reason.toLowerCase();
+      return lowerReason.includes('paternity') && !lowerReason.includes('maternity');
+    } else {
+      // For maternity users (or unassigned), only count maternity requests
+      const lowerReason = req.reason.toLowerCase();
+      return lowerReason.includes('maternity') || (isMaternity && !lowerReason.includes('paternity'));
+    }
   });
 
   // Convert to format expected by calculateMaternityLeaveBalance
@@ -878,11 +963,11 @@ export const getMaternityMemberAnalytics = (
   // Calculate base maternity leave balance
   const baseMaternityLeaveBalance = user.manualMaternityLeaveBalance !== undefined 
     ? user.manualMaternityLeaveBalance 
-    : maxMaternityLeaveDays;
+    : maxLeaveDays;
 
   // Calculate remaining maternity leave balance
   const remainingMaternityLeaveBalance = calculateMaternityLeaveBalance(
-    maxMaternityLeaveDays,
+    maxLeaveDays,
     maternityRequestsForCalculation,
     countingMethod,
     shiftSchedule,
@@ -927,7 +1012,7 @@ export const getMaternityMemberAnalytics = (
   // Calculate surplus maternity balance
   const surplusMaternityBalance = calculateMaternitySurplusBalance(
     user.manualMaternityLeaveBalance,
-    maxMaternityLeaveDays
+    maxLeaveDays
   );
 
   return {

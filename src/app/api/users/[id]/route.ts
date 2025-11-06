@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import bcrypt from 'bcryptjs';
 import { getTokenFromRequest, verifyToken } from '@/lib/auth';
 import { getDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
@@ -80,9 +81,9 @@ export async function PATCH(
     }
     
     const body = await request.json();
-    const { fullName, shiftTag, subgroupTag, manualLeaveBalance, manualYearToDateUsed, manualMaternityLeaveBalance, manualMaternityYearToDateUsed } = body;
+    const { fullName, shiftTag, subgroupTag, manualLeaveBalance, manualYearToDateUsed, manualMaternityLeaveBalance, manualMaternityYearToDateUsed, newPassword, maternityPaternityType } = body;
 
-    if (!fullName && shiftTag === undefined && subgroupTag === undefined && manualLeaveBalance === undefined && manualYearToDateUsed === undefined && manualMaternityLeaveBalance === undefined && manualMaternityYearToDateUsed === undefined) {
+    if (!fullName && shiftTag === undefined && subgroupTag === undefined && manualLeaveBalance === undefined && manualYearToDateUsed === undefined && manualMaternityLeaveBalance === undefined && manualMaternityYearToDateUsed === undefined && !newPassword && maternityPaternityType === undefined) {
       return badRequestError('At least one field is required');
     }
 
@@ -136,8 +137,28 @@ export async function PATCH(
       return forbiddenError('Access denied - users must be in the same team');
     }
 
+    // Validate newPassword if provided
+    if (newPassword !== undefined) {
+      if (typeof newPassword !== 'string' || newPassword.trim().length === 0) {
+        return badRequestError('Password must be a non-empty string');
+      }
+      if (newPassword.length < 6) {
+        return badRequestError('Password must be at least 6 characters long');
+      }
+      if (newPassword.length > 100) {
+        return badRequestError('Password must be no more than 100 characters long');
+      }
+    }
+
+    // Validate maternityPaternityType if provided
+    if (maternityPaternityType !== undefined) {
+      if (maternityPaternityType !== null && maternityPaternityType !== 'maternity' && maternityPaternityType !== 'paternity') {
+        return badRequestError('maternityPaternityType must be "maternity", "paternity", or null');
+      }
+    }
+
     // Build update object
-    const updateData: { fullName?: string; shiftTag?: string; subgroupTag?: string; manualLeaveBalance?: number; manualYearToDateUsed?: number; manualMaternityLeaveBalance?: number; manualMaternityYearToDateUsed?: number } = {};
+    const updateData: { fullName?: string; shiftTag?: string; subgroupTag?: string; manualLeaveBalance?: number; manualYearToDateUsed?: number; manualMaternityLeaveBalance?: number; manualMaternityYearToDateUsed?: number; password?: string; maternityPaternityType?: 'maternity' | 'paternity' | null } = {};
     const unsetData: { manualLeaveBalance?: string; manualYearToDateUsed?: string; manualMaternityLeaveBalance?: string; manualMaternityYearToDateUsed?: string } = {};
     let shouldUnset = false;
     
@@ -146,6 +167,9 @@ export async function PATCH(
     if (subgroupTag !== undefined) {
       // If subgroupTag is empty string, set to undefined (remove subgroup)
       updateData.subgroupTag = subgroupTag && subgroupTag.trim() ? subgroupTag.trim() : undefined;
+    }
+    if (maternityPaternityType !== undefined) {
+      updateData.maternityPaternityType = maternityPaternityType;
     }
     if (manualLeaveBalance !== undefined) {
       // If manualLeaveBalance is null, remove it (use calculated balance)
@@ -226,6 +250,11 @@ export async function PATCH(
         
         updateData.manualMaternityYearToDateUsed = manualMaternityYearToDateUsed;
       }
+    }
+    if (newPassword) {
+      // Hash the new password
+      const hashedPassword = await bcrypt.hash(newPassword, 12);
+      updateData.password = hashedPassword;
     }
 
     // Update user

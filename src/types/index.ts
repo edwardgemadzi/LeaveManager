@@ -13,6 +13,7 @@ export interface User {
   manualYearToDateUsed?: number; // Manual year-to-date used days override set by leader
   manualMaternityLeaveBalance?: number; // Manual maternity leave balance override
   manualMaternityYearToDateUsed?: number; // Manual maternity year-to-date used days override
+  maternityPaternityType?: 'maternity' | 'paternity' | null; // Type of parental leave assigned by leader
   createdAt: Date;
 }
 
@@ -30,6 +31,11 @@ export interface TeamSettings {
   maxLeavePerYear: number;
   minimumNoticePeriod: number; // Minimum days in advance for leave requests
   allowCarryover?: boolean; // Whether unused leave days can carry over to next year
+  carryoverSettings?: {
+    limitedToMonths?: number[]; // Array of month indices (0-11) where carryover can be used (e.g., [0] for January only)
+    maxCarryoverDays?: number; // Maximum days that can carry over
+    expiryDate?: Date; // Date when carryover days expire
+  };
   enableSubgrouping?: boolean; // Whether to enable subgroup organization within the team
   subgroups?: string[]; // List of predefined subgroup names (minimum 2 required if enableSubgrouping is true)
   workingDaysGroupNames?: Record<string, string>; // Custom names for working days pattern groups (e.g., {"MTWTF__": "Weekday Team"})
@@ -40,6 +46,10 @@ export interface TeamSettings {
   };
   maternityLeave?: {
     maxDays?: number; // Maximum maternity leave days (configurable by leader, default: 90)
+    countingMethod?: 'calendar' | 'working'; // How to count days: 'calendar' = count all calendar days, 'working' = count only working days (default: 'working')
+  };
+  paternityLeave?: {
+    maxDays?: number; // Maximum paternity leave days (configurable by leader, default: 90)
     countingMethod?: 'calendar' | 'working'; // How to count days: 'calendar' = count all calendar days, 'working' = count only working days (default: 'working')
   };
 }

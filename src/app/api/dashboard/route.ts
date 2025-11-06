@@ -82,6 +82,7 @@ export async function GET(request: NextRequest) {
         manualYearToDateUsed: currentUser.manualYearToDateUsed,
         manualMaternityLeaveBalance: currentUser.manualMaternityLeaveBalance,
         manualMaternityYearToDateUsed: currentUser.manualMaternityYearToDateUsed,
+        maternityPaternityType: currentUser.maternityPaternityType,
       } : null,
       members: members.map(member => {
         const baseMember = {
@@ -104,6 +105,7 @@ export async function GET(request: NextRequest) {
             manualYearToDateUsed: member.manualYearToDateUsed,
             manualMaternityLeaveBalance: member.manualMaternityLeaveBalance,
             manualMaternityYearToDateUsed: member.manualMaternityYearToDateUsed,
+            maternityPaternityType: member.maternityPaternityType,
           };
         }
         
