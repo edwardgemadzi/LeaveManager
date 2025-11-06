@@ -794,24 +794,94 @@ export default function MemberDashboard() {
             </Link>
 
             {/* Maternity Leave Card */}
-            {user?.maternityPaternityType && (
-            <Link href="/member/analytics" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
-              <div className="p-5 sm:p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
-                      {user.maternityPaternityType === 'maternity' ? '🤱 Maternity Leave' : '👨‍👩‍👧 Paternity Leave'}
-                    </p>
-                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
-                      {(() => {
-                        const maternityBalance = getMaternityLeaveBalance();
-                        const userType = user.maternityPaternityType;
-                        const maxDays = userType === 'paternity' 
-                          ? (team?.settings.paternityLeave?.maxDays || 90)
-                          : (team?.settings.maternityLeave?.maxDays || 90);
-                        return `${Math.round(maternityBalance.balance)} / ${maxDays}`;
-                      })()}
-                    </p>
+            {(() => {
+              const userType = user?.maternityPaternityType;
+              const hasTypeAssigned = !!userType;
+              const isTypeEnabled = userType === 'paternity' 
+                ? team?.settings.paternityLeave?.enabled 
+                : userType === 'maternity' 
+                  ? team?.settings.maternityLeave?.enabled 
+                  : false;
+              
+              // Show card if type is assigned and enabled, or show "Not available" message
+              if (!hasTypeAssigned) {
+                return (
+                  <div className="stat-card group opacity-60">
+                    <div className="p-5 sm:p-6">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                            Maternity/Paternity Leave
+                          </p>
+                          <p className="text-lg font-medium text-gray-400 dark:text-gray-500 italic mb-1">
+                            Not allocated
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                            You have not been assigned maternity or paternity leave
+                          </p>
+                        </div>
+                        <div className="flex-shrink-0 ml-4">
+                          <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center">
+                            <CalendarIcon className="h-6 w-6 text-gray-400 dark:text-gray-600" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+              
+              if (!isTypeEnabled) {
+                return (
+                  <div className="stat-card group opacity-60">
+                    <div className="p-5 sm:p-6">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                            {userType === 'maternity' ? '🤱 Maternity Leave' : '👨‍👩‍👧 Paternity Leave'}
+                          </p>
+                          <p className="text-lg font-medium text-gray-400 dark:text-gray-500 italic mb-1">
+                            Not available
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                            {userType === 'maternity' ? 'Maternity' : 'Paternity'} leave is not enabled for your team
+                          </p>
+                        </div>
+                        <div className="flex-shrink-0 ml-4">
+                          <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center">
+                            <CalendarIcon className="h-6 w-6 text-gray-400 dark:text-gray-600" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+              
+              // Type is assigned and enabled - show normal card
+              return (
+                <Link href="/member/analytics" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
+                  <div className="p-5 sm:p-6">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
+                          {userType === 'maternity' ? '🤱 Maternity Leave' : '👨‍👩‍👧 Paternity Leave'}
+                        </p>
+                        <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
+                          {(() => {
+                            const maternityBalance = getMaternityLeaveBalance();
+                            const maxDays = userType === 'paternity' 
+                              ? (team?.settings.paternityLeave?.maxDays || 90)
+                              : (team?.settings.maternityLeave?.maxDays || 90);
+                            
+                            // Show "Not available" if balance is 0/90 and no type assigned (shouldn't happen here, but safety check)
+                            if (maternityBalance.balance === 0 && maxDays === 90 && !user.manualMaternityLeaveBalance) {
+                              return 'Not available';
+                            }
+                            
+                            return `${Math.round(maternityBalance.balance)} / ${maxDays}`;
+                          })()}
+                        </p>
                     <div className="mt-2 space-y-1">
                       {(() => {
                         const maternityBalance = getMaternityLeaveBalance();
@@ -845,7 +915,8 @@ export default function MemberDashboard() {
                 </div>
               </div>
             </Link>
-            )}
+              );
+            })()}
           </div>
 
           {/* Member Score Card - Hero Style */}
