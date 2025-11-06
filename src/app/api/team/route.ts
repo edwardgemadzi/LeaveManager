@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
         shiftTag: currentUser.shiftTag,
         workingDaysTag: currentUser.workingDaysTag,
         subgroupTag: currentUser.subgroupTag,
+        maternityPaternityType: currentUser.maternityPaternityType,
         // Include manualLeaveBalance for current user (they can see their own)
         manualLeaveBalance: currentUser.manualLeaveBalance,
         manualYearToDateUsed: currentUser.manualYearToDateUsed,
@@ -68,6 +69,7 @@ export async function GET(request: NextRequest) {
           shiftTag: member.shiftTag,
           workingDaysTag: member.workingDaysTag,
           subgroupTag: member.subgroupTag,
+          maternityPaternityType: member.maternityPaternityType,
           createdAt: member.createdAt,
         };
         
