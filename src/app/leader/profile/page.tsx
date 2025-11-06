@@ -308,7 +308,7 @@ export default function LeaderProfilePage() {
                       })}
                     />
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      Password must be at least 6 characters long
+                      Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)
                     </p>
                   </div>
 
