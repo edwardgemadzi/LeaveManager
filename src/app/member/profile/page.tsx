@@ -76,8 +76,15 @@ export default function MemberProfilePage() {
       return;
     }
 
-    if (passwordForm.newPassword.length < 6) {
-      setError('New password must be at least 6 characters long');
+    // Validate password matches backend requirements
+    if (passwordForm.newPassword.length < 8) {
+      setError('New password must be at least 8 characters long');
+      return;
+    }
+
+    const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
+    if (!passwordPattern.test(passwordForm.newPassword)) {
+      setError('New password must contain at least one lowercase letter, one uppercase letter, one number, and one special character');
       return;
     }
 
@@ -107,7 +114,11 @@ export default function MemberProfilePage() {
           confirmPassword: '',
         });
       } else {
-        setError(data.error || 'Failed to change password');
+        // Show validation details if available, otherwise show error message
+        const errorMessage = data.details && data.details.length > 0
+          ? data.details.join(', ')
+          : (data.error || 'Failed to change password');
+        setError(errorMessage);
       }
     } catch (error) {
       console.error('Error changing password:', error);
