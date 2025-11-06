@@ -308,33 +308,8 @@ export default function LeaderLeaveBalancePage() {
     // Determine which type of leave the member is assigned
     const userType = member.maternityPaternityType;
     
-    // Check if the assigned leave type is enabled
-    if (userType === 'paternity') {
-      if (!team?.settings.paternityLeave?.enabled) {
-        // Paternity leave is not enabled, return null/empty data
-        return {
-          remainingBalance: 0,
-          daysUsed: 0,
-          baseBalance: 0,
-          percentageUsed: null,
-          surplusBalance: 0,
-          approvedCount: 0
-        };
-      }
-    } else if (userType === 'maternity') {
-      if (!team?.settings.maternityLeave?.enabled) {
-        // Maternity leave is not enabled, return null/empty data
-        return {
-          remainingBalance: 0,
-          daysUsed: 0,
-          baseBalance: 0,
-          percentageUsed: null,
-          surplusBalance: 0,
-          approvedCount: 0
-        };
-      }
-    } else {
-      // No type assigned, return empty data
+    // If no type assigned, return empty data
+    if (!userType) {
       return {
         remainingBalance: 0,
         daysUsed: 0,
@@ -346,7 +321,7 @@ export default function LeaderLeaveBalancePage() {
     }
     
     // Get appropriate leave settings based on member's assigned type
-    // Default to maternity if type is not assigned (backward compatibility)
+    // Use defaults if leave type is not enabled (assignment is available regardless of enabled status)
     let maxLeaveDays: number;
     let countingMethod: 'calendar' | 'working';
     
@@ -354,7 +329,7 @@ export default function LeaderLeaveBalancePage() {
       maxLeaveDays = team?.settings.paternityLeave?.maxDays || 90;
       countingMethod = team?.settings.paternityLeave?.countingMethod || 'working';
     } else {
-      // Default to maternity (for backward compatibility or if type is 'maternity' or null)
+      // Maternity leave
       maxLeaveDays = team?.settings.maternityLeave?.maxDays || 90;
       countingMethod = team?.settings.maternityLeave?.countingMethod || 'working';
     }
@@ -1536,13 +1511,8 @@ export default function LeaderLeaveBalancePage() {
                           {(() => {
                             const userType = member.maternityPaternityType;
                             
-                            // Check if member has type assigned and if it's enabled
+                            // Check if member has type assigned
                             const hasTypeAssigned = !!userType;
-                            const isTypeEnabled = userType === 'paternity' 
-                              ? team?.settings.paternityLeave?.enabled 
-                              : userType === 'maternity' 
-                                ? team?.settings.maternityLeave?.enabled 
-                                : false;
                             
                             // If no type assigned, show "No maternity/paternity"
                             if (!hasTypeAssigned) {
@@ -1563,26 +1533,7 @@ export default function LeaderLeaveBalancePage() {
                               );
                             }
                             
-                            // If type is assigned but not enabled, show "Not enabled"
-                            if (!isTypeEnabled) {
-                              return (
-                                <>
-                                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                                    <span className="text-sm text-gray-400 dark:text-gray-500 italic">
-                                      {userType === 'maternity' ? 'Maternity' : 'Paternity'} not enabled
-                                    </span>
-                                  </td>
-                                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                                    <span className="text-sm text-gray-400 dark:text-gray-500 italic">-</span>
-                                  </td>
-                                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                                    <span className="text-sm text-gray-400 dark:text-gray-500 italic">-</span>
-                                  </td>
-                                </>
-                              );
-                            }
-                            
-                            // Type is assigned and enabled - show normal data
+                            // Type is assigned - show data (regardless of enabled status)
                             const maternityData = getMemberMaternityLeaveData(member);
                             const maxLeaveDays = userType === 'paternity'
                               ? (team?.settings.paternityLeave?.maxDays || 90)
@@ -1660,8 +1611,8 @@ export default function LeaderLeaveBalancePage() {
                                 </td>
                                 <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                                   {(() => {
-                                    // Show "-" if no type assigned or not enabled
-                                    if (!hasTypeAssigned || !isTypeEnabled) {
+                                    // Show "-" if no type assigned
+                                    if (!hasTypeAssigned) {
                                       return <span className="text-sm text-gray-400 dark:text-gray-500 italic">-</span>;
                                     }
                                     
@@ -1712,8 +1663,8 @@ export default function LeaderLeaveBalancePage() {
                                 </td>
                                 <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                                   {(() => {
-                                    // Show "-" if no type assigned or not enabled
-                                    if (!hasTypeAssigned || !isTypeEnabled) {
+                                    // Show "-" if no type assigned
+                                    if (!hasTypeAssigned) {
                                       return <span className="text-sm text-gray-400 dark:text-gray-500 italic">-</span>;
                                     }
                                     return <span className="text-sm font-semibold text-gray-900 dark:text-white">
