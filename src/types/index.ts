@@ -101,6 +101,7 @@ export interface RegisterMemberRequest {
   password: string;
   teamUsername: string;
   shiftSchedule: ShiftSchedule;
+  maternityPaternityType?: 'maternity' | 'paternity' | null;
 }
 
 export interface CreateLeaveRequest {

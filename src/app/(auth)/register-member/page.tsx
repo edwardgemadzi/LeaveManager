@@ -15,6 +15,7 @@ export default function RegisterMemberPage() {
     password: '',
     confirmPassword: '',
     teamUsername: '',
+    maternityPaternityType: '' as '' | 'maternity' | 'paternity',
   });
   const [shiftSchedule, setShiftSchedule] = useState<ShiftSchedule>({
     pattern: [true, true, false, false],
@@ -49,6 +50,7 @@ export default function RegisterMemberPage() {
           password: formData.password,
           teamUsername: formData.teamUsername,
           shiftSchedule,
+          maternityPaternityType: formData.maternityPaternityType || null,
         }),
       });
 
@@ -185,6 +187,26 @@ export default function RegisterMemberPage() {
                 value={formData.confirmPassword}
                 onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
               />
+            </div>
+
+            <div>
+              <label htmlFor="maternityPaternityType" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Maternity/Paternity Leave (Optional)
+              </label>
+              <select
+                id="maternityPaternityType"
+                name="maternityPaternityType"
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
+                value={formData.maternityPaternityType}
+                onChange={(e) => setFormData({ ...formData, maternityPaternityType: e.target.value as '' | 'maternity' | 'paternity' })}
+              >
+                <option value="">None</option>
+                <option value="maternity">🤱 Maternity Leave</option>
+                <option value="paternity">👨‍👩‍👧 Paternity Leave</option>
+              </select>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Select if you are eligible for maternity or paternity leave
+              </p>
             </div>
 
             <div className="border-t border-gray-200 dark:border-gray-800 pt-4">

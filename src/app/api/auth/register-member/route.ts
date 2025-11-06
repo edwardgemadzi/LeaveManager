@@ -11,7 +11,7 @@ import { internalServerError, badRequestError, notFoundError } from '@/lib/error
 export async function POST(request: NextRequest) {
   try {
     const body: RegisterMemberRequest = await request.json();
-    const { username, fullName, password, teamUsername, shiftSchedule } = body;
+    const { username, fullName, password, teamUsername, shiftSchedule, maternityPaternityType } = body;
 
     if (!username || !fullName || !password || !teamUsername || !shiftSchedule) {
       return badRequestError('All fields are required');
@@ -71,6 +71,7 @@ export async function POST(request: NextRequest) {
       teamId: string;
       shiftSchedule: ShiftSchedule;
       workingDaysTag?: string;
+      maternityPaternityType?: 'maternity' | 'paternity' | null;
     } = {
       username,
       fullName,
@@ -79,6 +80,13 @@ export async function POST(request: NextRequest) {
       teamId: team._id,
       shiftSchedule: shiftScheduleCopy,
     };
+
+    // Add maternityPaternityType if provided
+    if (maternityPaternityType !== undefined && maternityPaternityType !== null) {
+      if (maternityPaternityType === 'maternity' || maternityPaternityType === 'paternity') {
+        userData.maternityPaternityType = maternityPaternityType;
+      }
+    }
 
     // Only store tag for fixed schedules
     if (shiftSchedule.type === 'fixed') {
