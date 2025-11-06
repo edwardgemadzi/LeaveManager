@@ -47,13 +47,20 @@ export function useTeamEvents(
   const onEventRef = useRef(onEvent);
   const onErrorRef = useRef(onError);
   const teamIdRef = useRef(teamId);
+  const enabledRef = useRef(enabled);
+  const fallbackToPollingRef = useRef(fallbackToPolling);
+  const pollingCallbackRef = useRef(pollingCallback);
+  const isConnectingRef = useRef(false);
 
   // Keep refs updated
   useEffect(() => {
     onEventRef.current = onEvent;
     onErrorRef.current = onError;
     teamIdRef.current = teamId;
-  }, [onEvent, onError, teamId]);
+    enabledRef.current = enabled;
+    fallbackToPollingRef.current = fallbackToPolling;
+    pollingCallbackRef.current = pollingCallback;
+  }, [onEvent, onError, teamId, enabled, fallbackToPolling, pollingCallback]);
 
   // Set up polling as fallback
   const { start: startPolling, stop: stopPolling } = usePolling(
@@ -67,7 +74,12 @@ export function useTeamEvents(
 
   // Connect to SSE
   const connect = useCallback(() => {
-    if (!teamIdRef.current || !enabled) {
+    // Prevent multiple simultaneous connection attempts
+    if (isConnectingRef.current || eventSourceRef.current?.readyState === EventSource.OPEN) {
+      return;
+    }
+
+    if (!teamIdRef.current || !enabledRef.current) {
       return;
     }
 
@@ -75,7 +87,7 @@ export function useTeamEvents(
     const token = localStorage.getItem('token');
     if (!token) {
       console.warn('[useTeamEvents] No token found, cannot connect to SSE');
-      if (fallbackToPolling && pollingCallback) {
+      if (fallbackToPollingRef.current && pollingCallbackRef.current) {
         setIsUsingFallback(true);
         startPolling();
       }
@@ -88,6 +100,8 @@ export function useTeamEvents(
       eventSourceRef.current = null;
     }
 
+    isConnectingRef.current = true;
+
     try {
       // Create EventSource connection
       const eventSource = new EventSource(`/api/events?token=${encodeURIComponent(token)}`);
@@ -95,6 +109,8 @@ export function useTeamEvents(
 
       // Handle connection open
       eventSource.onopen = () => {
+        console.log('[useTeamEvents] SSE connection opened');
+        isConnectingRef.current = false;
         setIsConnected(true);
         setIsUsingFallback(false);
         stopPolling(); // Stop polling if SSE is working
@@ -126,7 +142,8 @@ export function useTeamEvents(
               onErrorRef.current(error);
             }
             // Fallback to polling if error occurs
-            if (fallbackToPolling && pollingCallback) {
+            if (fallbackToPollingRef.current && pollingCallbackRef.current) {
+              isConnectingRef.current = false;
               setIsUsingFallback(true);
               setIsConnected(false);
               eventSource.close();
@@ -150,6 +167,7 @@ export function useTeamEvents(
       // Handle specific event types
       eventSource.addEventListener('leaveRequestCreated', (event: MessageEvent) => {
         try {
+          console.log('[useTeamEvents] Received leaveRequestCreated event:', event.data);
           const data = JSON.parse(event.data);
           if (onEventRef.current) {
             onEventRef.current({
@@ -207,33 +225,41 @@ export function useTeamEvents(
       // Handle connection errors
       eventSource.onerror = (error) => {
         console.error('[useTeamEvents] SSE connection error:', error);
+        console.error('[useTeamEvents] EventSource readyState:', eventSource.readyState);
         setIsConnected(false);
         
-        // Fallback to polling if connection fails
-        if (fallbackToPolling && pollingCallback) {
-          setIsUsingFallback(true);
-          eventSource.close();
-          startPolling();
-        } else if (onErrorRef.current) {
-          onErrorRef.current(new Error('SSE connection failed'));
+        // Only reconnect if connection was actually closed (not just a temporary error)
+        if (eventSource.readyState === EventSource.CLOSED) {
+          isConnectingRef.current = false;
+          // Fallback to polling if connection fails
+          if (fallbackToPollingRef.current && pollingCallbackRef.current) {
+            console.log('[useTeamEvents] Falling back to polling');
+            setIsUsingFallback(true);
+            eventSource.close();
+            startPolling();
+          } else if (onErrorRef.current) {
+            onErrorRef.current(new Error('SSE connection failed'));
+          }
         }
       };
     } catch (error) {
       console.error('[useTeamEvents] Error creating EventSource:', error);
+      isConnectingRef.current = false;
       setIsConnected(false);
       
       // Fallback to polling if initialization fails
-      if (fallbackToPolling && pollingCallback) {
+      if (fallbackToPollingRef.current && pollingCallbackRef.current) {
         setIsUsingFallback(true);
         startPolling();
       } else if (onErrorRef.current) {
         onErrorRef.current(error instanceof Error ? error : new Error('Failed to create EventSource'));
       }
     }
-  }, [enabled, fallbackToPolling, pollingCallback, startPolling, stopPolling]);
+  }, [startPolling, stopPolling]);
 
   // Cleanup function
   const disconnect = useCallback(() => {
+    isConnectingRef.current = false;
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
@@ -242,7 +268,7 @@ export function useTeamEvents(
     stopPolling();
   }, [stopPolling]);
 
-  // Connect on mount and when teamId changes
+  // Connect on mount and when teamId or enabled changes
   useEffect(() => {
     if (enabled && teamId) {
       connect();
@@ -250,11 +276,12 @@ export function useTeamEvents(
       disconnect();
     }
 
-    // Cleanup on unmount
+    // Cleanup on unmount or when dependencies change
     return () => {
       disconnect();
     };
-  }, [enabled, teamId, connect, disconnect]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, teamId]); // Only depend on actual values, not functions
 
   return {
     isConnected,

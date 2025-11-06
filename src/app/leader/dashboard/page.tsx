@@ -208,13 +208,16 @@ export default function LeaderDashboard() {
     },
     pollingInterval: 30000,
     onEvent: (event) => {
+      console.log('[LeaderDashboard] Received event:', event.type, event.data);
       // Handle leaveRequestCreated
       if (event.type === 'leaveRequestCreated') {
         const data = event.data as { requestId: string; userId: string; startDate: string; endDate: string; reason: string; status: string };
+        console.log('[LeaderDashboard] leaveRequestCreated event data:', data);
+        // Always refresh data when a new request is created, regardless of status
+        refetchData();
+        
+        // Only show notification for pending requests
         if (data.status === 'pending') {
-          // Add to pending requests
-          refetchData();
-          
           // Find member name for notification
           const member = members.find(m => m._id === data.userId);
           const memberName = member?.fullName || member?.username || 'A team member';

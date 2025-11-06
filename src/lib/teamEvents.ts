@@ -30,6 +30,7 @@ export function broadcastTeamUpdate(
 ): void {
   const listeners = eventListeners.get(teamId);
   if (!listeners || listeners.size === 0) {
+    console.log(`[teamEvents] No listeners for team ${teamId}, event ${type} not broadcast`);
     return;
   }
 
@@ -38,6 +39,8 @@ export function broadcastTeamUpdate(
     teamId,
     data,
   };
+
+  console.log(`[teamEvents] Broadcasting ${type} event to ${listeners.size} listener(s) for team ${teamId}`);
 
   // Broadcast to all listeners
   listeners.forEach((callback) => {

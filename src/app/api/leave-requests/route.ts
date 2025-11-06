@@ -8,7 +8,7 @@ import { isBypassNoticePeriodActive } from '@/lib/analyticsCalculations';
 import { validateRequest, schemas } from '@/lib/validation';
 import { getClient } from '@/lib/mongodb';
 import { broadcastTeamUpdate } from '@/lib/teamEvents';
-import { error as logError } from '@/lib/logger';
+import { error as logError, info } from '@/lib/logger';
 import { internalServerError } from '@/lib/errors';
 
 export async function GET(request: NextRequest) {
@@ -305,14 +305,23 @@ export async function POST(request: NextRequest) {
     // Use definite assignment assertion to satisfy TypeScript
     const createdRequest = leaveRequest!;
     
-    broadcastTeamUpdate(user.teamId!, 'leaveRequestCreated', {
-      requestId: createdRequest._id,
-      userId: createdRequest.userId,
-      startDate: createdRequest.startDate,
-      endDate: createdRequest.endDate,
+    // Serialize dates to ISO strings for JSON compatibility
+    // _id is guaranteed to exist since we just created the request
+    const eventData = {
+      requestId: (createdRequest._id || '').toString(),
+      userId: createdRequest.userId.toString(),
+      startDate: createdRequest.startDate instanceof Date 
+        ? createdRequest.startDate.toISOString() 
+        : new Date(createdRequest.startDate).toISOString(),
+      endDate: createdRequest.endDate instanceof Date 
+        ? createdRequest.endDate.toISOString() 
+        : new Date(createdRequest.endDate).toISOString(),
       reason: createdRequest.reason,
       status: createdRequest.status,
-    });
+    };
+    
+    info(`[LeaveRequest] Broadcasting leaveRequestCreated event for team ${user.teamId}:`, eventData);
+    broadcastTeamUpdate(user.teamId!, 'leaveRequestCreated', eventData);
 
     return NextResponse.json(createdRequest);
   } catch (error) {

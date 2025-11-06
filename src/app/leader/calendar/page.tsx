@@ -1,17 +1,19 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import TeamCalendar from '@/components/shared/Calendar';
 import { Team, User, LeaveRequest } from '@/types';
 import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
 import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
+import { useTeamEvents } from '@/hooks/useTeamEvents';
 
 export default function LeaderCalendarPage() {
   const [team, setTeam] = useState<Team | null>(null);
   const [members, setMembers] = useState<User[]>([]);
   const [allRequests, setAllRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Filter state
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved'>('all');
@@ -19,8 +21,7 @@ export default function LeaderCalendarPage() {
   const [selectedSubgroups, setSelectedSubgroups] = useState<string[]>([]);
   const [selectedWorkingDaysTags, setSelectedWorkingDaysTags] = useState<string[]>([]);
 
-  useEffect(() => {
-    const fetchData = async () => {
+  const fetchData = async () => {
       try {
         const token = localStorage.getItem('token');
         const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -54,8 +55,26 @@ export default function LeaderCalendarPage() {
       }
     };
 
+  useEffect(() => {
     fetchData();
   }, []);
+
+  // Real-time updates using SSE
+  useTeamEvents(team?._id || null, {
+    enabled: !loading && !!team,
+    onEvent: (event) => {
+      // Refresh calendar when leave requests are created, updated, or deleted
+      if (event.type === 'leaveRequestCreated' || event.type === 'leaveRequestUpdated' || event.type === 'leaveRequestDeleted') {
+        // Debounce refresh to avoid excessive API calls
+        if (refreshTimeoutRef.current) {
+          clearTimeout(refreshTimeoutRef.current);
+        }
+        refreshTimeoutRef.current = setTimeout(() => {
+          fetchData();
+        }, 300);
+      }
+    },
+  });
 
   // Get unique subgroups and working days tags from members
   const uniqueSubgroups = useMemo(() => {

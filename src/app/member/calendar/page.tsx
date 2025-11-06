@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import TeamCalendar from '@/components/shared/Calendar';
 import { Team, User, LeaveRequest } from '@/types';
+import { useTeamEvents } from '@/hooks/useTeamEvents';
 
 export default function MemberCalendarPage() {
   const [team, setTeam] = useState<Team | null>(null);
@@ -12,9 +13,9 @@ export default function MemberCalendarPage() {
   const [loading, setLoading] = useState(true);
 
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
+  const fetchData = async () => {
       try {
         const token = localStorage.getItem('token');
         const userData = JSON.parse(localStorage.getItem('user') || '{}');
@@ -79,8 +80,26 @@ export default function MemberCalendarPage() {
       }
     };
 
+  useEffect(() => {
     fetchData();
   }, []);
+
+  // Real-time updates using SSE
+  useTeamEvents(team?._id || null, {
+    enabled: !loading && !!team,
+    onEvent: (event) => {
+      // Refresh calendar when leave requests are created, updated, or deleted
+      if (event.type === 'leaveRequestCreated' || event.type === 'leaveRequestUpdated' || event.type === 'leaveRequestDeleted') {
+        // Debounce refresh to avoid excessive API calls
+        if (refreshTimeoutRef.current) {
+          clearTimeout(refreshTimeoutRef.current);
+        }
+        refreshTimeoutRef.current = setTimeout(() => {
+          fetchData();
+        }, 300);
+      }
+    },
+  });
 
   if (loading) {
     return (
