@@ -427,6 +427,20 @@ export default function MemberDashboard() {
     // Determine which type of leave the user is assigned
     const userType = user.maternityPaternityType;
     
+    // Check if the assigned leave type is enabled
+    if (userType === 'paternity') {
+      if (!team.settings.paternityLeave?.enabled) {
+        return { balance: 0, surplus: 0, daysUsed: 0 };
+      }
+    } else if (userType === 'maternity') {
+      if (!team.settings.maternityLeave?.enabled) {
+        return { balance: 0, surplus: 0, daysUsed: 0 };
+      }
+    } else {
+      // No type assigned, return empty data
+      return { balance: 0, surplus: 0, daysUsed: 0 };
+    }
+    
     // Get appropriate leave settings based on user's assigned type
     // Default to maternity if type is not assigned (backward compatibility)
     let maxLeaveDays: number;

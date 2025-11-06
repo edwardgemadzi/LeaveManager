@@ -308,6 +308,43 @@ export default function LeaderLeaveBalancePage() {
     // Determine which type of leave the member is assigned
     const userType = member.maternityPaternityType;
     
+    // Check if the assigned leave type is enabled
+    if (userType === 'paternity') {
+      if (!team?.settings.paternityLeave?.enabled) {
+        // Paternity leave is not enabled, return null/empty data
+        return {
+          remainingBalance: 0,
+          daysUsed: 0,
+          baseBalance: 0,
+          percentageUsed: null,
+          surplusBalance: 0,
+          approvedCount: 0
+        };
+      }
+    } else if (userType === 'maternity') {
+      if (!team?.settings.maternityLeave?.enabled) {
+        // Maternity leave is not enabled, return null/empty data
+        return {
+          remainingBalance: 0,
+          daysUsed: 0,
+          baseBalance: 0,
+          percentageUsed: null,
+          surplusBalance: 0,
+          approvedCount: 0
+        };
+      }
+    } else {
+      // No type assigned, return empty data
+      return {
+        remainingBalance: 0,
+        daysUsed: 0,
+        baseBalance: 0,
+        percentageUsed: null,
+        surplusBalance: 0,
+        approvedCount: 0
+      };
+    }
+    
     // Get appropriate leave settings based on member's assigned type
     // Default to maternity if type is not assigned (backward compatibility)
     let maxLeaveDays: number;
@@ -1496,14 +1533,20 @@ export default function LeaderLeaveBalancePage() {
                           </td>
                           {/* Maternity/Paternity Leave Columns */}
                           {(() => {
-                            const maternityData = getMemberMaternityLeaveData(member);
                             const userType = member.maternityPaternityType;
+                            
+                            // Only show maternity/paternity columns if:
+                            // 1. Member has type assigned
+                            // 2. The corresponding leave type is enabled
+                            if (!userType) return null;
+                            
+                            if (userType === 'paternity' && !team?.settings.paternityLeave?.enabled) return null;
+                            if (userType === 'maternity' && !team?.settings.maternityLeave?.enabled) return null;
+                            
+                            const maternityData = getMemberMaternityLeaveData(member);
                             const maxLeaveDays = userType === 'paternity'
                               ? (team?.settings.paternityLeave?.maxDays || 90)
                               : (team?.settings.maternityLeave?.maxDays || 90);
-                            
-                            // Only show maternity/paternity columns if member has type assigned
-                            if (!userType) return null;
                             
                             return (
                               <>

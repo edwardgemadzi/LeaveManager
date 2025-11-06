@@ -386,12 +386,21 @@ export default function LeaderDashboard() {
     
     members.forEach(member => {
       if (member.role === 'member' && member.maternityPaternityType) {
+        // Determine which type of leave the member is assigned
+        const userType = member.maternityPaternityType;
+        
+        // Check if the assigned leave type is enabled
+        if (userType === 'paternity' && !team.settings.paternityLeave?.enabled) {
+          return; // Skip if paternity leave is not enabled
+        }
+        if (userType === 'maternity' && !team.settings.maternityLeave?.enabled) {
+          return; // Skip if maternity leave is not enabled
+        }
+        
         const memberRequests = allRequests.filter(req => 
           req.userId === member._id && req.status === 'approved'
         );
         
-        // Determine which type of leave the member is assigned
-        const userType = member.maternityPaternityType;
         const maxLeaveDays = userType === 'paternity' ? maxPaternityLeaveDays : maxMaternityLeaveDays;
         const countingMethod = userType === 'paternity' ? paternityCountingMethod : maternityCountingMethod;
         
