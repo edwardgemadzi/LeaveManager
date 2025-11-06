@@ -316,22 +316,43 @@ export default function LeaderLeaveBalancePage() {
         baseBalance: 0,
         percentageUsed: null,
         surplusBalance: 0,
-        approvedCount: 0
+        approvedCount: 0,
+        hasSettings: false
       };
     }
     
     // Get appropriate leave settings based on member's assigned type
-    // Use defaults if leave type is not enabled (assignment is available regardless of enabled status)
-    let maxLeaveDays: number;
-    let countingMethod: 'calendar' | 'working';
+    // Check if settings exist - if not, return N/A data
+    let maxLeaveDays: number | null = null;
+    let countingMethod: 'calendar' | 'working' | null = null;
+    let hasSettings = false;
     
     if (userType === 'paternity') {
-      maxLeaveDays = team?.settings.paternityLeave?.maxDays || 90;
-      countingMethod = team?.settings.paternityLeave?.countingMethod || 'working';
+      if (team?.settings.paternityLeave?.maxDays !== undefined) {
+        maxLeaveDays = team.settings.paternityLeave.maxDays;
+        countingMethod = team.settings.paternityLeave.countingMethod || 'working';
+        hasSettings = true;
+      }
     } else {
       // Maternity leave
-      maxLeaveDays = team?.settings.maternityLeave?.maxDays || 90;
-      countingMethod = team?.settings.maternityLeave?.countingMethod || 'working';
+      if (team?.settings.maternityLeave?.maxDays !== undefined) {
+        maxLeaveDays = team.settings.maternityLeave.maxDays;
+        countingMethod = team.settings.maternityLeave.countingMethod || 'working';
+        hasSettings = true;
+      }
+    }
+    
+    // If no settings configured, return N/A data
+    if (!hasSettings || maxLeaveDays === null || countingMethod === null) {
+      return {
+        remainingBalance: 0,
+        daysUsed: 0,
+        baseBalance: 0,
+        percentageUsed: null,
+        surplusBalance: 0,
+        approvedCount: 0,
+        hasSettings: false
+      };
     }
     
     const memberRequests = allRequests.filter(req => req.userId === member._id);
@@ -422,7 +443,8 @@ export default function LeaderLeaveBalancePage() {
       baseBalance: baseMaternityBalance,
       percentageUsed,
       surplusBalance: surplusMaternityBalance,
-      approvedCount: approvedMaternityRequests.length
+      approvedCount: approvedMaternityRequests.length,
+      hasSettings: true
     };
   };
 
@@ -1533,11 +1555,30 @@ export default function LeaderLeaveBalancePage() {
                               );
                             }
                             
-                            // Type is assigned - show data (regardless of enabled status)
+                            // Type is assigned - check if settings exist
                             const maternityData = getMemberMaternityLeaveData(member);
                             const maxLeaveDays = userType === 'paternity'
-                              ? (team?.settings.paternityLeave?.maxDays || 90)
-                              : (team?.settings.maternityLeave?.maxDays || 90);
+                              ? team?.settings.paternityLeave?.maxDays
+                              : team?.settings.maternityLeave?.maxDays;
+                            
+                            // If no settings configured, show N/A
+                            if (!maternityData.hasSettings || maxLeaveDays === undefined) {
+                              return (
+                                <>
+                                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                                    <span className="text-sm text-gray-400 dark:text-gray-500 italic">
+                                      N/A
+                                    </span>
+                                  </td>
+                                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                                    <span className="text-sm text-gray-400 dark:text-gray-500 italic">-</span>
+                                  </td>
+                                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                                    <span className="text-sm text-gray-400 dark:text-gray-500 italic">-</span>
+                                  </td>
+                                </>
+                              );
+                            }
                             
                             return (
                               <>
