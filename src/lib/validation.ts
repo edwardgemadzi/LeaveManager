@@ -255,13 +255,6 @@ export const schemas = {
         'string.max': 'New password must be no more than 128 characters long',
         'string.pattern.base': 'New password must contain at least one lowercase letter, one uppercase letter, one number, and one special character',
         'any.required': 'New password is required'
-      }),
-    confirmPassword: Joi.string()
-      .valid(Joi.ref('newPassword'))
-      .required()
-      .messages({
-        'any.only': 'Password confirmation does not match',
-        'any.required': 'Password confirmation is required'
       })
   }),
 
