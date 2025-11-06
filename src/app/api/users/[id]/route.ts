@@ -279,6 +279,17 @@ export async function PATCH(
       return notFoundError('User not found');
     }
 
+    // Broadcast event if member data was updated (especially maternityPaternityType)
+    // Get the updated user to broadcast their teamId
+    const updatedUser = await users.findOne({ _id: new ObjectId(id) });
+    if (updatedUser && updatedUser.teamId) {
+      const { broadcastTeamUpdate } = await import('@/lib/teamEvents');
+      broadcastTeamUpdate(updatedUser.teamId, 'settingsUpdated', {
+        message: 'Member data updated',
+        userId: id
+      });
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     logError('Update user error:', error);
