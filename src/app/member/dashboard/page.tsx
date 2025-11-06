@@ -1374,6 +1374,7 @@ export default function MemberDashboard() {
                       })()}
                     </p>
                   </div>
+                  </div>
                 </div>
               </Link>
             </>
