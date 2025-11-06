@@ -366,13 +366,25 @@ export default function MemberAnalyticsPage() {
     }
     
     // Carryover limitations
+    const realisticCarryoverUsable = analytics.realisticCarryoverUsableDays ?? 0;
+    const daysLostToCarryoverLimits = willCarryover > 0 ? Math.max(0, willCarryover - realisticCarryoverUsable) : 0;
+    
     if (willCarryover > 0 && carryoverLimitedMonths && carryoverLimitedMonths.length > 0) {
       const monthNames = carryoverLimitedMonths.map(m => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m]).join(', ');
-      recommendations.push(`📅 ${Math.round(willCarryover)} days will carry over but can only be used in ${monthNames} of next year. Plan accordingly.`);
+      if (daysLostToCarryoverLimits > 0) {
+        recommendations.push(`📅 ${Math.round(willCarryover)} days will carry over but can only be used in ${monthNames} of next year. However, ${Math.round(daysLostToCarryoverLimits)} days will be lost due to carryover limitations. Plan accordingly.`);
+      } else {
+        recommendations.push(`📅 ${Math.round(willCarryover)} days will carry over but can only be used in ${monthNames} of next year. Plan accordingly.`);
+      }
     }
     
     if (willCarryover > 0 && carryoverMaxDays && willCarryover > carryoverMaxDays) {
       recommendations.push(`⚠️ You have ${Math.round(willCarryover)} days that will carry over, but only ${carryoverMaxDays} days are allowed. ${Math.round(willCarryover - carryoverMaxDays)} days will be lost.`);
+    }
+    
+    // Days lost due to carryover limitations (when realisticCarryoverUsableDays < willCarryover)
+    if (willCarryover > 0 && daysLostToCarryoverLimits > 0 && (!carryoverMaxDays || willCarryover <= carryoverMaxDays)) {
+      recommendations.push(`⚠️ ${Math.round(daysLostToCarryoverLimits)} days will be lost due to carryover limitations, even though they will carry over.`);
     }
     
     if (willCarryover > 0 && carryoverExpiryDate) {
@@ -399,7 +411,7 @@ export default function MemberAnalyticsPage() {
     const yearProgress = daysElapsed / (daysElapsed + daysRemaining);
     const usageProgress = (analytics.workingDaysUsed ?? 0) / (analytics.workingDaysInYear ?? 1);
     if (yearProgress > 0.5 && usageProgress < yearProgress * 0.7) {
-      recommendations.push(`📈 You&apos;re ${Math.round(yearProgress * 100)}% through the year but have only used ${Math.round(usageProgress * 100)}% of your leave. Consider planning more leave.`);
+      recommendations.push(`📈 You're ${Math.round(yearProgress * 100)}% through the year but have only used ${Math.round(usageProgress * 100)}% of your leave. Consider planning more leave.`);
     }
     
     return recommendations;
