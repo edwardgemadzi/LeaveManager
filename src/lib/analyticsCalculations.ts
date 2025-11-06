@@ -891,18 +891,33 @@ export const getMemberAnalytics = (
     // If carryover is limited to specific months, calculate realistic usage
     // Days that can only be used in limited months have a narrower window
     if (carryoverSettings?.limitedToMonths && carryoverSettings.limitedToMonths.length > 0) {
-      // Calculate the proportion of the year that carryover days can be used
-      // If limited to January only (1 month), that's 1/12 of the year
-      const limitedMonthsCount = carryoverSettings.limitedToMonths.length;
-      const monthsInYear = 12;
-      const carryoverUsageWindow = limitedMonthsCount / monthsInYear;
+      // Carryover days are for NEXT YEAR, so limited months are in the future
+      // Calculate actual working days available in the limited months of next year
+      const nextYear = new Date().getFullYear() + 1;
+      let totalWorkingDaysInLimitedMonths = 0;
       
-      // The carryover limitation reduces the effective value of carryover days
-      // Since they can only be used in limited months, they're less valuable
-      // Formula: realistic = carryoverDays * usageWindow
-      // Example: 10 carryover days, limited to January (1/12) → 10 * 1/12 = 0.83 days
-      const effectiveCarryoverDays = carryoverResult.willCarryover * carryoverUsageWindow;
-      realisticCarryoverUsableDays = Math.max(0, effectiveCarryoverDays);
+      for (const monthIndex of carryoverSettings.limitedToMonths) {
+        // Create date for the first day of the limited month in next year
+        const monthStart = new Date(nextYear, monthIndex, 1);
+        monthStart.setHours(0, 0, 0, 0);
+        
+        // Create date for the last day of the limited month in next year
+        const monthEnd = new Date(nextYear, monthIndex + 1, 0);
+        monthEnd.setHours(23, 59, 59, 999);
+        
+        // Count working days in this month (using user's shift schedule)
+        const workingDaysInMonth = countWorkingDays(monthStart, monthEnd, shiftSchedule);
+        totalWorkingDaysInLimitedMonths += workingDaysInMonth;
+      }
+      
+      // Realistic usage is the minimum of:
+      // 1. Days that will carry over
+      // 2. Working days available in limited months
+      // This ensures we don't show more usable days than are actually available
+      realisticCarryoverUsableDays = Math.min(
+        carryoverResult.willCarryover,
+        totalWorkingDaysInLimitedMonths
+      );
     } else {
       // No month limitations - carryover days can be used throughout the year
       // But still consider max carryover days and expiry if set
