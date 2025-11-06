@@ -1188,6 +1188,7 @@ export default function LeaderLeaveBalancePage() {
                     <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                       Requests
                     </th>
+                    {/* Always show maternity/paternity headers - will show "No maternity/paternity" for members without type */}
                     <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                       Maternity/Paternity Balance
                     </th>
@@ -1535,14 +1536,53 @@ export default function LeaderLeaveBalancePage() {
                           {(() => {
                             const userType = member.maternityPaternityType;
                             
-                            // Only show maternity/paternity columns if:
-                            // 1. Member has type assigned
-                            // 2. The corresponding leave type is enabled
-                            if (!userType) return null;
+                            // Check if member has type assigned and if it's enabled
+                            const hasTypeAssigned = !!userType;
+                            const isTypeEnabled = userType === 'paternity' 
+                              ? team?.settings.paternityLeave?.enabled 
+                              : userType === 'maternity' 
+                                ? team?.settings.maternityLeave?.enabled 
+                                : false;
                             
-                            if (userType === 'paternity' && !team?.settings.paternityLeave?.enabled) return null;
-                            if (userType === 'maternity' && !team?.settings.maternityLeave?.enabled) return null;
+                            // If no type assigned, show "No maternity/paternity"
+                            if (!hasTypeAssigned) {
+                              return (
+                                <>
+                                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                                    <span className="text-sm text-gray-400 dark:text-gray-500 italic">
+                                      No maternity/paternity
+                                    </span>
+                                  </td>
+                                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                                    <span className="text-sm text-gray-400 dark:text-gray-500 italic">-</span>
+                                  </td>
+                                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                                    <span className="text-sm text-gray-400 dark:text-gray-500 italic">-</span>
+                                  </td>
+                                </>
+                              );
+                            }
                             
+                            // If type is assigned but not enabled, show "Not enabled"
+                            if (!isTypeEnabled) {
+                              return (
+                                <>
+                                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                                    <span className="text-sm text-gray-400 dark:text-gray-500 italic">
+                                      {userType === 'maternity' ? 'Maternity' : 'Paternity'} not enabled
+                                    </span>
+                                  </td>
+                                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                                    <span className="text-sm text-gray-400 dark:text-gray-500 italic">-</span>
+                                  </td>
+                                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                                    <span className="text-sm text-gray-400 dark:text-gray-500 italic">-</span>
+                                  </td>
+                                </>
+                              );
+                            }
+                            
+                            // Type is assigned and enabled - show normal data
                             const maternityData = getMemberMaternityLeaveData(member);
                             const maxLeaveDays = userType === 'paternity'
                               ? (team?.settings.paternityLeave?.maxDays || 90)
@@ -1619,54 +1659,67 @@ export default function LeaderLeaveBalancePage() {
                                   )}
                                 </td>
                                 <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                                  {editingMaternityDaysTaken === member._id ? (
-                                    <div className="flex items-center space-x-2">
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        step="1"
-                                        value={tempMaternityDaysTaken}
-                                        onChange={(e) => setTempMaternityDaysTaken(e.target.value)}
-                                        disabled={updating === member._id}
-                                        className="w-20 px-2 py-1 text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 disabled:opacity-50"
-                                        onKeyDown={(e) => {
-                                          if (e.key === 'Enter') {
-                                            handleSaveMaternityDaysTaken(member._id!);
-                                          } else if (e.key === 'Escape') {
-                                            handleCancelEditMaternityDaysTaken();
-                                          }
-                                        }}
-                                        autoFocus
-                                      />
-                                      <button
-                                        onClick={() => handleSaveMaternityDaysTaken(member._id!)}
-                                        disabled={updating === member._id}
-                                        className="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded disabled:opacity-50"
+                                  {(() => {
+                                    // Show "-" if no type assigned or not enabled
+                                    if (!hasTypeAssigned || !isTypeEnabled) {
+                                      return <span className="text-sm text-gray-400 dark:text-gray-500 italic">-</span>;
+                                    }
+                                    
+                                    return editingMaternityDaysTaken === member._id ? (
+                                      <div className="flex items-center space-x-2">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          step="1"
+                                          value={tempMaternityDaysTaken}
+                                          onChange={(e) => setTempMaternityDaysTaken(e.target.value)}
+                                          disabled={updating === member._id}
+                                          className="w-20 px-2 py-1 text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 disabled:opacity-50"
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                              handleSaveMaternityDaysTaken(member._id!);
+                                            } else if (e.key === 'Escape') {
+                                              handleCancelEditMaternityDaysTaken();
+                                            }
+                                          }}
+                                          autoFocus
+                                        />
+                                        <button
+                                          onClick={() => handleSaveMaternityDaysTaken(member._id!)}
+                                          disabled={updating === member._id}
+                                          className="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded disabled:opacity-50"
+                                        >
+                                          {updating === member._id ? 'Saving...' : 'Save'}
+                                        </button>
+                                        <button
+                                          onClick={handleCancelEditMaternityDaysTaken}
+                                          disabled={updating === member._id}
+                                          className="px-2 py-1 text-xs bg-gray-500 hover:bg-gray-600 text-white rounded disabled:opacity-50"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <div 
+                                        className="text-sm text-gray-900 dark:text-white cursor-pointer hover:text-pink-600 dark:hover:text-pink-400"
+                                        onClick={() => handleEditMaternityDaysTaken(member)}
+                                        title={`Click to edit ${userType === 'maternity' ? 'maternity' : 'paternity'} days taken`}
                                       >
-                                        {updating === member._id ? 'Saving...' : 'Save'}
-                                      </button>
-                                      <button
-                                        onClick={handleCancelEditMaternityDaysTaken}
-                                        disabled={updating === member._id}
-                                        className="px-2 py-1 text-xs bg-gray-500 hover:bg-gray-600 text-white rounded disabled:opacity-50"
-                                      >
-                                        Cancel
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <div 
-                                      className="text-sm text-gray-900 dark:text-white cursor-pointer hover:text-pink-600 dark:hover:text-pink-400"
-                                      onClick={() => handleEditMaternityDaysTaken(member)}
-                                      title={`Click to edit ${userType === 'maternity' ? 'maternity' : 'paternity'} days taken`}
-                                    >
-                                      {Math.round(maternityData.daysUsed)}
-                                    </div>
-                                  )}
+                                        {Math.round(maternityData.daysUsed)}
+                                      </div>
+                                    );
+                                  })()}
                                 </td>
                                 <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                                  <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                                    {maternityData.percentageUsed !== null ? `${Math.round(maternityData.percentageUsed)}%` : '-'}
-                                  </span>
+                                  {(() => {
+                                    // Show "-" if no type assigned or not enabled
+                                    if (!hasTypeAssigned || !isTypeEnabled) {
+                                      return <span className="text-sm text-gray-400 dark:text-gray-500 italic">-</span>;
+                                    }
+                                    return <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                                      {maternityData.percentageUsed !== null ? `${Math.round(maternityData.percentageUsed)}%` : '-'}
+                                    </span>;
+                                  })()}
                                 </td>
                               </>
                             );
