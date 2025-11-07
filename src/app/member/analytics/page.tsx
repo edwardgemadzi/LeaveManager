@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { Team, User } from '@/types';
-import { MemberAnalytics, MaternityMemberAnalytics, getMaternityMemberAnalytics } from '@/lib/analyticsCalculations';
+import { MemberAnalytics, MaternityMemberAnalytics, getMaternityMemberAnalytics, generateWorkingDaysTag } from '@/lib/analyticsCalculations';
+import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
 import { 
   ChartBarIcon, 
@@ -632,7 +633,14 @@ export default function MemberAnalyticsPage() {
                     {expandedSections.has('team-competition') && (
                       <div className="mt-2 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg text-xs text-gray-700 dark:text-gray-300">
                         <p className="font-semibold mb-1">Team Competition:</p>
-                        <p>Number of team members with the same working days pattern and shift type who compete for the same available days.</p>
+                        <p>Number of team members with the same working days pattern{(() => {
+                          if (!user || !user.shiftSchedule) return '';
+                          const workingDaysTag = user.shiftSchedule.type === 'rotating'
+                            ? generateWorkingDaysTag(user.shiftSchedule)
+                            : (user.workingDaysTag || generateWorkingDaysTag(user.shiftSchedule));
+                          const groupName = getWorkingDaysGroupDisplayName(workingDaysTag, team?.settings);
+                          return ` (${groupName})`;
+                        })()} and shift type who compete for the same available days.</p>
                       </div>
                     )}
                     {analytics.averageDaysPerMember !== undefined && analytics.averageDaysPerMember > 0 && (
@@ -662,7 +670,14 @@ export default function MemberAnalyticsPage() {
                   <p className="font-semibold text-indigo-900 dark:text-indigo-300 mb-2">Competition Context</p>
                   <p className="text-sm text-indigo-700 dark:text-indigo-400 mb-2 leading-relaxed">
                     <strong>{analytics.membersSharingSameShift}</strong> team member{analytics.membersSharingSameShift !== 1 ? 's' : ''} 
-                    {' '}with the <strong>same working days pattern</strong> and <strong>shift type</strong> need to coordinate use of 
+                    {' '}with the <strong>same working days pattern</strong>{(() => {
+                      if (!user || !user.shiftSchedule) return '';
+                      const workingDaysTag = user.shiftSchedule.type === 'rotating'
+                        ? generateWorkingDaysTag(user.shiftSchedule)
+                        : (user.workingDaysTag || generateWorkingDaysTag(user.shiftSchedule));
+                      const groupName = getWorkingDaysGroupDisplayName(workingDaysTag, team?.settings);
+                      return ` (${groupName})`;
+                    })()} and <strong>shift type</strong> need to coordinate use of 
                     {' '}<strong>{Math.round(analytics.usableDays ?? 0)}</strong> available days.
                   </p>
                   <p className="text-sm text-indigo-700 dark:text-indigo-400 leading-relaxed">

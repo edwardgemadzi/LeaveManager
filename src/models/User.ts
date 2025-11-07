@@ -114,26 +114,58 @@ export class UserModel {
     const users = db.collection<User>('users');
     const objectId = new ObjectId(userId);
     
+    // Get current user to check for existing shift schedule
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const currentUser = await users.findOne({ _id: objectId } as any);
+    if (!currentUser) {
+      throw new Error('User not found');
+    }
+    
+    // Prepare update object
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const update: any = { $set: { shiftSchedule } };
+    
+    // If user has an existing shift schedule, move it to history
+    if (currentUser.shiftSchedule) {
+      const newStartDate = new Date(shiftSchedule.startDate);
+      newStartDate.setHours(0, 0, 0, 0);
+      
+      // Calculate end date for previous shift (day before new shift starts)
+      const previousEndDate = new Date(newStartDate);
+      previousEndDate.setDate(previousEndDate.getDate() - 1);
+      previousEndDate.setHours(23, 59, 59, 999);
+      
+      // Create historical shift entry
+      const historicalShift = {
+        pattern: currentUser.shiftSchedule.pattern,
+        startDate: currentUser.shiftSchedule.startDate,
+        endDate: previousEndDate,
+        type: currentUser.shiftSchedule.type
+      };
+      
+      // Add to shift history array
+      const existingHistory = currentUser.shiftHistory || [];
+      update.$set.shiftHistory = [...existingHistory, historicalShift];
+    }
+    
     // Only store tag for fixed schedules (tags are stable)
     // For rotating schedules, tags change daily and should be regenerated
     if (shiftSchedule.type === 'fixed') {
       const workingDaysTag = generateWorkingDaysTag(shiftSchedule);
-      await users.updateOne(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { _id: objectId } as any,
-        { $set: { shiftSchedule, workingDaysTag } }
-      );
+      update.$set.workingDaysTag = workingDaysTag;
     } else {
       // For rotating schedules, remove stored tag (will be regenerated on use)
+      if (!update.$unset) {
+        update.$unset = {};
+      }
+      update.$unset.workingDaysTag = '';
+    }
+    
     await users.updateOne(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       { _id: objectId } as any,
-        { 
-          $set: { shiftSchedule },
-          $unset: { workingDaysTag: '' }
-        }
-      );
-    }
+      update
+    );
   }
 
   static async updateWorkingDaysTag(userId: string): Promise<void> {

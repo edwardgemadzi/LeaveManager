@@ -9,7 +9,8 @@ import { calculateLeaveBalance, countWorkingDays, calculateSurplusBalance, calcu
 import { MemberAnalytics } from '@/lib/analyticsCalculations';
 import { useBrowserNotification } from '@/hooks/useBrowserNotification';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
-import { calculateTimeBasedLeaveScore } from '@/lib/helpers';
+import { calculateTimeBasedLeaveScore, getWorkingDaysGroupDisplayName } from '@/lib/helpers';
+import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
 import { 
   ClockIcon, 
   CalendarIcon, 
@@ -1218,7 +1219,14 @@ export default function MemberDashboard() {
                       <p className="font-semibold text-indigo-900 dark:text-indigo-300 mb-2">Competition Context</p>
                       <p className="text-sm text-indigo-700 dark:text-indigo-400 mb-2 leading-relaxed">
                         <strong>{analytics.membersSharingSameShift}</strong> team member{analytics.membersSharingSameShift !== 1 ? 's' : ''} 
-                        {' '}with the <strong>same working days pattern</strong> and <strong>shift type</strong> need to coordinate use of 
+                        {' '}with the <strong>same working days pattern</strong>{(() => {
+                          if (!user || !user.shiftSchedule) return '';
+                          const workingDaysTag = user.shiftSchedule.type === 'rotating'
+                            ? generateWorkingDaysTag(user.shiftSchedule)
+                            : (user.workingDaysTag || generateWorkingDaysTag(user.shiftSchedule));
+                          const groupName = getWorkingDaysGroupDisplayName(workingDaysTag, team?.settings);
+                          return ` (${groupName})`;
+                        })()} and <strong>shift type</strong> need to coordinate use of 
                         {' '}<strong>{Math.round(analytics.usableDays ?? 0)}</strong> available days.
                       </p>
                       <p className="text-sm text-indigo-700 dark:text-indigo-400 leading-relaxed">

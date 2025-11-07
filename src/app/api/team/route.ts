@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
         fullName: currentUser.fullName,
         role: currentUser.role,
         shiftSchedule: currentUser.shiftSchedule,
+        shiftHistory: currentUser.shiftHistory, // Include shift history for historical schedule support
         shiftTag: currentUser.shiftTag,
         workingDaysTag: currentUser.workingDaysTag,
         subgroupTag: currentUser.subgroupTag,
@@ -66,6 +67,7 @@ export async function GET(request: NextRequest) {
           fullName: member.fullName,
           role: member.role,
           shiftSchedule: member.shiftSchedule,
+          shiftHistory: member.shiftHistory, // Include shift history for historical schedule support
           shiftTag: member.shiftTag,
           workingDaysTag: member.workingDaysTag,
           subgroupTag: member.subgroupTag,

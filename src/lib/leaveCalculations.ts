@@ -1,7 +1,77 @@
-import { ShiftSchedule } from '@/types';
+import { ShiftSchedule, User } from '@/types';
+
+// Helper function to get the correct shift schedule for a given date
+// Checks historical shifts and returns the schedule that was active on that date
+export const getShiftScheduleForDate = (user: User, date: Date): ShiftSchedule | undefined => {
+  if (!user.shiftSchedule) return undefined;
+  
+  const checkDate = new Date(date);
+  checkDate.setHours(0, 0, 0, 0);
+  
+  // Check if date is in the past and user has shift history
+  if (user.shiftHistory && user.shiftHistory.length > 0) {
+    // Find the historical shift that was active on this date
+    // A shift is active if: startDate <= date <= endDate
+    for (const historicalShift of user.shiftHistory) {
+      // Handle both Date objects and ISO strings from JSON
+      const startDate = new Date(historicalShift.startDate);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(historicalShift.endDate);
+      endDate.setHours(23, 59, 59, 999);
+      
+      // Check if date is within the historical shift period
+      // For dates before the historical shift start date but before the current shift start date,
+      // we should still use the historical shift (with the rotation start date)
+      const currentShiftStartDate = user.shiftSchedule?.startDate ? new Date(user.shiftSchedule.startDate) : null;
+      const isBeforeHistoricalStart = checkDate < startDate;
+      const isBeforeCurrentShift = currentShiftStartDate && checkDate < currentShiftStartDate;
+      
+      if (checkDate >= startDate && checkDate <= endDate) {
+        // Date is within the historical shift period
+        return {
+          pattern: historicalShift.pattern,
+          startDate: historicalShift.startDate,
+          type: historicalShift.type
+        };
+      } else if (isBeforeHistoricalStart && isBeforeCurrentShift) {
+        // Date is before historical shift start but before current shift start
+        // Use historical shift with its rotation start date
+        return {
+          pattern: historicalShift.pattern,
+          startDate: historicalShift.startDate,
+          type: historicalShift.type
+        };
+      }
+    }
+  }
+  
+  // If no historical shift matches, use current schedule
+  // Also use current schedule if date is today or in the future
+  return user.shiftSchedule;
+};
 
 // Function to check if a date is a working day for a user
-export const isWorkingDay = (date: Date, shiftSchedule: ShiftSchedule): boolean => {
+// Overload 1: Accepts User object (uses historical schedules for past dates)
+export function isWorkingDay(date: Date, user: User): boolean;
+// Overload 2: Accepts ShiftSchedule directly (backward compatibility)
+export function isWorkingDay(date: Date, shiftSchedule: ShiftSchedule): boolean;
+// Implementation
+export function isWorkingDay(date: Date, userOrSchedule: User | ShiftSchedule): boolean {
+  let shiftSchedule: ShiftSchedule | undefined;
+  
+  // Check if first parameter is User or ShiftSchedule
+  if ('shiftSchedule' in userOrSchedule) {
+    // It's a User object
+    shiftSchedule = getShiftScheduleForDate(userOrSchedule, date);
+  } else {
+    // It's a ShiftSchedule - check if it has the required properties
+    if ('pattern' in userOrSchedule && 'startDate' in userOrSchedule && 'type' in userOrSchedule) {
+      shiftSchedule = userOrSchedule;
+    } else {
+      shiftSchedule = undefined;
+    }
+  }
+  
   if (!shiftSchedule) return true; // Default to all days if no schedule
   
   if (shiftSchedule.type === 'rotating') {
@@ -28,24 +98,49 @@ export const isWorkingDay = (date: Date, shiftSchedule: ShiftSchedule): boolean 
 };
 
 // Function to get working days between two dates
-export const getWorkingDays = (startDate: Date, endDate: Date, shiftSchedule: ShiftSchedule): Date[] => {
+// Overload 1: Accepts User object (uses historical schedules for past dates)
+export function getWorkingDays(startDate: Date, endDate: Date, user: User): Date[];
+// Overload 2: Accepts ShiftSchedule directly (backward compatibility)
+export function getWorkingDays(startDate: Date, endDate: Date, shiftSchedule: ShiftSchedule): Date[];
+// Implementation
+export function getWorkingDays(startDate: Date, endDate: Date, userOrSchedule: User | ShiftSchedule): Date[] {
   const workingDays: Date[] = [];
   const current = new Date(startDate);
+  const end = new Date(endDate);
   
-  while (current <= endDate) {
-    if (isWorkingDay(current, shiftSchedule)) {
-      workingDays.push(new Date(current));
+  while (current <= end) {
+    // Type guard to determine if it's a User or ShiftSchedule
+    if ('shiftSchedule' in userOrSchedule) {
+      // It's a User object - use historical schedules
+      if (isWorkingDay(current, userOrSchedule as User)) {
+        workingDays.push(new Date(current));
+      }
+    } else {
+      // It's a ShiftSchedule - use directly
+      if (isWorkingDay(current, userOrSchedule as ShiftSchedule)) {
+        workingDays.push(new Date(current));
+      }
     }
     current.setDate(current.getDate() + 1);
   }
   
   return workingDays;
-};
+}
 
 // Function to count working days between two dates
-export const countWorkingDays = (startDate: Date, endDate: Date, shiftSchedule: ShiftSchedule): number => {
-  return getWorkingDays(startDate, endDate, shiftSchedule).length;
-};
+// Overload 1: Accepts User object (uses historical schedules for past dates)
+export function countWorkingDays(startDate: Date, endDate: Date, user: User): number;
+// Overload 2: Accepts ShiftSchedule directly (backward compatibility)
+export function countWorkingDays(startDate: Date, endDate: Date, shiftSchedule: ShiftSchedule): number;
+// Implementation
+export function countWorkingDays(startDate: Date, endDate: Date, userOrSchedule: User | ShiftSchedule): number {
+  // Type guard to determine if it's a User or ShiftSchedule
+  if ('shiftSchedule' in userOrSchedule) {
+    return getWorkingDays(startDate, endDate, userOrSchedule as User).length;
+  } else {
+    return getWorkingDays(startDate, endDate, userOrSchedule as ShiftSchedule).length;
+  }
+}
 
 // Helper function to check if a leave request is maternity leave
 export const isMaternityLeave = (reason: string): boolean => {
@@ -87,13 +182,30 @@ export const countMaternityLeaveDays = (
 };
 
 // Function to calculate leave balance for a user
-export const calculateLeaveBalance = (
+// Overload 1: Accepts User object (uses historical schedules for past dates)
+export function calculateLeaveBalance(
+  maxLeavePerYear: number,
+  approvedRequests: Array<{ startDate: Date; endDate: Date; reason?: string }>,
+  user: User,
+  manualLeaveBalance?: number,
+  manualYearToDateUsed?: number
+): number;
+// Overload 2: Accepts ShiftSchedule directly (backward compatibility)
+export function calculateLeaveBalance(
   maxLeavePerYear: number,
   approvedRequests: Array<{ startDate: Date; endDate: Date; reason?: string }>,
   shiftSchedule: ShiftSchedule,
   manualLeaveBalance?: number,
   manualYearToDateUsed?: number
-): number => {
+): number;
+// Implementation
+export function calculateLeaveBalance(
+  maxLeavePerYear: number,
+  approvedRequests: Array<{ startDate: Date; endDate: Date; reason?: string }>,
+  userOrSchedule: User | ShiftSchedule,
+  manualLeaveBalance?: number,
+  manualYearToDateUsed?: number
+): number {
   const currentYear = new Date().getFullYear();
   const yearStart = new Date(currentYear, 0, 1);
   yearStart.setHours(0, 0, 0, 0);
@@ -123,7 +235,11 @@ export const calculateLeaveBalance = (
       const overlapEnd = reqEnd < yearEnd ? reqEnd : yearEnd;
       
       // Count working days only for the overlap period (includes future approved dates)
-      const workingDays = countWorkingDays(overlapStart, overlapEnd, shiftSchedule);
+      // Use User object to support historical schedules for past dates
+      // Type guard to determine if it's a User or ShiftSchedule
+      const workingDays = ('shiftSchedule' in userOrSchedule)
+        ? countWorkingDays(overlapStart, overlapEnd, userOrSchedule as User)
+        : countWorkingDays(overlapStart, overlapEnd, userOrSchedule as ShiftSchedule);
       return total + workingDays;
     }
     

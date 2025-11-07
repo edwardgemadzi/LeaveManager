@@ -6,6 +6,7 @@ export interface User {
   role: 'leader' | 'member';
   teamId?: string;
   shiftSchedule?: ShiftSchedule;
+  shiftHistory?: Array<{ pattern: boolean[]; startDate: Date; endDate: Date; type: 'rotating' | 'fixed' }>; // Historical shift schedules
   shiftTag?: 'day' | 'night' | 'mixed'; // New field for shift categorization
   workingDaysTag?: string; // Automatic tag grouping members who work on exactly the same days
   subgroupTag?: string; // Custom subgroup name assigned by leader (only when enableSubgrouping is true)

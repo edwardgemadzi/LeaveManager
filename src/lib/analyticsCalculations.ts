@@ -198,15 +198,9 @@ export const calculateDateAvailability = (
     const reqUser = members.find(m => m._id === req.userId);
     if (!reqUser) continue;
     
-    // Get the requesting user's schedule (or default)
-    const reqUserSchedule = reqUser.shiftSchedule || {
-      pattern: [true, true, true, true, true, false, false],
-      startDate: new Date(),
-      type: 'fixed'
-    };
-    
     // Only count if the requesting user also works on this date
-    if (!isWorkingDay(checkDate, reqUserSchedule)) continue;
+    // Use User object to support historical schedules for past dates
+    if (!isWorkingDay(checkDate, reqUser)) continue;
     
     // Check if they have the same workingDaysTag
     // For rotating schedules, always regenerate (tags change daily)
@@ -773,6 +767,7 @@ export const getMemberAnalytics = (
   );
   
   // Calculate working days used from approved requests in the current year
+  // Use User object to support historical schedules for past dates
   const yearToDateWorkingDays = approvedRegularRequests.reduce((total, req) => {
     const start = new Date(req.startDate);
     const end = new Date(req.endDate);
@@ -785,7 +780,8 @@ export const getMemberAnalytics = (
       const overlapEnd = end < yearEnd ? end : yearEnd;
       
       if (overlapEnd >= overlapStart) {
-        return total + countWorkingDays(overlapStart, overlapEnd, shiftSchedule);
+        // Use User object to support historical schedules for past dates
+        return total + countWorkingDays(overlapStart, overlapEnd, user);
       }
     }
     return total;
@@ -813,10 +809,11 @@ export const getMemberAnalytics = (
   // - If manualLeaveBalance is not set, use maxLeavePerYear
   const baseLeaveBalance = user.manualLeaveBalance !== undefined ? user.manualLeaveBalance : team.settings.maxLeavePerYear;
   
+  // Use User object to support historical schedules for past dates
   const remainingLeaveBalance = calculateLeaveBalance(
     team.settings.maxLeavePerYear,
     approvedRequestsForCalculation,
-    shiftSchedule,
+    user,
     user.manualLeaveBalance,
     user.manualYearToDateUsed
   );

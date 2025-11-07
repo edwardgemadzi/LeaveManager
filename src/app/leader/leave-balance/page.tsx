@@ -182,11 +182,13 @@ export default function LeaderLeaveBalancePage() {
     yearEnd.setHours(23, 59, 59, 999);
 
     // Calculate total working days in year
-    const totalWorkingDaysInYear = countWorkingDays(yearStart, yearEnd, shiftSchedule);
+    // Use member User object to support historical schedules for past dates
+    const totalWorkingDaysInYear = countWorkingDays(yearStart, yearEnd, member);
     
     // Calculate working days used year-to-date
     // Count all approved days in the current year (including future approved dates)
     // because approved requests are already committed/allocated
+    // Use member User object to support historical schedules for past dates
     const yearToDateWorkingDays = approvedRequests.reduce((total, req) => {
       const start = new Date(req.startDate);
       const end = new Date(req.endDate);
@@ -199,7 +201,7 @@ export default function LeaderLeaveBalancePage() {
         const overlapEnd = end < yearEnd ? end : yearEnd;
         
         if (overlapEnd >= overlapStart) {
-          return total + countWorkingDays(overlapStart, overlapEnd, shiftSchedule);
+          return total + countWorkingDays(overlapStart, overlapEnd, member);
         }
       }
       return total;
@@ -212,10 +214,11 @@ export default function LeaderLeaveBalancePage() {
 
     // Calculate total days used (all time, not just this year)
     // First, calculate total from all approved requests
+    // Use member User object to support historical schedules for past dates
     const totalFromAllRequests = approvedRequests.reduce((total, req) => {
       const start = new Date(req.startDate);
       const end = new Date(req.endDate);
-      return total + countWorkingDays(start, end, shiftSchedule);
+      return total + countWorkingDays(start, end, member);
     }, 0);
     
     // If manualYearToDateUsed is set, replace the current year's year-to-date portion with manual value
@@ -519,12 +522,6 @@ export default function LeaderLeaveBalancePage() {
         const memberRequests = allRequests.filter(req => req.userId === memberId);
         const approvedRequests = memberRequests.filter(req => req.status === 'approved');
         
-        const shiftSchedule = member.shiftSchedule || {
-          pattern: [true, true, true, true, true, false, false],
-          startDate: new Date(),
-          type: 'fixed'
-        };
-        
         const currentYear = new Date().getFullYear();
         const yearStart = new Date(currentYear, 0, 1);
         yearStart.setHours(0, 0, 0, 0);
@@ -540,7 +537,8 @@ export default function LeaderLeaveBalancePage() {
           if (reqStart <= yearEnd && reqEnd >= yearStart) {
             const overlapStart = reqStart > yearStart ? reqStart : yearStart;
             const overlapEnd = reqEnd < yearEnd ? reqEnd : yearEnd;
-            const workingDays = countWorkingDays(overlapStart, overlapEnd, shiftSchedule);
+            // Use member User object to support historical schedules for past dates
+            const workingDays = countWorkingDays(overlapStart, overlapEnd, member);
             return total + workingDays;
           }
           return total;

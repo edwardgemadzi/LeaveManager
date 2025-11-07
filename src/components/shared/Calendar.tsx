@@ -286,8 +286,9 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
     const clickedDate = normalizeDate(slotInfo.start);
 
     // Only allow selection of working days
+      // Use User object to support historical schedules for past dates
       if (currentUser && currentUser.shiftSchedule) {
-        const isWorking = isWorkingDay(clickedDate, currentUser.shiftSchedule);
+        const isWorking = isWorkingDay(clickedDate, currentUser);
         if (!isWorking) {
           showInfo('You can only request leave for your scheduled working days.');
           return;
@@ -313,8 +314,9 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
           return updated;
         } else {
           // Add date (only if it's a working day)
+          // Use User object to support historical schedules for past dates
           if (currentUser && currentUser.shiftSchedule) {
-            const isWorking = isWorkingDay(clickedDate, currentUser.shiftSchedule);
+            const isWorking = isWorkingDay(clickedDate, currentUser);
             if (!isWorking) {
               showInfo('You can only request leave for your scheduled working days.');
               return prev;
@@ -336,7 +338,8 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
     const isSelected = isMember && selectionMode && selectedDates.some(d => isSameDay(d, normalizedDate));
     
     // Only highlight working days if currentUser is provided and has a role of 'member'
-    const isWorking = currentUser && currentUser.role === 'member' && currentUser.shiftSchedule && isWorkingDay(date, currentUser.shiftSchedule);
+    // Use User object to support historical schedules for past dates
+    const isWorking = currentUser && currentUser.role === 'member' && currentUser.shiftSchedule && isWorkingDay(date, currentUser);
 
     if (isSelected) {
       style.backgroundColor = '#dbeafe'; // Light blue for selected
@@ -486,7 +489,8 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
 
     // Validate that all selected dates are working days
     if (currentUser && currentUser.shiftSchedule) {
-      const nonWorkingDays = sortedDates.filter(date => !isWorkingDay(date, currentUser.shiftSchedule!));
+      // Use User object to support historical schedules for past dates
+      const nonWorkingDays = sortedDates.filter(date => !isWorkingDay(date, currentUser));
       if (nonWorkingDays.length > 0) {
         showInfo('You can only request leave for your scheduled working days. Please remove non-working days from your selection.');
         return;
