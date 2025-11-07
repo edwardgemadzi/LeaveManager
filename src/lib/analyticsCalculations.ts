@@ -1420,3 +1420,168 @@ export const getGroupedTeamAnalytics = (
   };
 };
 
+// Leave frequency data interface
+export interface LeaveFrequencyData {
+  period: string; // Display name (e.g., "January 2025" or "Week 1, 2025")
+  periodKey: string; // Unique key for sorting (e.g., "2025-01" or "2025-W01")
+  workingDaysUsed: number; // Total working days used in this period
+  requestCount: number; // Number of leave requests in this period
+}
+
+// Calculate leave frequency by period (month or week)
+export const calculateLeaveFrequencyByPeriod = (
+  approvedRequests: LeaveRequest[],
+  members: User[],
+  periodType: 'month' | 'week' = 'month'
+): LeaveFrequencyData[] => {
+  // Filter out maternity leave requests
+  const regularRequests = approvedRequests.filter(req => 
+    !req.reason || !isMaternityLeave(req.reason)
+  );
+
+  debug(`[Leave Frequency] Processing ${regularRequests.length} regular requests with ${members.length} members`);
+
+  // Create a map to aggregate data by period
+  const frequencyMap = new Map<string, { workingDaysUsed: number; requestCount: number }>();
+
+  let requestsWithMembers = 0;
+  let requestsWithoutMembers = 0;
+
+  // Process each request
+  for (const request of regularRequests) {
+    const startDate = new Date(request.startDate);
+    const endDate = new Date(request.endDate);
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
+
+    // Find the member for this request
+    const member = members.find(m => {
+      const memberId = m._id ? String(m._id) : '';
+      const requestUserId = request.userId ? String(request.userId) : '';
+      return memberId === requestUserId;
+    });
+
+    if (!member) {
+      requestsWithoutMembers++;
+      debug(`[Leave Frequency] Request ${request._id} has no matching member. userId: ${request.userId}`);
+      continue;
+    }
+    
+    requestsWithMembers++;
+
+    // Get all dates in the request period
+    const currentDate = new Date(startDate);
+    while (currentDate <= endDate) {
+      let periodKey: string;
+      let period: string;
+
+      if (periodType === 'month') {
+        // Group by month
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        periodKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+        period = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      } else {
+        // Group by week
+        const year = currentDate.getFullYear();
+        const week = getWeekNumber(currentDate);
+        periodKey = `${year}-W${String(week).padStart(2, '0')}`;
+        const weekStart = getWeekStart(currentDate);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        period = `Week ${week}, ${year} (${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
+      }
+
+      // Check if this is a working day for the member
+      if (isWorkingDay(currentDate, member)) {
+        if (!frequencyMap.has(periodKey)) {
+          frequencyMap.set(periodKey, { workingDaysUsed: 0, requestCount: 0 });
+        }
+        const periodData = frequencyMap.get(periodKey)!;
+        periodData.workingDaysUsed += 1;
+      }
+
+      // Move to next day
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    // Count requests per period (each request is counted once per period it spans)
+    const requestPeriods = new Set<string>();
+    const requestDate = new Date(startDate);
+    while (requestDate <= endDate) {
+      let periodKey: string;
+      if (periodType === 'month') {
+        const year = requestDate.getFullYear();
+        const month = requestDate.getMonth();
+        periodKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+      } else {
+        const year = requestDate.getFullYear();
+        const week = getWeekNumber(requestDate);
+        periodKey = `${year}-W${String(week).padStart(2, '0')}`;
+      }
+      requestPeriods.add(periodKey);
+      requestDate.setDate(requestDate.getDate() + 1);
+    }
+
+    // Increment request count for each period this request spans
+    requestPeriods.forEach(periodKey => {
+      if (!frequencyMap.has(periodKey)) {
+        frequencyMap.set(periodKey, { workingDaysUsed: 0, requestCount: 0 });
+      }
+      frequencyMap.get(periodKey)!.requestCount += 1;
+    });
+  }
+
+  debug(`[Leave Frequency] Requests with members: ${requestsWithMembers}, without members: ${requestsWithoutMembers}`);
+  debug(`[Leave Frequency] Frequency map size: ${frequencyMap.size}`);
+
+  // Convert map to array and sort by period key
+  const frequencyData: LeaveFrequencyData[] = Array.from(frequencyMap.entries())
+    .map(([periodKey, data]) => {
+      // Get period display name from the first request in that period
+      let period: string;
+      if (periodType === 'month') {
+        const [year, month] = periodKey.split('-');
+        const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+        period = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      } else {
+        const [year, weekStr] = periodKey.split('-W');
+        const week = parseInt(weekStr);
+        // Calculate week start date
+        const jan1 = new Date(parseInt(year), 0, 1);
+        const daysOffset = (week - 1) * 7;
+        const weekStart = new Date(jan1);
+        weekStart.setDate(jan1.getDate() + daysOffset - jan1.getDay());
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        period = `Week ${week}, ${year} (${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
+      }
+      return {
+        period,
+        periodKey,
+        workingDaysUsed: data.workingDaysUsed,
+        requestCount: data.requestCount
+      };
+    })
+    .sort((a, b) => a.periodKey.localeCompare(b.periodKey));
+
+  return frequencyData;
+};
+
+// Helper function to get week number
+function getWeekNumber(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
+
+// Helper function to get week start (Monday)
+function getWeekStart(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+  return new Date(d.setDate(diff));
+}
+

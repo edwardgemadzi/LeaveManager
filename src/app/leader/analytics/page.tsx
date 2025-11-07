@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
-import { Team, LeaveRequest } from '@/types';
-import { GroupedTeamAnalytics } from '@/lib/analyticsCalculations';
+import { Team, LeaveRequest, User } from '@/types';
+import { GroupedTeamAnalytics, calculateLeaveFrequencyByPeriod } from '@/lib/analyticsCalculations';
 import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
 import { isMaternityLeave } from '@/lib/leaveCalculations';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
@@ -14,6 +14,8 @@ export default function LeaderAnalyticsPage() {
   const [team, setTeam] = useState<Team | null>(null);
   const [allRequests, setAllRequests] = useState<LeaveRequest[]>([]);
   const [analytics, setAnalytics] = useState<GroupedTeamAnalytics | null>(null);
+  const [members, setMembers] = useState<User[]>([]);
+  const [periodType, setPeriodType] = useState<'month' | 'week'>('month');
   const [loading, setLoading] = useState(true);
   const [selectedSubgroup, setSelectedSubgroup] = useState<string>('all');
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -54,12 +56,15 @@ export default function LeaderAnalyticsPage() {
         } else {
           const teamData = await teamResponse.json();
           setTeam(teamData.team);
+          setMembers(teamData.members || []);
         }
 
         // Process requests response
         if (requestsResponse.ok) {
           const requestsData = await requestsResponse.json();
-          setAllRequests(requestsData.requests || []);
+          // API returns array directly, not wrapped in { requests: [...] }
+          const requests = Array.isArray(requestsData) ? requestsData : (requestsData.requests || []);
+          setAllRequests(requests);
         }
 
         // Process analytics response
@@ -344,7 +349,7 @@ export default function LeaderAnalyticsPage() {
           <div className="card mb-8">
             <div className="p-5 sm:p-6">
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-6">End of Year Projections</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                 <div className="bg-blue-50/50 dark:bg-blue-900/20 rounded-xl p-5 border border-blue-200 dark:border-blue-800">
                   <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wider mb-2">Projected Usage</p>
                   <p className="text-3xl sm:text-4xl font-bold text-blue-900 dark:text-blue-300 mb-2">{Math.round(projectionUsage)}</p>
@@ -362,19 +367,17 @@ export default function LeaderAnalyticsPage() {
                         Unused days carried to next year
                       </p>
                     </div>
-                    {willCarryover > 0 && totalRealisticCarryoverUsableDays > 0 && (
-                      <div className="bg-teal-50/50 dark:bg-teal-900/20 rounded-xl p-5 border border-teal-200 dark:border-teal-800">
-                        <p className="text-xs font-semibold text-teal-700 dark:text-teal-400 uppercase tracking-wider mb-2">Realistic Carryover Usage</p>
-                        <p className="text-3xl sm:text-4xl font-bold text-teal-900 dark:text-teal-300 mb-2">{Math.round(totalRealisticCarryoverUsableDays)}</p>
-                        <p className="text-xs text-teal-600 dark:text-teal-400">
-                          {team.settings.carryoverSettings?.limitedToMonths && team.settings.carryoverSettings.limitedToMonths.length > 0 ? (
-                            `Effective days considering month limitations`
-                          ) : (
-                            `Usable carryover days`
-                          )}
-                        </p>
-                      </div>
-                    )}
+                    <div className="bg-teal-50/50 dark:bg-teal-900/20 rounded-xl p-5 border border-teal-200 dark:border-teal-800">
+                      <p className="text-xs font-semibold text-teal-700 dark:text-teal-400 uppercase tracking-wider mb-2">Realistic Carryover Usage</p>
+                      <p className="text-3xl sm:text-4xl font-bold text-teal-900 dark:text-teal-300 mb-2">{Math.round(totalRealisticCarryoverUsableDays)}</p>
+                      <p className="text-xs text-teal-600 dark:text-teal-400">
+                        {team.settings.carryoverSettings?.limitedToMonths && team.settings.carryoverSettings.limitedToMonths.length > 0 ? (
+                          `Effective days considering month limitations`
+                        ) : (
+                          `Usable carryover days`
+                        )}
+                      </p>
+                    </div>
                   </>
                 ) : (
                   <div className="bg-red-50/50 dark:bg-red-900/20 rounded-xl p-5 border border-red-200 dark:border-red-800">
@@ -398,6 +401,148 @@ export default function LeaderAnalyticsPage() {
                   </p>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Leave Frequency Chart */}
+          <div className="card mb-8">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">Leave Frequency by Period</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    See which periods are mostly free for planning
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setPeriodType('month')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      periodType === 'month'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    Month
+                  </button>
+                  <button
+                    onClick={() => setPeriodType('week')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      periodType === 'week'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    Week
+                  </button>
+                </div>
+              </div>
+
+              {(() => {
+                if (loading) {
+                  return (
+                    <div className="text-center py-12">
+                      <p className="text-gray-500 dark:text-gray-400">Loading data...</p>
+                    </div>
+                  );
+                }
+
+                if (members.length === 0) {
+                  return (
+                    <div className="text-center py-12">
+                      <p className="text-gray-500 dark:text-gray-400">No member data available</p>
+                    </div>
+                  );
+                }
+
+                if (allRequests.length === 0) {
+                  return (
+                    <div className="text-center py-12">
+                      <p className="text-gray-500 dark:text-gray-400">No leave requests to display</p>
+                    </div>
+                  );
+                }
+
+                const approvedRequests = allRequests.filter(req => req.status === 'approved');
+                
+                if (approvedRequests.length === 0) {
+                  return (
+                    <div className="text-center py-12">
+                      <ChartBarIcon className="h-12 w-12 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
+                      <p className="text-gray-500 dark:text-gray-400">No approved leave requests to display</p>
+                    </div>
+                  );
+                }
+
+                // Debug logging
+                console.log('[Leave Frequency] Members:', members.length);
+                console.log('[Leave Frequency] Approved requests:', approvedRequests.length);
+                console.log('[Leave Frequency] Period type:', periodType);
+                
+                const leaveFrequencyData = calculateLeaveFrequencyByPeriod(approvedRequests, members, periodType);
+                
+                // Debug logging
+                console.log('[Leave Frequency] Calculated data:', leaveFrequencyData);
+                
+                if (leaveFrequencyData.length === 0) {
+                  return (
+                    <div className="text-center py-12">
+                      <ChartBarIcon className="h-12 w-12 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
+                      <p className="text-gray-500 dark:text-gray-400">No leave frequency data available</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                        Members: {members.length}, Approved requests: {approvedRequests.length}
+                      </p>
+                    </div>
+                  );
+                }
+
+                const maxWorkingDays = Math.max(...leaveFrequencyData.map(d => d.workingDaysUsed));
+
+                return (
+                  <div className={`space-y-4 ${periodType === 'week' ? 'max-h-96 overflow-y-auto pr-2' : ''}`}>
+                    {leaveFrequencyData.map((data) => {
+                      const percentage = maxWorkingDays > 0 ? (data.workingDaysUsed / maxWorkingDays) * 100 : 0;
+                      const colorClass = percentage >= 70 
+                        ? 'bg-red-500 dark:bg-red-600' 
+                        : percentage >= 40 
+                        ? 'bg-yellow-500 dark:bg-yellow-600' 
+                        : 'bg-green-500 dark:bg-green-600';
+
+                      return (
+                        <div key={data.periodKey} className="flex items-center gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                {data.period}
+                              </p>
+                              <div className="flex items-center gap-3 ml-2">
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                  {data.requestCount} request{data.requestCount !== 1 ? 's' : ''}
+                                </span>
+                                <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                  {data.workingDaysUsed} days
+                                </span>
+                              </div>
+                            </div>
+                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-6 overflow-hidden">
+                              <div
+                                className={`h-full ${colorClass} transition-all duration-300 flex items-center justify-end pr-2`}
+                                style={{ width: `${Math.min(percentage, 100)}%` }}
+                              >
+                                {percentage > 15 && (
+                                  <span className="text-xs font-medium text-white">
+                                    {Math.round(percentage)}%
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
