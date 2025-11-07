@@ -8,6 +8,7 @@ import { LEAVE_REASONS, EMERGENCY_REASONS, isEmergencyReason } from '@/lib/leave
 import { ExclamationTriangleIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import { useNotification } from '@/hooks/useNotification';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
+import { parseDateSafe } from '@/lib/dateUtils';
 
 export default function LeaderRequestsPage() {
   const { showSuccess, showError, showInfo } = useNotification();
@@ -259,8 +260,8 @@ export default function LeaderRequestsPage() {
           );
           
           const ranges = memberRequests.map(req => ({
-            startDate: new Date(req.startDate),
-            endDate: new Date(req.endDate),
+            startDate: parseDateSafe(req.startDate),
+            endDate: parseDateSafe(req.endDate),
           }));
           
           setExistingRanges(ranges);
@@ -729,7 +730,7 @@ export default function LeaderRequestsPage() {
                             </span>
                           </div>
                           <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
-                            {new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()}
+                            {parseDateSafe(request.startDate).toLocaleDateString()} - {parseDateSafe(request.endDate).toLocaleDateString()}
                           </p>
                           <p className="text-base text-gray-700 dark:text-gray-300 mb-3">{request.reason}</p>
                           <div className="flex items-center flex-wrap gap-2">
@@ -740,7 +741,7 @@ export default function LeaderRequestsPage() {
                               const isEmergency = request.reason && isEmergencyReason(request.reason);
                               const isHistorical = !isEmergency && 
                                 request.status === 'approved' && 
-                                new Date(request.startDate) < new Date();
+                                parseDateSafe(request.startDate) < new Date();
                               
                               if (isEmergency) {
                                 return (

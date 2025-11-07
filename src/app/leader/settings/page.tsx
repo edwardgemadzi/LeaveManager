@@ -5,6 +5,7 @@ import Navbar from '@/components/shared/Navbar';
 import { Team } from '@/types';
 import { useToast } from '@/contexts/ToastContext';
 import { MinusIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { parseDateSafe } from '@/lib/dateUtils';
 
 export default function TeamSettingsPage() {
   const { showSuccess } = useToast();
@@ -102,12 +103,12 @@ export default function TeamSettingsPage() {
         if (teamSettings.bypassNoticePeriod?.startDate) {
           teamSettings.bypassNoticePeriod.startDate = typeof teamSettings.bypassNoticePeriod.startDate === 'string' 
             ? teamSettings.bypassNoticePeriod.startDate.split('T')[0]
-            : new Date(teamSettings.bypassNoticePeriod.startDate).toISOString().split('T')[0];
+            : parseDateSafe(teamSettings.bypassNoticePeriod.startDate).toISOString().split('T')[0];
         }
         if (teamSettings.bypassNoticePeriod?.endDate) {
           teamSettings.bypassNoticePeriod.endDate = typeof teamSettings.bypassNoticePeriod.endDate === 'string'
             ? teamSettings.bypassNoticePeriod.endDate.split('T')[0]
-            : new Date(teamSettings.bypassNoticePeriod.endDate).toISOString().split('T')[0];
+            : parseDateSafe(teamSettings.bypassNoticePeriod.endDate).toISOString().split('T')[0];
         }
         setSettings(teamSettings);
       } catch (error) {
@@ -142,8 +143,8 @@ export default function TeamSettingsPage() {
         setSaving(false);
         return;
       }
-      const startDate = new Date(settings.bypassNoticePeriod.startDate);
-      const endDate = new Date(settings.bypassNoticePeriod.endDate);
+      const startDate = parseDateSafe(settings.bypassNoticePeriod.startDate);
+      const endDate = parseDateSafe(settings.bypassNoticePeriod.endDate);
       if (endDate < startDate) {
         setError('End date must be on or after start date');
         setSaving(false);
@@ -215,12 +216,12 @@ export default function TeamSettingsPage() {
           if (teamSettings.bypassNoticePeriod?.startDate) {
             teamSettings.bypassNoticePeriod.startDate = typeof teamSettings.bypassNoticePeriod.startDate === 'string' 
               ? teamSettings.bypassNoticePeriod.startDate.split('T')[0]
-              : new Date(teamSettings.bypassNoticePeriod.startDate).toISOString().split('T')[0];
+              : parseDateSafe(teamSettings.bypassNoticePeriod.startDate).toISOString().split('T')[0];
           }
           if (teamSettings.bypassNoticePeriod?.endDate) {
             teamSettings.bypassNoticePeriod.endDate = typeof teamSettings.bypassNoticePeriod.endDate === 'string'
               ? teamSettings.bypassNoticePeriod.endDate.split('T')[0]
-              : new Date(teamSettings.bypassNoticePeriod.endDate).toISOString().split('T')[0];
+              : parseDateSafe(teamSettings.bypassNoticePeriod.endDate).toISOString().split('T')[0];
           }
           setSettings(teamSettings);
           
@@ -537,7 +538,7 @@ export default function TeamSettingsPage() {
                           return isActive && (
                             <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
                               <p className="text-sm text-blue-800 dark:text-blue-400 font-medium">
-                                Bypass is currently active from {new Date(settings.bypassNoticePeriod.startDate).toLocaleDateString()} to {new Date(settings.bypassNoticePeriod.endDate).toLocaleDateString()}
+                                Bypass is currently active from {parseDateSafe(settings.bypassNoticePeriod.startDate).toLocaleDateString()} to {parseDateSafe(settings.bypassNoticePeriod.endDate).toLocaleDateString()}
                               </p>
                             </div>
                           );

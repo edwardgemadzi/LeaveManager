@@ -10,23 +10,9 @@ import { LEAVE_REASONS, isEmergencyReason } from '@/lib/leaveReasons';
 import { CheckCircleIcon, ClockIcon, XCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useNotification } from '@/hooks/useNotification';
 import { useBrowserNotification } from '@/hooks/useBrowserNotification';
+import { parseDateSafe } from '@/lib/dateUtils';
 
 const localizer = momentLocalizer(moment);
-
-// Helper function to parse dates in a timezone-safe way
-// This prevents Yandex browser and other browsers from interpreting dates differently
-const parseDateSafe = (dateInput: string | Date): Date => {
-  if (dateInput instanceof Date) {
-    return new Date(dateInput);
-  }
-  
-  // If it's an ISO string, parse it and normalize to local midnight
-  const date = new Date(dateInput);
-  
-  // Normalize to local midnight to avoid timezone shifts
-  const normalized = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  return normalized;
-};
 
 interface CalendarEvent {
   id: string;

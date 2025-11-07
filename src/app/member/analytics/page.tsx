@@ -7,6 +7,7 @@ import { Team, User } from '@/types';
 import { MemberAnalytics, MaternityMemberAnalytics, getMaternityMemberAnalytics, generateWorkingDaysTag } from '@/lib/analyticsCalculations';
 import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
+import { parseDateSafe } from '@/lib/dateUtils';
 import { 
   ChartBarIcon, 
   CheckCircleIcon, 
@@ -200,8 +201,8 @@ export default function MemberAnalyticsPage() {
     
     approvedRequests.forEach(req => {
       // Handle both Date objects and date strings (from JSON serialization)
-      const start = req.startDate instanceof Date ? new Date(req.startDate) : new Date(req.startDate);
-      const end = req.endDate instanceof Date ? new Date(req.endDate) : new Date(req.endDate);
+      const start = parseDateSafe(req.startDate);
+      const end = parseDateSafe(req.endDate);
       
       // Validate dates
       if (isNaN(start.getTime()) || isNaN(end.getTime())) {
@@ -253,8 +254,8 @@ export default function MemberAnalyticsPage() {
     
     // Average duration
     const durations = approvedRequests.map(req => {
-      const start = new Date(req.startDate);
-      const end = new Date(req.endDate);
+      const start = parseDateSafe(req.startDate);
+      const end = parseDateSafe(req.endDate);
       return countWorkingDays(start, end, shiftSchedule);
     });
     const avgDuration = durations.length > 0 ? durations.reduce((a: number, b: number) => a + b, 0) / durations.length : 0;
@@ -269,12 +270,12 @@ export default function MemberAnalyticsPage() {
     
     // Request frequency (average days between requests)
     const sortedRequests = approvedRequests.sort((a: LeaveRequest, b: LeaveRequest) => 
-      new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+      parseDateSafe(a.startDate).getTime() - parseDateSafe(b.startDate).getTime()
     );
     let totalDaysBetween = 0;
     for (let i = 1; i < sortedRequests.length; i++) {
-      const prevEnd = new Date(sortedRequests[i - 1].endDate);
-      const currStart = new Date(sortedRequests[i].startDate);
+      const prevEnd = parseDateSafe(sortedRequests[i - 1].endDate);
+      const currStart = parseDateSafe(sortedRequests[i].startDate);
       const daysBetween = Math.floor((currStart.getTime() - prevEnd.getTime()) / (1000 * 60 * 60 * 24));
       totalDaysBetween += daysBetween;
     }
@@ -314,7 +315,7 @@ export default function MemberAnalyticsPage() {
     let totalAdvanceNotice = 0;
     approvedRequests.forEach(req => {
       const requestDate = new Date(req.createdAt);
-      const startDate = new Date(req.startDate);
+      const startDate = parseDateSafe(req.startDate);
       const daysNotice = Math.floor((startDate.getTime() - requestDate.getTime()) / (1000 * 60 * 60 * 24));
       totalAdvanceNotice += Math.max(0, daysNotice);
     });
@@ -1072,8 +1073,8 @@ export default function MemberAnalyticsPage() {
                     return (
                       <div className="space-y-2">
                         {maternityRequests.map((req) => {
-                          const startDate = new Date(req.startDate);
-                          const endDate = new Date(req.endDate);
+                          const startDate = parseDateSafe(req.startDate);
+                          const endDate = parseDateSafe(req.endDate);
                           const days = countWorkingDays(startDate, endDate, user?.shiftSchedule || {
                             pattern: [true, true, true, true, true, false, false],
                             startDate: new Date(),

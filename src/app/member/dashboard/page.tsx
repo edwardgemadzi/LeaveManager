@@ -11,6 +11,7 @@ import { useBrowserNotification } from '@/hooks/useBrowserNotification';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
 import { calculateTimeBasedLeaveScore, getWorkingDaysGroupDisplayName } from '@/lib/helpers';
 import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
+import { parseDateSafe } from '@/lib/dateUtils';
 import { 
   ClockIcon, 
   CalendarIcon, 
@@ -197,8 +198,8 @@ export default function MemberDashboard() {
             previousRequestsRef.current.forEach((prevRequest) => {
               const currentRequest = currentRequests.find((r: LeaveRequest) => r._id === prevRequest._id);
               if (currentRequest && prevRequest.status === 'pending' && currentRequest.status !== 'pending') {
-                const startDate = new Date(currentRequest.startDate).toLocaleDateString();
-                const endDate = new Date(currentRequest.endDate).toLocaleDateString();
+                const startDate = parseDateSafe(currentRequest.startDate).toLocaleDateString();
+                const endDate = parseDateSafe(currentRequest.endDate).toLocaleDateString();
                 
                 if (currentRequest.status === 'approved') {
                   showNotification(
@@ -378,12 +379,12 @@ export default function MemberDashboard() {
     
     // Find most recent approved request
     const mostRecent = approvedRequests.reduce((latest, req) => {
-      const reqDate = new Date(req.endDate);
-      const latestDate = new Date(latest.endDate);
+      const reqDate = parseDateSafe(req.endDate);
+      const latestDate = parseDateSafe(latest.endDate);
       return reqDate > latestDate ? req : latest;
     });
     
-    const monthsSinceLastLeave = (Date.now() - new Date(mostRecent.endDate).getTime()) / (1000 * 60 * 60 * 24 * 30);
+    const monthsSinceLastLeave = (Date.now() - parseDateSafe(mostRecent.endDate).getTime()) / (1000 * 60 * 60 * 24 * 30);
     
     if (monthsSinceLastLeave >= 3) {
       leaveReminderNotifiedRef.current = true;
@@ -402,8 +403,8 @@ export default function MemberDashboard() {
     const approvedRequests = myRequests
       .filter(req => req.status === 'approved')
       .map(req => ({
-        startDate: new Date(req.startDate),
-        endDate: new Date(req.endDate),
+        startDate: parseDateSafe(req.startDate),
+        endDate: parseDateSafe(req.endDate),
         reason: req.reason
       }));
 
@@ -471,8 +472,8 @@ export default function MemberDashboard() {
         }
       })
       .map(req => ({
-        startDate: new Date(req.startDate),
-        endDate: new Date(req.endDate),
+        startDate: parseDateSafe(req.startDate),
+        endDate: parseDateSafe(req.endDate),
         reason: req.reason
       }));
 
@@ -499,8 +500,8 @@ export default function MemberDashboard() {
       daysUsed = user.manualMaternityYearToDateUsed;
     } else {
       daysUsed = approvedMaternityRequests.reduce((total, req) => {
-        const reqStart = new Date(req.startDate);
-        const reqEnd = new Date(req.endDate);
+        const reqStart = parseDateSafe(req.startDate);
+        const reqEnd = parseDateSafe(req.endDate);
         reqStart.setHours(0, 0, 0, 0);
         reqEnd.setHours(23, 59, 59, 999);
         
@@ -527,12 +528,12 @@ export default function MemberDashboard() {
     
     const currentYear = new Date().getFullYear();
     const approvedRequests = myRequests
-      .filter(req => req.status === 'approved' && new Date(req.startDate).getFullYear() === currentYear);
+      .filter(req => req.status === 'approved' && parseDateSafe(req.startDate).getFullYear() === currentYear);
 
     return approvedRequests.reduce((total, req) => {
       const workingDays = countWorkingDays(
-        new Date(req.startDate),
-        new Date(req.endDate),
+        parseDateSafe(req.startDate),
+        parseDateSafe(req.endDate),
         user.shiftSchedule || { pattern: [true, true, true, true, true, false, false], startDate: new Date(), type: 'rotating' }
       );
       return total + workingDays;
@@ -1447,7 +1448,7 @@ export default function MemberDashboard() {
                             <div className="flex items-center gap-1.5">
                               <CalendarIcon className="h-4 w-4 text-gray-500 dark:text-gray-500" />
                               <span className="font-medium">
-                                {new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()}
+                                {parseDateSafe(request.startDate).toLocaleDateString()} - {parseDateSafe(request.endDate).toLocaleDateString()}
                               </span>
                             </div>
                           </div>

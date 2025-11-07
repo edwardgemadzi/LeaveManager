@@ -9,6 +9,7 @@ import { calculateUsableDays, calculateMembersSharingSameShift, GroupedTeamAnaly
 import { UsersIcon, CalendarIcon, ChartBarIcon, ArrowTrendingUpIcon } from '@heroicons/react/24/outline';
 import { useNotification } from '@/hooks/useNotification';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
+import { parseDateSafe } from '@/lib/dateUtils';
 
 export default function LeaderLeaveBalancePage() {
   const { showError, showInfo } = useNotification();
@@ -190,8 +191,8 @@ export default function LeaderLeaveBalancePage() {
     // because approved requests are already committed/allocated
     // Use member User object to support historical schedules for past dates
     const yearToDateWorkingDays = approvedRequests.reduce((total, req) => {
-      const start = new Date(req.startDate);
-      const end = new Date(req.endDate);
+      const start = parseDateSafe(req.startDate);
+      const end = parseDateSafe(req.endDate);
       start.setHours(0, 0, 0, 0);
       end.setHours(23, 59, 59, 999);
       
@@ -216,8 +217,8 @@ export default function LeaderLeaveBalancePage() {
     // First, calculate total from all approved requests
     // Use member User object to support historical schedules for past dates
     const totalFromAllRequests = approvedRequests.reduce((total, req) => {
-      const start = new Date(req.startDate);
-      const end = new Date(req.endDate);
+      const start = parseDateSafe(req.startDate);
+      const end = parseDateSafe(req.endDate);
       return total + countWorkingDays(start, end, member);
     }, 0);
     
@@ -241,8 +242,8 @@ export default function LeaderLeaveBalancePage() {
     // Calculate remaining balance (needed for fallback)
     // Include reason field so calculateLeaveBalance can filter out maternity leave
     const approvedRequestsForCalculation = approvedRequests.map(req => ({
-      startDate: new Date(req.startDate),
-      endDate: new Date(req.endDate),
+      startDate: parseDateSafe(req.startDate),
+      endDate: parseDateSafe(req.endDate),
       reason: req.reason
     }));
     
@@ -414,8 +415,8 @@ export default function LeaderLeaveBalancePage() {
 
     // Calculate remaining maternity leave balance
     const approvedMaternityRequestsForCalculation = approvedMaternityRequests.map(req => ({
-      startDate: new Date(req.startDate),
-      endDate: new Date(req.endDate),
+      startDate: parseDateSafe(req.startDate),
+      endDate: parseDateSafe(req.endDate),
       reason: req.reason
     }));
 
@@ -529,8 +530,8 @@ export default function LeaderLeaveBalancePage() {
         yearEnd.setHours(23, 59, 59, 999);
         
         daysUsed = approvedRequests.reduce((total, req) => {
-          const reqStart = new Date(req.startDate);
-          const reqEnd = new Date(req.endDate);
+          const reqStart = parseDateSafe(req.startDate);
+          const reqEnd = parseDateSafe(req.endDate);
           reqStart.setHours(0, 0, 0, 0);
           reqEnd.setHours(23, 59, 59, 999);
           
@@ -768,8 +769,8 @@ export default function LeaderLeaveBalancePage() {
         today.setHours(0, 0, 0, 0);
         
         daysUsed = filteredMaternityRequests.reduce((total, req) => {
-          const reqStart = new Date(req.startDate);
-          const reqEnd = new Date(req.endDate);
+          const reqStart = parseDateSafe(req.startDate);
+          const reqEnd = parseDateSafe(req.endDate);
           reqStart.setHours(0, 0, 0, 0);
           reqEnd.setHours(23, 59, 59, 999);
           

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { parseDateSafe } from '@/lib/dateUtils';
 
 interface DateRange {
   startDate: Date;
@@ -52,9 +53,9 @@ export default function MigrationCalendar({
   const isDateInRange = (date: Date, range: DateRange) => {
     const checkDate = new Date(date);
     checkDate.setHours(0, 0, 0, 0);
-    const start = new Date(range.startDate);
+    const start = parseDateSafe(range.startDate);
     start.setHours(0, 0, 0, 0);
-    const end = new Date(range.endDate);
+    const end = parseDateSafe(range.endDate);
     end.setHours(23, 59, 59, 999);
     return checkDate >= start && checkDate <= end;
   };
@@ -128,9 +129,9 @@ export default function MigrationCalendar({
 
     // Check if this range overlaps with existing ranges
     const overlaps = ranges.some(range => {
-      const rangeStart = new Date(range.startDate);
+      const rangeStart = parseDateSafe(range.startDate);
       rangeStart.setHours(0, 0, 0, 0);
-      const rangeEnd = new Date(range.endDate);
+      const rangeEnd = parseDateSafe(range.endDate);
       rangeEnd.setHours(0, 0, 0, 0);
       return (start <= rangeEnd && end >= rangeStart);
     });

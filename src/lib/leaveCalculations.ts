@@ -1,16 +1,5 @@
 import { ShiftSchedule, User } from '@/types';
-
-// Helper function to parse dates in a timezone-safe way
-// This prevents Yandex browser and other browsers from interpreting dates differently
-const parseDateSafe = (dateInput: string | Date): Date => {
-  if (dateInput instanceof Date) {
-    return new Date(dateInput);
-  }
-  
-  const date = new Date(dateInput);
-  // Normalize to local midnight to avoid timezone shifts
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-};
+import { parseDateSafe } from '@/lib/dateUtils';
 
 // Helper function to get the correct shift schedule for a given date
 // Checks historical shifts and returns the schedule that was active on that date

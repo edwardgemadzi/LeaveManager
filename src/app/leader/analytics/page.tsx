@@ -9,6 +9,7 @@ import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
 import { isMaternityLeave } from '@/lib/leaveCalculations';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
 import { UsersIcon, CalendarIcon, ChartBarIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
+import { parseDateSafe } from '@/lib/dateUtils';
 
 export default function LeaderAnalyticsPage() {
   const [team, setTeam] = useState<Team | null>(null);
@@ -167,11 +168,11 @@ export default function LeaderAnalyticsPage() {
     const years = new Set<number>();
     allRequests.forEach(req => {
       if (req.startDate) {
-        const year = new Date(req.startDate).getFullYear();
+        const year = parseDateSafe(req.startDate).getFullYear();
         years.add(year);
       }
       if (req.endDate) {
-        const year = new Date(req.endDate).getFullYear();
+        const year = parseDateSafe(req.endDate).getFullYear();
         years.add(year);
       }
     });
@@ -225,8 +226,8 @@ export default function LeaderAnalyticsPage() {
       if (!filteredMemberIds.has(requestUserId)) return false;
       
       // Filter by year - include requests that overlap with the selected year
-      const reqStart = new Date(req.startDate);
-      const reqEnd = new Date(req.endDate);
+      const reqStart = parseDateSafe(req.startDate);
+      const reqEnd = parseDateSafe(req.endDate);
       reqStart.setHours(0, 0, 0, 0);
       reqEnd.setHours(23, 59, 59, 999);
       

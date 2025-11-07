@@ -11,6 +11,7 @@ import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
 import { useBrowserNotification } from '@/hooks/useBrowserNotification';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
 import { calculateTimeBasedTeamHealthScore } from '@/lib/helpers';
+import { parseDateSafe } from '@/lib/dateUtils';
 import { 
   UsersIcon, 
   ClockIcon, 
@@ -192,8 +193,8 @@ export default function LeaderDashboard() {
             newRequests.forEach((req: LeaveRequest) => {
               const member = currentMembers.find((m: User) => m._id === req.userId);
               const memberName = member?.fullName || member?.username || 'A team member';
-              const startDate = new Date(req.startDate).toLocaleDateString();
-              const endDate = new Date(req.endDate).toLocaleDateString();
+              const startDate = parseDateSafe(req.startDate).toLocaleDateString();
+              const endDate = parseDateSafe(req.endDate).toLocaleDateString();
               
               showNotification(
                 'New Leave Request',
@@ -223,8 +224,8 @@ export default function LeaderDashboard() {
           // Find member name for notification
           const member = members.find(m => m._id === data.userId);
           const memberName = member?.fullName || member?.username || 'A team member';
-          const startDate = new Date(data.startDate).toLocaleDateString();
-          const endDate = new Date(data.endDate).toLocaleDateString();
+          const startDate = parseDateSafe(data.startDate).toLocaleDateString();
+          const endDate = parseDateSafe(data.endDate).toLocaleDateString();
           
           showNotification(
             'New Leave Request',
@@ -341,8 +342,8 @@ export default function LeaderDashboard() {
           );
 
           const approvedRequests = memberRequests.map(req => ({
-            startDate: new Date(req.startDate),
-            endDate: new Date(req.endDate)
+            startDate: parseDateSafe(req.startDate),
+            endDate: parseDateSafe(req.endDate)
           }));
 
           const remainingBalance = calculateLeaveBalance(
@@ -415,8 +416,8 @@ export default function LeaderDashboard() {
             return lowerReason.includes('maternity') || (isMaternityLeave(req.reason) && !lowerReason.includes('paternity'));
           }
         }).map(req => ({
-          startDate: new Date(req.startDate),
-          endDate: new Date(req.endDate),
+          startDate: parseDateSafe(req.startDate),
+          endDate: parseDateSafe(req.endDate),
           reason: req.reason
         }));
 
@@ -448,8 +449,8 @@ export default function LeaderDashboard() {
         } else {
           const approvedMaternityRequestsForCalc = approvedMaternityRequests;
           daysUsed = approvedMaternityRequestsForCalc.reduce((total, req) => {
-            const reqStart = new Date(req.startDate);
-            const reqEnd = new Date(req.endDate);
+            const reqStart = parseDateSafe(req.startDate);
+            const reqEnd = parseDateSafe(req.endDate);
             reqStart.setHours(0, 0, 0, 0);
             reqEnd.setHours(23, 59, 59, 999);
             
@@ -996,7 +997,7 @@ export default function LeaderDashboard() {
                               <div className="flex items-center gap-1.5">
                                 <CalendarIcon className="h-4 w-4 text-gray-500 dark:text-gray-500" />
                                 <span className="font-medium">
-                                  {new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()}
+                                  {parseDateSafe(request.startDate).toLocaleDateString()} - {parseDateSafe(request.endDate).toLocaleDateString()}
                                 </span>
                               </div>
                             </div>

@@ -7,6 +7,7 @@ import { LEAVE_REASONS } from '@/lib/leaveReasons';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useNotification } from '@/hooks/useNotification';
 import { useBrowserNotification } from '@/hooks/useBrowserNotification';
+import { parseDateSafe } from '@/lib/dateUtils';
 
 export default function MemberRequestsPage() {
   const { showSuccess, showError, showInfo } = useNotification();
@@ -353,7 +354,7 @@ export default function MemberRequestsPage() {
                           </span>
                         </div>
                         <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
-                          {new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()}
+                          {parseDateSafe(request.startDate).toLocaleDateString()} - {parseDateSafe(request.endDate).toLocaleDateString()}
                         </p>
                         <p className="text-base text-gray-700 dark:text-gray-300 mb-3">{request.reason}</p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
