@@ -13,6 +13,21 @@ import { useBrowserNotification } from '@/hooks/useBrowserNotification';
 
 const localizer = momentLocalizer(moment);
 
+// Helper function to parse dates in a timezone-safe way
+// This prevents Yandex browser and other browsers from interpreting dates differently
+const parseDateSafe = (dateInput: string | Date): Date => {
+  if (dateInput instanceof Date) {
+    return new Date(dateInput);
+  }
+  
+  // If it's an ISO string, parse it and normalize to local midnight
+  const date = new Date(dateInput);
+  
+  // Normalize to local midnight to avoid timezone shifts
+  const normalized = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  return normalized;
+};
+
 interface CalendarEvent {
   id: string;
   title: string;
@@ -138,9 +153,9 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
       // For all other leave types (including maternity/paternity with working counting), create events only for working days
       if (shouldShowAllDays) {
         // Create events for all calendar days in the period (maternity/paternity with calendar counting only)
-        const startDate = new Date(request.startDate);
+        const startDate = parseDateSafe(request.startDate);
         startDate.setHours(0, 0, 0, 0);
-        const endDate = new Date(request.endDate);
+        const endDate = parseDateSafe(request.endDate);
         endDate.setHours(23, 59, 59, 999);
         
         const currentDate = new Date(startDate);
@@ -179,8 +194,8 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
         calendarEvents.push({
           id: request._id!,
           title: eventTitle,
-          start: new Date(request.startDate),
-          end: new Date(request.endDate),
+          start: parseDateSafe(request.startDate),
+          end: parseDateSafe(request.endDate),
           resource: {
             status: request.status,
             userId: request.userId,
@@ -195,8 +210,8 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
         // Pass member User object to support historical shift schedules for past dates
         // If member doesn't exist, fall back to shiftSchedule (shouldn't happen in this branch)
         const workingDays = getWorkingDays(
-          new Date(request.startDate),
-          new Date(request.endDate),
+          parseDateSafe(request.startDate),
+          parseDateSafe(request.endDate),
           member || shiftSchedule
         );
         
@@ -475,8 +490,8 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
           calendarEvents.push({
             id: request._id!,
             title: eventTitle,
-            start: new Date(request.startDate),
-            end: new Date(request.endDate),
+            start: parseDateSafe(request.startDate),
+            end: parseDateSafe(request.endDate),
             resource: {
               status: request.status,
               userId: request.userId,
@@ -488,8 +503,8 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
           });
         } else {
           const workingDays = getWorkingDays(
-            new Date(request.startDate),
-            new Date(request.endDate),
+            parseDateSafe(request.startDate),
+            parseDateSafe(request.endDate),
             shiftSchedule
           );
           

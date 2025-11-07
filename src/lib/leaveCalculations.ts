@@ -1,5 +1,17 @@
 import { ShiftSchedule, User } from '@/types';
 
+// Helper function to parse dates in a timezone-safe way
+// This prevents Yandex browser and other browsers from interpreting dates differently
+const parseDateSafe = (dateInput: string | Date): Date => {
+  if (dateInput instanceof Date) {
+    return new Date(dateInput);
+  }
+  
+  const date = new Date(dateInput);
+  // Normalize to local midnight to avoid timezone shifts
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+};
+
 // Helper function to get the correct shift schedule for a given date
 // Checks historical shifts and returns the schedule that was active on that date
 export const getShiftScheduleForDate = (user: User, date: Date): ShiftSchedule | undefined => {
@@ -14,15 +26,15 @@ export const getShiftScheduleForDate = (user: User, date: Date): ShiftSchedule |
     // A shift is active if: startDate <= date <= endDate
     for (const historicalShift of user.shiftHistory) {
       // Handle both Date objects and ISO strings from JSON
-      const startDate = new Date(historicalShift.startDate);
+      const startDate = parseDateSafe(historicalShift.startDate);
       startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(historicalShift.endDate);
+      const endDate = parseDateSafe(historicalShift.endDate);
       endDate.setHours(23, 59, 59, 999);
       
       // Check if date is within the historical shift period
       // For dates before the historical shift start date but before the current shift start date,
       // we should still use the historical shift (with the rotation start date)
-      const currentShiftStartDate = user.shiftSchedule?.startDate ? new Date(user.shiftSchedule.startDate) : null;
+      const currentShiftStartDate = user.shiftSchedule?.startDate ? parseDateSafe(user.shiftSchedule.startDate) : null;
       const isBeforeHistoricalStart = checkDate < startDate;
       const isBeforeCurrentShift = currentShiftStartDate && checkDate < currentShiftStartDate;
       
@@ -76,7 +88,7 @@ export function isWorkingDay(date: Date, userOrSchedule: User | ShiftSchedule): 
   
   if (shiftSchedule.type === 'rotating') {
     // For rotating shifts, calculate days since start date
-    const startDate = new Date(shiftSchedule.startDate);
+    const startDate = parseDateSafe(shiftSchedule.startDate);
     const daysDiff = Math.floor((date.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
     
     // Use modulo to find position in the rotation pattern
