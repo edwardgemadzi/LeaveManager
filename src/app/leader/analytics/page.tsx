@@ -1,14 +1,14 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { Team, LeaveRequest, User } from '@/types';
-import { GroupedTeamAnalytics, calculateLeaveFrequencyByPeriod } from '@/lib/analyticsCalculations';
+import { GroupedTeamAnalytics, calculateLeaveFrequencyByPeriod, generateWorkingDaysTag } from '@/lib/analyticsCalculations';
 import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
 import { isMaternityLeave } from '@/lib/leaveCalculations';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
-import { UsersIcon, CalendarIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { UsersIcon, CalendarIcon, ChartBarIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 
 export default function LeaderAnalyticsPage() {
   const [team, setTeam] = useState<Team | null>(null);
@@ -16,6 +16,10 @@ export default function LeaderAnalyticsPage() {
   const [analytics, setAnalytics] = useState<GroupedTeamAnalytics | null>(null);
   const [members, setMembers] = useState<User[]>([]);
   const [periodType, setPeriodType] = useState<'month' | 'week'>('month');
+  const [frequencySubgroup, setFrequencySubgroup] = useState<string>('all');
+  const [frequencyWorkingDays, setFrequencyWorkingDays] = useState<string>('all');
+  const [frequencyYear, setFrequencyYear] = useState<number>(new Date().getFullYear());
+  const [showFrequencyInfo, setShowFrequencyInfo] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedSubgroup, setSelectedSubgroup] = useState<string>('all');
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -96,9 +100,13 @@ export default function LeaderAnalyticsPage() {
     fetchData();
     
     // Listen for settings updates to refresh analytics
+    let settingsTimeout: NodeJS.Timeout | null = null;
     const handleSettingsUpdated = () => {
       // Add a small delay to ensure database write is fully committed before fetching
-      setTimeout(() => {
+      if (settingsTimeout) {
+        clearTimeout(settingsTimeout);
+      }
+      settingsTimeout = setTimeout(() => {
         fetchData();
       }, 200);
     };
@@ -106,6 +114,9 @@ export default function LeaderAnalyticsPage() {
     window.addEventListener('teamSettingsUpdated', handleSettingsUpdated);
     return () => {
       window.removeEventListener('teamSettingsUpdated', handleSettingsUpdated);
+      if (settingsTimeout) {
+        clearTimeout(settingsTimeout);
+      }
     };
   }, []);
 
@@ -125,6 +136,116 @@ export default function LeaderAnalyticsPage() {
       }
     },
   });
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Memoize working days patterns for filter dropdown (before any early returns)
+  const workingDaysPatterns = useMemo(() => {
+    if (!members.length) return [];
+    const patterns = new Map<string, string>();
+    members.forEach(member => {
+      const workingDaysTag = member.shiftSchedule?.type === 'rotating'
+        ? generateWorkingDaysTag(member.shiftSchedule)
+        : (member.workingDaysTag || generateWorkingDaysTag(member.shiftSchedule));
+      if (workingDaysTag && workingDaysTag !== 'no-schedule') {
+        const displayName = getWorkingDaysGroupDisplayName(workingDaysTag, team?.settings);
+        patterns.set(workingDaysTag, displayName);
+      }
+    });
+    return Array.from(patterns.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  }, [members, team?.settings]);
+
+  // Memoize available years for filter dropdown (before any early returns)
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    allRequests.forEach(req => {
+      if (req.startDate) {
+        const year = new Date(req.startDate).getFullYear();
+        years.add(year);
+      }
+      if (req.endDate) {
+        const year = new Date(req.endDate).getFullYear();
+        years.add(year);
+      }
+    });
+    // Add current year if no requests
+    if (years.size === 0) {
+      years.add(new Date().getFullYear());
+    }
+    return Array.from(years).sort((a, b) => b - a); // Sort descending
+  }, [allRequests]);
+
+  // Memoize filtered members for leave frequency chart (before any early returns)
+  const filteredMembersForFrequency = useMemo(() => {
+    if (!members.length) return [];
+    
+    return members.filter(member => {
+      // Filter by subgroup
+      if (frequencySubgroup !== 'all') {
+        const memberSubgroup = member.subgroupTag || 'Ungrouped';
+        if (memberSubgroup !== frequencySubgroup) {
+          return false;
+        }
+      }
+
+      // Filter by working days pattern
+      if (frequencyWorkingDays !== 'all') {
+        const memberWorkingDaysTag = member.shiftSchedule?.type === 'rotating'
+          ? generateWorkingDaysTag(member.shiftSchedule)
+          : (member.workingDaysTag || generateWorkingDaysTag(member.shiftSchedule));
+        if (memberWorkingDaysTag !== frequencyWorkingDays) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [members, frequencySubgroup, frequencyWorkingDays]);
+
+  // Memoize approved requests for leave frequency chart (before any early returns)
+  const approvedRequestsForFrequency = useMemo(() => {
+    if (!allRequests.length || !filteredMembersForFrequency.length) return [];
+    
+    const filteredMemberIds = new Set(filteredMembersForFrequency.map(m => String(m._id)));
+    const yearStart = new Date(frequencyYear, 0, 1);
+    yearStart.setHours(0, 0, 0, 0);
+    const yearEnd = new Date(frequencyYear, 11, 31);
+    yearEnd.setHours(23, 59, 59, 999);
+    
+    return allRequests.filter(req => {
+      if (req.status !== 'approved') return false;
+      const requestUserId = req.userId ? String(req.userId) : '';
+      if (!filteredMemberIds.has(requestUserId)) return false;
+      
+      // Filter by year - include requests that overlap with the selected year
+      const reqStart = new Date(req.startDate);
+      const reqEnd = new Date(req.endDate);
+      reqStart.setHours(0, 0, 0, 0);
+      reqEnd.setHours(23, 59, 59, 999);
+      
+      // Check if request overlaps with selected year
+      return reqStart <= yearEnd && reqEnd >= yearStart;
+    });
+  }, [allRequests, filteredMembersForFrequency, frequencyYear]);
+
+  // Memoize leave frequency calculation (before any early returns)
+  const leaveFrequencyData = useMemo(() => {
+    if (!approvedRequestsForFrequency.length || !filteredMembersForFrequency.length) return [];
+    return calculateLeaveFrequencyByPeriod(approvedRequestsForFrequency, filteredMembersForFrequency, periodType, frequencyYear);
+  }, [approvedRequestsForFrequency, filteredMembersForFrequency, periodType, frequencyYear]);
+
+  // Memoize max working days (before any early returns)
+  const maxWorkingDays = useMemo(() => {
+    if (!leaveFrequencyData.length) return 0;
+    return Math.max(...leaveFrequencyData.map(d => d.workingDaysUsed));
+  }, [leaveFrequencyData]);
 
   if (loading) {
     return (
@@ -407,34 +528,94 @@ export default function LeaderAnalyticsPage() {
           {/* Leave Frequency Chart */}
           <div className="card mb-8">
             <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">Leave Frequency by Period</h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">Leave Frequency by Period</h2>
+                    <button
+                      type="button"
+                      onClick={() => setShowFrequencyInfo(!showFrequencyInfo)}
+                      className="focus:outline-none"
+                      aria-label="Toggle explanation"
+                    >
+                      <InformationCircleIcon className="h-5 w-5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 cursor-pointer" />
+                    </button>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
                     See which periods are mostly free for planning
                   </p>
+                  {showFrequencyInfo && (
+                    <p className="text-xs text-gray-500 dark:text-gray-500 italic mb-1">
+                      Percentages show relative usage between periods. The period with the most leave days used is shown as 100%, and other periods are compared to that maximum.
+                    </p>
+                  )}
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setPeriodType('month')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      periodType === 'month'
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                    }`}
-                  >
-                    Month
-                  </button>
-                  <button
-                    onClick={() => setPeriodType('week')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      periodType === 'week'
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                    }`}
-                  >
-                    Week
-                  </button>
+                <div className="flex flex-wrap items-center gap-3">
+                  {team?.settings.enableSubgrouping && subgroups.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Filter by Subgroup:</label>
+                      <select
+                        value={frequencySubgroup}
+                        onChange={(e) => setFrequencySubgroup(e.target.value)}
+                        className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
+                      >
+                        <option value="all">All Subgroups</option>
+                        {subgroups.map(subgroup => (
+                          <option key={subgroup} value={subgroup}>{subgroup}</option>
+                        ))}
+                        <option value="Ungrouped">Ungrouped</option>
+                      </select>
+                    </div>
+                  )}
+                  {workingDaysPatterns.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Filter by Working Days:</label>
+                      <select
+                        value={frequencyWorkingDays}
+                        onChange={(e) => setFrequencyWorkingDays(e.target.value)}
+                        className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
+                      >
+                        <option value="all">All Patterns</option>
+                        {workingDaysPatterns.map(([tag, displayName]) => (
+                          <option key={tag} value={tag}>{displayName}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Year:</label>
+                    <select
+                      value={frequencyYear}
+                      onChange={(e) => setFrequencyYear(parseInt(e.target.value))}
+                      className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
+                    >
+                      {availableYears.map(year => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setPeriodType('month')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        periodType === 'month'
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      Month
+                    </button>
+                    <button
+                      onClick={() => setPeriodType('week')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        periodType === 'week'
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      Week
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -463,26 +644,42 @@ export default function LeaderAnalyticsPage() {
                   );
                 }
 
-                const approvedRequests = allRequests.filter(req => req.status === 'approved');
-                
-                if (approvedRequests.length === 0) {
+                if (filteredMembersForFrequency.length === 0) {
                   return (
                     <div className="text-center py-12">
                       <ChartBarIcon className="h-12 w-12 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
-                      <p className="text-gray-500 dark:text-gray-400">No approved leave requests to display</p>
+                      <p className="text-gray-500 dark:text-gray-400">
+                        {frequencySubgroup !== 'all' || frequencyWorkingDays !== 'all'
+                          ? 'No members found matching the selected filters'
+                          : 'No members found'}
+                      </p>
+                    </div>
+                  );
+                }
+                
+                if (approvedRequestsForFrequency.length === 0) {
+                  return (
+                    <div className="text-center py-12">
+                      <ChartBarIcon className="h-12 w-12 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
+                      <p className="text-gray-500 dark:text-gray-400">
+                        {frequencySubgroup !== 'all' || frequencyWorkingDays !== 'all'
+                          ? 'No approved leave requests to display for selected filters'
+                          : 'No approved leave requests to display'}
+                      </p>
                     </div>
                   );
                 }
 
-                // Debug logging
-                console.log('[Leave Frequency] Members:', members.length);
-                console.log('[Leave Frequency] Approved requests:', approvedRequests.length);
-                console.log('[Leave Frequency] Period type:', periodType);
-                
-                const leaveFrequencyData = calculateLeaveFrequencyByPeriod(approvedRequests, members, periodType);
-                
-                // Debug logging
-                console.log('[Leave Frequency] Calculated data:', leaveFrequencyData);
+                // Only log in development to prevent data leakage in production
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('[Leave Frequency] Members:', filteredMembersForFrequency.length);
+                  console.log('[Leave Frequency] Approved requests:', approvedRequestsForFrequency.length);
+                  console.log('[Leave Frequency] Period type:', periodType);
+                  console.log('[Leave Frequency] Subgroup filter:', frequencySubgroup);
+                  console.log('[Leave Frequency] Working days filter:', frequencyWorkingDays);
+                  console.log('[Leave Frequency] Year filter:', frequencyYear);
+                  console.log('[Leave Frequency] Calculated data:', leaveFrequencyData);
+                }
                 
                 if (leaveFrequencyData.length === 0) {
                   return (
@@ -490,13 +687,11 @@ export default function LeaderAnalyticsPage() {
                       <ChartBarIcon className="h-12 w-12 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
                       <p className="text-gray-500 dark:text-gray-400">No leave frequency data available</p>
                       <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-                        Members: {members.length}, Approved requests: {approvedRequests.length}
+                        Members: {members.length}, Approved requests: {approvedRequestsForFrequency.length}
                       </p>
                     </div>
                   );
                 }
-
-                const maxWorkingDays = Math.max(...leaveFrequencyData.map(d => d.workingDaysUsed));
 
                 return (
                   <div className={`space-y-4 ${periodType === 'week' ? 'max-h-96 overflow-y-auto pr-2' : ''}`}>

@@ -1432,7 +1432,8 @@ export interface LeaveFrequencyData {
 export const calculateLeaveFrequencyByPeriod = (
   approvedRequests: LeaveRequest[],
   members: User[],
-  periodType: 'month' | 'week' = 'month'
+  periodType: 'month' | 'week' = 'month',
+  year?: number
 ): LeaveFrequencyData[] => {
   // Filter out maternity leave requests
   const regularRequests = approvedRequests.filter(req => 
@@ -1447,12 +1448,37 @@ export const calculateLeaveFrequencyByPeriod = (
   let requestsWithMembers = 0;
   let requestsWithoutMembers = 0;
 
+  // If year is specified, set year boundaries
+  let yearStart: Date | null = null;
+  let yearEnd: Date | null = null;
+  if (year !== undefined) {
+    yearStart = new Date(year, 0, 1);
+    yearStart.setHours(0, 0, 0, 0);
+    yearEnd = new Date(year, 11, 31);
+    yearEnd.setHours(23, 59, 59, 999);
+  }
+
   // Process each request
   for (const request of regularRequests) {
-    const startDate = new Date(request.startDate);
-    const endDate = new Date(request.endDate);
+    let startDate = new Date(request.startDate);
+    let endDate = new Date(request.endDate);
     startDate.setHours(0, 0, 0, 0);
     endDate.setHours(23, 59, 59, 999);
+
+    // If year is specified, clip the request period to the year boundaries
+    if (year !== undefined && yearStart && yearEnd) {
+      // Only process if request overlaps with the selected year
+      if (startDate > yearEnd || endDate < yearStart) {
+        continue; // Request doesn't overlap with selected year
+      }
+      // Clip to year boundaries
+      if (startDate < yearStart) {
+        startDate = new Date(yearStart);
+      }
+      if (endDate > yearEnd) {
+        endDate = new Date(yearEnd);
+      }
+    }
 
     // Find the member for this request
     const member = members.find(m => {
@@ -1469,27 +1495,21 @@ export const calculateLeaveFrequencyByPeriod = (
     
     requestsWithMembers++;
 
-    // Get all dates in the request period
+    // Get all dates in the request period (already clipped to year if specified)
     const currentDate = new Date(startDate);
     while (currentDate <= endDate) {
       let periodKey: string;
-      let period: string;
 
       if (periodType === 'month') {
         // Group by month
         const year = currentDate.getFullYear();
         const month = currentDate.getMonth();
         periodKey = `${year}-${String(month + 1).padStart(2, '0')}`;
-        period = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
       } else {
         // Group by week
         const year = currentDate.getFullYear();
         const week = getWeekNumber(currentDate);
         periodKey = `${year}-W${String(week).padStart(2, '0')}`;
-        const weekStart = getWeekStart(currentDate);
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekEnd.getDate() + 6);
-        period = `Week ${week}, ${year} (${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
       }
 
       // Check if this is a working day for the member
@@ -1506,18 +1526,19 @@ export const calculateLeaveFrequencyByPeriod = (
     }
 
     // Count requests per period (each request is counted once per period it spans)
+    // Use the already clipped startDate and endDate (which respect year boundaries if specified)
     const requestPeriods = new Set<string>();
     const requestDate = new Date(startDate);
     while (requestDate <= endDate) {
       let periodKey: string;
       if (periodType === 'month') {
-        const year = requestDate.getFullYear();
+        const dateYear = requestDate.getFullYear();
         const month = requestDate.getMonth();
-        periodKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+        periodKey = `${dateYear}-${String(month + 1).padStart(2, '0')}`;
       } else {
-        const year = requestDate.getFullYear();
+        const dateYear = requestDate.getFullYear();
         const week = getWeekNumber(requestDate);
-        periodKey = `${year}-W${String(week).padStart(2, '0')}`;
+        periodKey = `${dateYear}-W${String(week).padStart(2, '0')}`;
       }
       requestPeriods.add(periodKey);
       requestDate.setDate(requestDate.getDate() + 1);
@@ -1540,28 +1561,44 @@ export const calculateLeaveFrequencyByPeriod = (
     .map(([periodKey, data]) => {
       // Get period display name from the first request in that period
       let period: string;
+      let periodYear: number;
       if (periodType === 'month') {
         const [year, month] = periodKey.split('-');
-        const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+        periodYear = parseInt(year);
+        const date = new Date(periodYear, parseInt(month) - 1, 1);
         period = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
       } else {
         const [year, weekStr] = periodKey.split('-W');
+        periodYear = parseInt(year);
         const week = parseInt(weekStr);
         // Calculate week start date
-        const jan1 = new Date(parseInt(year), 0, 1);
+        const jan1 = new Date(periodYear, 0, 1);
         const daysOffset = (week - 1) * 7;
         const weekStart = new Date(jan1);
         weekStart.setDate(jan1.getDate() + daysOffset - jan1.getDay());
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekEnd.getDate() + 6);
-        period = `Week ${week}, ${year} (${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
+        period = `Week ${week}, ${periodYear} (${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
       }
       return {
         period,
         periodKey,
         workingDaysUsed: data.workingDaysUsed,
-        requestCount: data.requestCount
+        requestCount: data.requestCount,
+        periodYear
       };
+    })
+    .filter(item => {
+      // If year is specified, only include periods from that year
+      if (year !== undefined) {
+        return item.periodYear === year;
+      }
+      return true;
+    })
+    .map(({ periodYear: _periodYear, ...item }) => {
+      // periodYear is used in filter above, then removed from final result
+      void _periodYear; // Suppress unused variable warning
+      return item;
     })
     .sort((a, b) => a.periodKey.localeCompare(b.periodKey));
 
@@ -1577,11 +1614,4 @@ function getWeekNumber(date: Date): number {
   return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
 }
 
-// Helper function to get week start (Monday)
-function getWeekStart(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
-  return new Date(d.setDate(diff));
-}
 
