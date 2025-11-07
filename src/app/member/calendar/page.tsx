@@ -141,7 +141,11 @@ export default function MemberCalendarPage() {
                 teamId={team._id} 
                 members={members} 
                 currentUser={user || undefined}
-                teamSettings={team?.settings ? { minimumNoticePeriod: team.settings.minimumNoticePeriod || 1 } : undefined}
+                teamSettings={team?.settings ? { 
+                  minimumNoticePeriod: team.settings.minimumNoticePeriod || 1,
+                  maternityLeave: team.settings.maternityLeave,
+                  paternityLeave: team.settings.paternityLeave
+                } : undefined}
                 initialRequests={requests}
               />
             ) : (

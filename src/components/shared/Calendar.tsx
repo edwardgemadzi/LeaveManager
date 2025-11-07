@@ -5,7 +5,7 @@ import { Calendar, momentLocalizer, View, Views } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { LeaveRequest, User } from '@/types';
-import { getWorkingDays, isWorkingDay } from '@/lib/leaveCalculations';
+import { getWorkingDays, isWorkingDay, isMaternityLeave } from '@/lib/leaveCalculations';
 import { LEAVE_REASONS, isEmergencyReason } from '@/lib/leaveReasons';
 import { CheckCircleIcon, ClockIcon, XCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useNotification } from '@/hooks/useNotification';
@@ -32,7 +32,11 @@ interface CalendarProps {
   teamId: string;
   members: User[];
   currentUser?: User; // Current logged-in user (for highlighting working days)
-  teamSettings?: { minimumNoticePeriod: number }; // Optional: team settings (if provided, skip fetching)
+  teamSettings?: { 
+    minimumNoticePeriod: number;
+    maternityLeave?: { countingMethod?: 'calendar' | 'working' };
+    paternityLeave?: { countingMethod?: 'calendar' | 'working' };
+  }; // Optional: team settings (if provided, skip fetching)
   initialRequests?: LeaveRequest[]; // Optional: initial requests (if provided, skip fetching)
 }
 
@@ -112,7 +116,61 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
       // Only mark as emergency if reason exactly matches emergency reason values
       const isEmergency = request.reason ? isEmergencyReason(request.reason) : false;
       
-      if (!shiftSchedule) {
+      // Check if this is maternity/paternity leave
+      const isMaternityPaternity = request.reason ? isMaternityLeave(request.reason) : false;
+      
+      // Determine counting method for maternity/paternity leave ONLY
+      // Only maternity/paternity leave with calendar counting should show all days
+      let shouldShowAllDays = false;
+      if (isMaternityPaternity) {
+        const userType = member?.maternityPaternityType;
+        let countingMethod: 'calendar' | 'working' = 'working';
+        if (userType === 'paternity') {
+          countingMethod = providedTeamSettings?.paternityLeave?.countingMethod || 'working';
+        } else {
+          countingMethod = providedTeamSettings?.maternityLeave?.countingMethod || 'working';
+        }
+        // Only show all days if it's maternity/paternity leave AND counting method is calendar
+        shouldShowAllDays = countingMethod === 'calendar';
+      }
+      
+      // For maternity/paternity leave with calendar counting, create events for ALL days
+      // For all other leave types (including maternity/paternity with working counting), create events only for working days
+      if (shouldShowAllDays) {
+        // Create events for all calendar days in the period (maternity/paternity with calendar counting only)
+        const startDate = new Date(request.startDate);
+        startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(request.endDate);
+        endDate.setHours(23, 59, 59, 999);
+        
+        const currentDate = new Date(startDate);
+        let index = 0;
+        
+        while (currentDate <= endDate) {
+          const eventTitle = isEmergency 
+            ? `[EMERGENCY] ${memberName} - ${request.reason}` 
+            : `${memberName} - ${request.reason}`;
+            
+          calendarEvents.push({
+            id: `${request._id!}-${index}`,
+            title: eventTitle,
+            start: new Date(currentDate),
+            end: new Date(currentDate),
+            resource: {
+              status: request.status,
+              userId: request.userId,
+              username: member?.username || 'Unknown',
+              fullName: member?.fullName,
+              isEmergency,
+              requestedBy: request.requestedBy,
+            },
+          });
+          
+          // Move to next day
+          currentDate.setDate(currentDate.getDate() + 1);
+          index++;
+        }
+      } else if (!shiftSchedule) {
         // If no shift schedule, create a single event for the entire period
         const eventTitle = isEmergency 
           ? `[EMERGENCY] ${memberName} - ${request.reason}` 
@@ -134,10 +192,12 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
         });
       } else {
         // Create separate events for each working day
+        // Pass member User object to support historical shift schedules for past dates
+        // If member doesn't exist, fall back to shiftSchedule (shouldn't happen in this branch)
         const workingDays = getWorkingDays(
           new Date(request.startDate),
           new Date(request.endDate),
-          shiftSchedule
+          member || shiftSchedule
         );
         
         workingDays.forEach((workingDay, index) => {
@@ -164,7 +224,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
     });
 
     setEvents(calendarEvents);
-  }, [members]);
+  }, [members, providedTeamSettings]);
 
   useEffect(() => {
     // Use provided initialRequests if available (including empty array for filtered results)

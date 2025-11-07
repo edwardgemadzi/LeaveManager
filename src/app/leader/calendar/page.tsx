@@ -394,6 +394,11 @@ export default function LeaderCalendarPage() {
               <TeamCalendar 
                 teamId={team._id} 
                 members={members}
+                teamSettings={team?.settings ? { 
+                  minimumNoticePeriod: team.settings.minimumNoticePeriod || 1,
+                  maternityLeave: team.settings.maternityLeave,
+                  paternityLeave: team.settings.paternityLeave
+                } : undefined}
                 initialRequests={filteredRequests}
               />
             ) : (
