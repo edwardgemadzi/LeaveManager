@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTokenFromRequest, verifyToken } from '@/lib/auth';
-import { AuthUser } from '@/types';
+import { AuthUser, User } from '@/types';
 import { getDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { unauthorizedError, forbiddenError, notFoundError } from '@/lib/errors';
@@ -84,7 +84,7 @@ export function requireLeader(
  */
 export async function getSafeUserData(
   userId: string | ObjectId
-): Promise<any | null> {
+): Promise<Omit<User, 'password'> | null> {
   // Validate ObjectId format if string
   if (typeof userId === 'string' && !ObjectId.isValid(userId)) {
     return null;
@@ -101,11 +101,17 @@ export async function getSafeUserData(
     return null;
   }
 
-  // Remove sensitive data
+  // Remove sensitive data and convert ObjectId to string
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { password, ...safeUserData } = userData;
+  
+  // Convert _id from ObjectId to string if it exists
+  const result: Omit<User, 'password'> = {
+    ...safeUserData,
+    _id: userData._id ? userData._id.toString() : undefined,
+  } as Omit<User, 'password'>;
 
-  return safeUserData;
+  return result;
 }
 
 /**
@@ -118,7 +124,7 @@ export async function getSafeUserData(
 export async function requireSafeUserData(
   userId: string | ObjectId,
   notFoundMessage = 'User not found'
-): Promise<any | NextResponse> {
+): Promise<Omit<User, 'password'> | NextResponse> {
   // Validate ObjectId format if string
   if (typeof userId === 'string' && !ObjectId.isValid(userId)) {
     return notFoundError(notFoundMessage);
