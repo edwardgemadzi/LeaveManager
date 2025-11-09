@@ -1,51 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import { getTokenFromRequest, verifyToken } from '@/lib/auth';
 import { getDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { UserModel } from '@/models/User';
 import { teamIdsMatch } from '@/lib/helpers';
 import { apiRateLimit } from '@/lib/rateLimit';
 import { error as logError } from '@/lib/logger';
-import { internalServerError, unauthorizedError, forbiddenError, badRequestError, notFoundError } from '@/lib/errors';
+import { internalServerError, badRequestError, notFoundError, forbiddenError } from '@/lib/errors';
+import { requireLeader, requireSafeUserData } from '@/lib/api-helpers';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const token = getTokenFromRequest(request);
-    if (!token) {
-      return unauthorizedError();
-    }
-
-    const user = verifyToken(token);
-    if (!user || user.role !== 'leader') {
-      return forbiddenError();
+    // Require leader authentication
+    const authResult = requireLeader(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
     }
 
     const { id } = await params;
     
-    // Validate ObjectId format
-    if (!ObjectId.isValid(id)) {
-      return badRequestError('Invalid user ID format');
-    }
-    
-    const db = await getDatabase();
-    const users = db.collection('users');
-    
-    // Get user data
-    const userData = await users.findOne({ _id: new ObjectId(id) });
-    
-    if (!userData) {
-      return notFoundError('User not found');
+    // Get safe user data (validates ObjectId and removes password)
+    const userDataResult = await requireSafeUserData(id, 'User not found');
+    if (userDataResult instanceof NextResponse) {
+      return userDataResult;
     }
 
-    // Remove sensitive data
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...safeUserData } = userData;
-
-    return NextResponse.json({ user: safeUserData });
+    return NextResponse.json({ user: userDataResult });
   } catch (error) {
     logError('Get user error:', error);
     return internalServerError();
@@ -63,15 +46,12 @@ export async function PATCH(
       return rateLimitResponse;
     }
     
-    const token = getTokenFromRequest(request);
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Require leader authentication
+    const authResult = requireLeader(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
     }
-
-    const user = verifyToken(token);
-    if (!user || user.role !== 'leader') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const user = authResult;
 
     const { id } = await params;
     
@@ -308,31 +288,21 @@ export async function DELETE(
       return rateLimitResponse;
     }
     
-    const token = getTokenFromRequest(request);
-    if (!token) {
-      return unauthorizedError();
+    // Require leader authentication
+    const authResult = requireLeader(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
     }
-
-    const user = verifyToken(token);
-    if (!user || user.role !== 'leader') {
-      return forbiddenError();
-    }
+    const user = authResult;
 
     const { id } = await params;
     
-    // Validate ObjectId format
-    if (!ObjectId.isValid(id)) {
-      return badRequestError('Invalid user ID format');
+    // Get safe user data (validates ObjectId and removes password)
+    const userDataResult = await requireSafeUserData(id, 'User not found');
+    if (userDataResult instanceof NextResponse) {
+      return userDataResult;
     }
-    
-    const db = await getDatabase();
-    const users = db.collection('users');
-
-    // Check if user exists and is not a leader
-    const targetUserDoc = await users.findOne({ _id: new ObjectId(id) });
-    if (!targetUserDoc) {
-      return notFoundError('User not found');
-    }
+    const targetUserDoc = userDataResult;
 
     if (targetUserDoc.role === 'leader') {
       return badRequestError('Cannot delete team leader');
@@ -357,10 +327,12 @@ export async function DELETE(
     }
 
     // Delete user's leave requests first
+    const db = await getDatabase();
     const leaveRequests = db.collection('leaveRequests');
     await leaveRequests.deleteMany({ userId: id });
 
     // Delete the user
+    const users = db.collection('users');
     const result = await users.deleteOne({ _id: new ObjectId(id) });
 
     if (result.deletedCount === 0) {

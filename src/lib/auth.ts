@@ -25,6 +25,19 @@ interface DecodedToken {
 }
 
 export const verifyToken = (token: string): AuthUser | null => {
+  // Validate token format before attempting verification
+  if (!token || typeof token !== 'string' || token.trim().length === 0) {
+    // Don't log errors for missing tokens - this is expected
+    return null;
+  }
+  
+  // Basic JWT format validation (should have 3 parts separated by dots)
+  const parts = token.split('.');
+  if (parts.length !== 3) {
+    // Invalid JWT format - don't log as error, just return null
+    return null;
+  }
+  
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as DecodedToken;
     // Handle old tokens that might have teamIds/selectedTeamId - map to single teamId
@@ -36,6 +49,13 @@ export const verifyToken = (token: string): AuthUser | null => {
       teamId: decoded.teamId || decoded.selectedTeamId || (decoded.teamIds && decoded.teamIds.length > 0 ? decoded.teamIds[0] : undefined),
     };
   } catch (err) {
+    // Only log errors for tokens that look valid but fail verification (expired, invalid signature, etc.)
+    // Don't log for malformed tokens - this is expected for invalid tokens
+    if (err && typeof err === 'object' && 'name' in err && err.name === 'JsonWebTokenError' && 'message' in err && err.message === 'jwt malformed') {
+      // This is expected for invalid tokens - don't log
+      return null;
+    }
+    // Log other JWT errors (expired, invalid signature, etc.)
     console.error('Token verification error:', err);
     return null;
   }
@@ -44,7 +64,12 @@ export const verifyToken = (token: string): AuthUser | null => {
 export const getTokenFromRequest = (request: Request): string | null => {
   const authHeader = request.headers.get('authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    return authHeader.substring(7);
+    const token = authHeader.substring(7).trim();
+    // Return null for empty tokens
+    if (token.length === 0) {
+      return null;
+    }
+    return token;
   }
   return null;
 };

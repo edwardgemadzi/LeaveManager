@@ -10,8 +10,10 @@ import { internalServerError, unauthorizedError, badRequestError } from '@/lib/e
 
 export async function POST(request: NextRequest) {
   try {
-    // Apply rate limiting
-    const rateLimitResponse = authRateLimit(request);
+    // Apply rate limiting (skip in test mode)
+    const rateLimitResponse = process.env.NODE_ENV !== 'test' 
+      ? authRateLimit(request)
+      : null;
     if (rateLimitResponse) {
       return rateLimitResponse;
     }

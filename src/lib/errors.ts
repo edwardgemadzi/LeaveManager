@@ -66,10 +66,3 @@ export function internalServerError(message = 'Internal server error'): NextResp
   return errorResponse(message, 500);
 }
 
-/**
- * Validation error (400)
- */
-export function validationError(details: string[]): NextResponse<ErrorResponse> {
-  return errorResponse('Validation failed', 400, details);
-}
-

@@ -109,11 +109,36 @@ export function rateLimit(options: RateLimitOptions) {
 }
 
 // Predefined rate limiters
-export const authRateLimit = rateLimit({
+const authRateLimitConfig = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   maxRequests: 5, // 5 attempts per 15 minutes
   message: 'Too many authentication attempts. Please try again later.'
 });
+
+/**
+ * Authentication rate limiter with test environment support
+ * Skips rate limiting in test environment to allow parallel test execution
+ * 
+ * SECURITY: Only disables rate limiting via server-side environment variables.
+ * NEVER disable based on request headers (user-agent, etc.) - these can be spoofed!
+ */
+export function authRateLimit(request: NextRequest): NextResponse | null {
+  // Only disable rate limiting via server-side environment variables
+  // NEVER disable based on request headers (user-agent, etc.) - these can be spoofed!
+  const shouldDisable = process.env.NODE_ENV === 'test' || 
+                        process.env.DISABLE_RATE_LIMIT === 'true';
+  
+  // Safety check: Warn if rate limiting is disabled in production
+  if (shouldDisable && process.env.NODE_ENV === 'production') {
+    console.error('[SECURITY WARNING] Rate limiting is disabled in production!');
+  }
+  
+  if (shouldDisable) {
+    return null;
+  }
+  
+  return authRateLimitConfig(request);
+}
 
 export const apiRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes

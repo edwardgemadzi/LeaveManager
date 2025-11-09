@@ -1,24 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTokenFromRequest, verifyToken } from '@/lib/auth';
 import { UserModel } from '@/models/User';
 import { ShiftSchedule } from '@/types';
 import { error as logError } from '@/lib/logger';
-import { internalServerError, unauthorizedError, forbiddenError, badRequestError, notFoundError } from '@/lib/errors';
+import { internalServerError, badRequestError, notFoundError, forbiddenError } from '@/lib/errors';
+import { requireLeader } from '@/lib/api-helpers';
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const token = getTokenFromRequest(request);
-    if (!token) {
-      return unauthorizedError();
+    // Require leader authentication
+    const authResult = requireLeader(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
     }
-
-    const user = verifyToken(token);
-    if (!user || user.role !== 'leader') {
-      return forbiddenError();
-    }
+    const user = authResult;
 
     const { id } = await params;
     const { shiftSchedule } = await request.json();

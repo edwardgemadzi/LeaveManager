@@ -1,41 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTokenFromRequest, verifyToken } from '@/lib/auth';
 import { getDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { error as logError } from '@/lib/logger';
-import { internalServerError, unauthorizedError, badRequestError, notFoundError } from '@/lib/errors';
+import { internalServerError, badRequestError, notFoundError } from '@/lib/errors';
+import { requireAuth, requireSafeUserData } from '@/lib/api-helpers';
 
 export async function GET(request: NextRequest) {
   try {
-    const token = getTokenFromRequest(request);
-    if (!token) {
-      return unauthorizedError();
+    // Require authentication
+    const authResult = requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+    const user = authResult;
+
+    // Get safe user data (validates ObjectId and removes password)
+    const userDataResult = await requireSafeUserData(user.id, 'User not found');
+    if (userDataResult instanceof NextResponse) {
+      return userDataResult;
     }
 
-    const user = verifyToken(token);
-    if (!user) {
-      return unauthorizedError('Invalid token');
-    }
-
-    // Validate ObjectId format
-    if (!ObjectId.isValid(user.id)) {
-      return badRequestError('Invalid user ID format');
-    }
-    
-    // Get fresh user data from database
-    const db = await getDatabase();
-    const users = db.collection('users');
-    
-    const userData = await users.findOne({ _id: new ObjectId(user.id) });
-    if (!userData) {
-      return notFoundError('User not found');
-    }
-
-    // Remove sensitive data
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...safeUserData } = userData;
-
-    return NextResponse.json({ user: safeUserData });
+    return NextResponse.json({ user: userDataResult });
 
   } catch (error) {
     logError('Get profile error:', error);
@@ -45,15 +30,12 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const token = getTokenFromRequest(request);
-    if (!token) {
-      return unauthorizedError();
+    // Require authentication
+    const authResult = requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult;
     }
-
-    const user = verifyToken(token);
-    if (!user) {
-      return unauthorizedError('Invalid token');
-    }
+    const user = authResult;
 
     const { fullName } = await request.json();
 
@@ -61,11 +43,6 @@ export async function PATCH(request: NextRequest) {
       return badRequestError('Full name is required');
     }
 
-    // Validate ObjectId format
-    if (!ObjectId.isValid(user.id)) {
-      return badRequestError('Invalid user ID format');
-    }
-    
     // Update user profile
     const db = await getDatabase();
     const users = db.collection('users');
@@ -79,10 +56,12 @@ export async function PATCH(request: NextRequest) {
       return notFoundError('User not found');
     }
 
-    // Get updated user data
-    const updatedUser = await users.findOne({ _id: new ObjectId(user.id) });
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...safeUserData } = updatedUser!;
+    // Get updated safe user data (validates ObjectId and removes password)
+    const updatedUserResult = await requireSafeUserData(user.id, 'User not found');
+    if (updatedUserResult instanceof NextResponse) {
+      return updatedUserResult;
+    }
+    const safeUserData = updatedUserResult;
 
     return NextResponse.json({ 
       success: true, 

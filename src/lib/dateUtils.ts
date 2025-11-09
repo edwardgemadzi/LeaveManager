@@ -17,12 +17,3 @@ export const parseDateSafe = (dateInput: string | Date): Date => {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 };
 
-/**
- * Parse a date string and ensure it's normalized to local midnight
- * Useful for date-only comparisons
- */
-export const parseDateOnly = (dateString: string): Date => {
-  const date = new Date(dateString);
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-};
-
