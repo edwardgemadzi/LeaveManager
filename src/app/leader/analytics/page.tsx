@@ -879,14 +879,33 @@ export default function LeaderAnalyticsPage() {
                       </div>
 
                             <div className="bg-gray-50/50 dark:bg-gray-900/50 rounded-xl p-4 border border-gray-200 dark:border-gray-800">
-                              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Competition Level</p>
+                              <div className="flex items-center gap-2 mb-1">
+                                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Competition Level</p>
+                                {(() => {
+                                  const hasPartialCompetition = groupMembers.some(m => m.analytics.hasPartialCompetition);
+                                  const partialOverlapWithBalance = groupMembers.reduce((sum, m) => 
+                                    sum + (m.analytics.partialOverlapMembersWithBalance || 0), 0
+                                  );
+                                  
+                                  if (hasPartialCompetition) {
+                                    return (
+                                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                        partialOverlapWithBalance > 0
+                                          ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
+                                          : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                                      }`}>
+                                        {partialOverlapWithBalance > 0 ? '⚠️' : 'ℹ️'} {groupMembers.reduce((sum, m) => sum + (m.analytics.partialOverlapMembersCount || 0), 0)}
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+                              </div>
                             <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">
                           {groupMembers.length} members
                         </p>
                             <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                          {groupMembers.length > 0 
-                                ? Math.round(group.aggregate.groupTotalRealisticUsableDays / groupMembers.length)
-                            : 0} days/member
+                          {group.aggregate.groupAverageRealisticUsableDays} days/member
                         </p>
                       </div>
                           </div>
@@ -900,9 +919,20 @@ export default function LeaderAnalyticsPage() {
                           {groupMembers.map((member) => (
                             <div key={member.userId} className="flex items-center justify-between bg-gray-50/50 dark:bg-gray-900/50 rounded-xl p-4 border border-gray-200 dark:border-gray-800">
                               <div className="flex-1">
-                                <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                                  {member.fullName || member.username}
-                                </p>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                                    {member.fullName || member.username}
+                                  </p>
+                                  {member.analytics.hasPartialCompetition && (
+                                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                      (member.analytics.partialOverlapMembersWithBalance || 0) > 0
+                                        ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
+                                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                                    }`}>
+                                      {(member.analytics.partialOverlapMembersWithBalance || 0) > 0 ? '⚠️' : 'ℹ️'} {member.analytics.partialOverlapMembersCount || 0}
+                                    </span>
+                                  )}
+                                </div>
                                 {member.fullName && (
                                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{member.username}</p>
                                 )}

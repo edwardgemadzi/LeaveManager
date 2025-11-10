@@ -162,6 +162,30 @@ export const calculateDateAvailability = (
   const checkDate = new Date(date);
   checkDate.setHours(0, 0, 0, 0);
   
+  // Debug: Check if this is Zambia subgroup for enhanced logging
+  const isZambia = (userSubgroupTag || '').toLowerCase().includes('zambia');
+  
+  // Debug: Log for Zambia subgroup to see what's happening
+  if (typeof window === 'undefined' && isZambia) {
+    const logKey = `calcAvail_zambia_${team._id || 'unknown'}_${checkDate.toISOString().split('T')[0]}`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lastLog = (global as any)[logKey] || 0;
+    const nowTime = Date.now();
+    if (nowTime - lastLog > 3000) { // Log every 3 seconds for Zambia
+      console.log(`[TERMINAL] [calculateDateAvailability] Zambia - Starting check:`, {
+        date: checkDate.toISOString().split('T')[0],
+        userId,
+        userSubgroup: userSubgroupTag || 'Ungrouped',
+        userShiftTag: userShiftTag || 'none',
+        totalApprovedRequests: allApprovedRequests.length,
+        membersCount: members.length,
+        concurrentLeave
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (global as any)[logKey] = nowTime;
+    }
+  }
+  
   // Only consider this date if it's a working day for the user
   if (!isWorkingDay(checkDate, userShiftSchedule)) {
     // If it's not a working day for the user, return 0 (not usable)
@@ -170,7 +194,11 @@ export const calculateDateAvailability = (
   
   // Find all approved requests that overlap with this date
   // Exclude maternity leave requests from concurrent leave calculations (maternity leave is isolated)
+  // IMPORTANT: Explicitly filter by status to ensure only approved requests are counted
   const overlappingRequests = allApprovedRequests.filter(req => {
+    // Explicitly check status - only count approved requests
+    if (req.status !== 'approved') return false;
+    
     // Skip maternity leave requests
     if (req.reason && (req.reason.toLowerCase() === 'maternity' || req.reason.toLowerCase().includes('maternity') || req.reason.toLowerCase().includes('paternity'))) {
       return false;
@@ -182,8 +210,81 @@ export const calculateDateAvailability = (
     reqEnd.setHours(23, 59, 59, 999);
     
     // Check if date falls within request range
-    return checkDate >= reqStart && checkDate <= reqEnd;
+    const overlaps = checkDate >= reqStart && checkDate <= reqEnd;
+    
+    // Debug: Log when requests don't overlap (to understand why)
+    if (typeof window === 'undefined' && !overlaps && allApprovedRequests.length > 0) {
+      const logKey = `calcAvail_date_check_${team._id || 'unknown'}_${checkDate.toISOString().split('T')[0]}`;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const lastLog = (global as any)[logKey] || 0;
+      const nowTime = Date.now();
+      if (nowTime - lastLog > 10000) { // Log at most once per 10 seconds per date
+        // Sample a few requests to see their date ranges
+        const sampleRequests = allApprovedRequests.slice(0, 3).map(req => ({
+          userId: req.userId,
+          startDate: req.startDate,
+          endDate: req.endDate,
+          status: req.status,
+          overlaps: (() => {
+            const s = new Date(req.startDate);
+            const e = new Date(req.endDate);
+            s.setHours(0, 0, 0, 0);
+            e.setHours(23, 59, 59, 999);
+            return checkDate >= s && checkDate <= e;
+          })()
+        }));
+        console.warn(`[TERMINAL] [calculateDateAvailability] Date range check:`, {
+          checkDate: checkDate.toISOString().split('T')[0],
+          totalApprovedRequests: allApprovedRequests.length,
+          overlappingCount: allApprovedRequests.filter(r => {
+            if (r.status !== 'approved') return false;
+            const s = new Date(r.startDate);
+            const e = new Date(r.endDate);
+            s.setHours(0, 0, 0, 0);
+            e.setHours(23, 59, 59, 999);
+            return checkDate >= s && checkDate <= e;
+          }).length,
+          sampleRequests
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (global as any)[logKey] = nowTime;
+      }
+    }
+    
+    return overlaps;
   });
+  
+  // Debug: Log overlapping requests count for Zambia
+  if (typeof window === 'undefined' && isZambia) {
+    const logKey = `calcAvail_zambia_overlap_${team._id || 'unknown'}_${checkDate.toISOString().split('T')[0]}`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lastLog = (global as any)[logKey] || 0;
+    const nowTime = Date.now();
+    if (nowTime - lastLog > 3000) {
+      console.log(`[TERMINAL] [calculateDateAvailability] Zambia - Overlapping requests found:`, {
+        date: checkDate.toISOString().split('T')[0],
+        overlappingRequestsCount: overlappingRequests.length,
+        sampleOverlappingRequests: overlappingRequests.slice(0, 3).map(req => {
+          const reqUser = members.find(m => {
+            const mId = m._id ? String(m._id) : '';
+            const reqId = req.userId ? String(req.userId) : '';
+            return mId === reqId;
+          });
+          return {
+            userId: req.userId,
+            startDate: req.startDate,
+            endDate: req.endDate,
+            status: req.status,
+            reqUserSubgroup: reqUser?.subgroupTag || 'Ungrouped',
+            reqUserShiftTag: reqUser?.shiftTag || 'none',
+            reqUserFound: !!reqUser
+          };
+        })
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (global as any)[logKey] = nowTime;
+    }
+  }
   
   // Count only requests from users who:
   // 1. Work on this date (same working days)
@@ -191,33 +292,102 @@ export const calculateDateAvailability = (
   // 3. Have the same shiftTag (day/night/mixed)
   let relevantCount = 0;
   
+  // Debug: Track filtering reasons
+  let skippedSelf = 0;
+  let skippedUserNotFound = 0;
+  let skippedNotWorkingDay = 0;
+  let skippedNoTagOverlap = 0;
+  let skippedShiftTagMismatch = 0;
+  let skippedSubgroupMismatch = 0;
+  
   for (const req of overlappingRequests) {
     // Skip user's own requests (they don't block themselves)
-    if (req.userId === userId) continue;
+    // Convert both to strings for comparison (handle ObjectId and string types)
+    const reqUserId = req.userId ? String(req.userId) : '';
+    const checkUserId = userId ? String(userId) : '';
+    if (reqUserId === checkUserId) {
+      skippedSelf++;
+      continue;
+    }
     
-    const reqUser = members.find(m => m._id === req.userId);
-    if (!reqUser) continue;
+    // Convert both to strings for comparison (handle ObjectId and string types)
+    const reqUser = members.find(m => {
+      const mId = m._id ? String(m._id) : '';
+      return mId === reqUserId;
+    });
+    if (!reqUser) {
+      skippedUserNotFound++;
+      // Debug: Log if request user is not found in members array
+      if (typeof window === 'undefined') {
+        const logKey = `calcAvail_missing_${team._id || 'unknown'}`;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const lastLog = (global as any)[logKey] || 0;
+        const now = Date.now();
+        if (now - lastLog > 5000) {
+          console.warn(`[calculateDateAvailability] Request user not found in members array:`, {
+            requestUserId: req.userId,
+            membersCount: members.length,
+            date: checkDate.toISOString().split('T')[0],
+            overlappingRequestsCount: overlappingRequests.length
+          });
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (global as any)[logKey] = now;
+        }
+      }
+      continue;
+    }
     
     // Only count if the requesting user also works on this date
     // Use User object to support historical schedules for past dates
-    if (!isWorkingDay(checkDate, reqUser)) continue;
+    if (!isWorkingDay(checkDate, reqUser)) {
+      skippedNotWorkingDay++;
+      continue;
+    }
     
-    // Check if they have the same workingDaysTag
+    // Check if they have the same workingDaysTag OR have partial overlap
     // For rotating schedules, always regenerate (tags change daily)
     // For fixed schedules, use stored tag or generate if missing
     const reqUserWorkingDaysTag = reqUser.shiftSchedule?.type === 'rotating'
       ? generateWorkingDaysTag(reqUser.shiftSchedule)
       : (reqUser.workingDaysTag || generateWorkingDaysTag(reqUser.shiftSchedule));
+    
+    let hasWorkingDaysOverlap = false;
     if (userWorkingDaysTag !== undefined) {
-      if (reqUserWorkingDaysTag !== userWorkingDaysTag) continue;
+      // Check for exact tag match (100% overlap)
+      if (reqUserWorkingDaysTag === userWorkingDaysTag) {
+        hasWorkingDaysOverlap = true;
+      } else {
+        // Check for partial overlap (some intersecting working days)
+        // Only check if both users have shift schedules
+        if (userShiftSchedule && reqUser.shiftSchedule) {
+          hasWorkingDaysOverlap = detectPartialOverlap(userShiftSchedule, reqUser.shiftSchedule, 30);
+        }
+      }
+    } else {
+      // If user has no workingDaysTag, check for partial overlap
+      if (userShiftSchedule && reqUser.shiftSchedule) {
+        hasWorkingDaysOverlap = detectPartialOverlap(userShiftSchedule, reqUser.shiftSchedule, 30);
+      }
+    }
+    
+    // If no working days overlap (neither exact nor partial), skip this member
+    if (!hasWorkingDaysOverlap) {
+      skippedNoTagOverlap++;
+      continue;
     }
     
     // Check if they have the same shiftTag
     if (userShiftTag !== undefined) {
-      if (reqUser.shiftTag !== userShiftTag) continue;
+      if (reqUser.shiftTag !== userShiftTag) {
+        skippedShiftTagMismatch++;
+        continue;
+      }
     } else {
       // User has no shift tag - only count members with no shift tag
-      if (reqUser.shiftTag !== undefined) continue;
+      if (reqUser.shiftTag !== undefined) {
+        skippedShiftTagMismatch++;
+        continue;
+      }
     }
     
     // Check subgroup if subgrouping is enabled
@@ -228,11 +398,167 @@ export const calculateDateAvailability = (
       const reqUserSubgroup = reqUser.subgroupTag || 'Ungrouped';
       
       // Only count if they're in the same subgroup
-      if (userSubgroup !== reqUserSubgroup) continue;
+      if (userSubgroup !== reqUserSubgroup) {
+        skippedSubgroupMismatch++;
+        continue;
+      }
     }
     
-    // This member qualifies - they work on this day, have same tag, same shift tag, and same subgroup
+    // This member qualifies - they work on this day, have same tag or partial overlap, same shift tag, and same subgroup
     relevantCount++;
+  }
+  
+  // Debug: Log when requests ARE being counted (to verify it's working)
+  // Also log for Zambia subgroup specifically to debug the issue
+  if (typeof window === 'undefined' && overlappingRequests.length > 0) {
+    const logKey = `calcAvail_counted_${team._id || 'unknown'}_${checkDate.toISOString().split('T')[0]}_${userSubgroupTag || 'Ungrouped'}`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lastLog = (global as any)[logKey] || 0;
+    const nowTime = Date.now();
+    // Log more frequently for Zambia subgroup to debug
+    const isZambia = (userSubgroupTag || '').toLowerCase().includes('zambia');
+    const throttleTime = isZambia ? 2000 : 5000; // Log every 2 seconds for Zambia, 5 seconds for others
+    if (nowTime - lastLog > throttleTime) {
+      if (relevantCount > 0) {
+        console.log(`[TERMINAL] [calculateDateAvailability] Requests ARE being counted:`, {
+          date: checkDate.toISOString().split('T')[0],
+          overlappingRequestsCount: overlappingRequests.length,
+          relevantCount,
+          availability: Math.max(0, concurrentLeave - relevantCount),
+          userSubgroup: userSubgroupTag || 'Ungrouped',
+          userShiftTag: userShiftTag || 'none',
+          concurrentLeave
+        });
+      } else if (isZambia) {
+        // For Zambia, also log when there are overlapping requests but none are counted
+        const sampleOverlappingRequests = overlappingRequests.slice(0, 3).map(req => {
+          const reqUserId = req.userId ? String(req.userId) : '';
+          const reqUser = members.find(m => {
+            const mId = m._id ? String(m._id) : '';
+            return mId === reqUserId;
+          });
+          return {
+            userId: req.userId,
+            startDate: req.startDate,
+            endDate: req.endDate,
+            status: req.status,
+            reqUserSubgroup: reqUser?.subgroupTag || 'Ungrouped',
+            reqUserShiftTag: reqUser?.shiftTag || 'none',
+            reqUserFound: !!reqUser
+          };
+        });
+        console.warn(`[TERMINAL] [calculateDateAvailability] Zambia - Overlapping requests but none counted:`, {
+          date: checkDate.toISOString().split('T')[0],
+          overlappingRequestsCount: overlappingRequests.length,
+          relevantCount,
+          skippedSelf,
+          skippedUserNotFound,
+          skippedNotWorkingDay,
+          skippedNoTagOverlap,
+          skippedShiftTagMismatch,
+          skippedSubgroupMismatch,
+          userSubgroup: userSubgroupTag || 'Ungrouped',
+          userShiftTag: userShiftTag || 'none',
+          concurrentLeave,
+          sampleOverlappingRequests
+        });
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (global as any)[logKey] = nowTime;
+    }
+  }
+  
+  // Debug: Log filtering details for first few dates to understand why requests aren't blocking
+  // Always log to terminal (not browser console) for debugging
+  if (typeof window === 'undefined') {
+    // Log when there are overlapping requests but none are counted
+    if (overlappingRequests.length > 0 && relevantCount === 0) {
+      const logKey = `calcAvail_filter_${team._id || 'unknown'}_${checkDate.toISOString().split('T')[0]}`;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const lastLog = (global as any)[logKey] || 0;
+      const nowTime = Date.now();
+      if (nowTime - lastLog > 5000) { // Log at most once per 5 seconds per date
+        // Get sample of overlapping requests with their user info
+        const sampleOverlappingRequests = overlappingRequests.slice(0, 3).map(req => {
+          const reqUserId = req.userId ? String(req.userId) : '';
+          const reqUser = members.find(m => {
+            const mId = m._id ? String(m._id) : '';
+            return mId === reqUserId;
+          });
+          return {
+            userId: req.userId,
+            startDate: req.startDate,
+            endDate: req.endDate,
+            status: req.status,
+            reqUserSubgroup: reqUser?.subgroupTag || 'Ungrouped',
+            reqUserShiftTag: reqUser?.shiftTag || 'none',
+            reqUserFound: !!reqUser
+          };
+        });
+        console.warn(`[TERMINAL] [calculateDateAvailability] No requests counted as blocking:`, {
+          date: checkDate.toISOString().split('T')[0],
+          overlappingRequestsCount: overlappingRequests.length,
+          relevantCount,
+          skippedSelf,
+          skippedUserNotFound,
+          skippedNotWorkingDay,
+          skippedNoTagOverlap,
+          skippedShiftTagMismatch,
+          skippedSubgroupMismatch,
+          userSubgroup: userSubgroupTag || 'Ungrouped',
+          userShiftTag: userShiftTag || 'none',
+          concurrentLeave,
+          membersCount: members.length,
+          sampleOverlappingRequests
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (global as any)[logKey] = nowTime;
+      }
+    }
+    
+    // Also log when there are NO overlapping requests at all (to understand why)
+    if (overlappingRequests.length === 0 && allApprovedRequests.length > 0) {
+      const logKey = `calcAvail_no_overlap_${team._id || 'unknown'}_${checkDate.toISOString().split('T')[0]}`;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const lastLog = (global as any)[logKey] || 0;
+      const nowTime = Date.now();
+      if (nowTime - lastLog > 10000) { // Log at most once per 10 seconds per date
+        // Sample a few approved requests to see their dates
+        const sampleRequests = allApprovedRequests.slice(0, 3).map(req => {
+          const reqUserId = req.userId ? String(req.userId) : '';
+          const reqUser = members.find(m => {
+            const mId = m._id ? String(m._id) : '';
+            return mId === reqUserId;
+          });
+          return {
+            userId: req.userId,
+            startDate: req.startDate,
+            endDate: req.endDate,
+            status: req.status,
+            reqUserSubgroup: reqUser?.subgroupTag || 'Ungrouped',
+            reqUserShiftTag: reqUser?.shiftTag || 'none',
+            reqUserFound: !!reqUser,
+            overlaps: (() => {
+              const s = new Date(req.startDate);
+              const e = new Date(req.endDate);
+              s.setHours(0, 0, 0, 0);
+              e.setHours(23, 59, 59, 999);
+              return checkDate >= s && checkDate <= e;
+            })()
+          };
+        });
+        console.warn(`[TERMINAL] [calculateDateAvailability] No overlapping requests found:`, {
+          date: checkDate.toISOString().split('T')[0],
+          totalApprovedRequests: allApprovedRequests.length,
+          userSubgroup: userSubgroupTag || 'Ungrouped',
+          userShiftTag: userShiftTag || 'none',
+          membersCount: members.length,
+          sampleRequests
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (global as any)[logKey] = nowTime;
+      }
+    }
   }
   
   // Available slots = concurrent limit - current count
@@ -288,6 +614,15 @@ export const calculateUsableDays = (
   // Debug: Count days with different availability levels
   const availabilityCounts: Record<number, number> = {};
   
+  // Debug: Track approved requests that should block days
+  // Reuse the 'today' variable already defined above
+  const futureApprovedRequests = allApprovedRequests.filter(req => {
+    if (req.status !== 'approved') return false;
+    const reqStart = new Date(req.startDate);
+    reqStart.setHours(0, 0, 0, 0);
+    return reqStart >= today && reqStart <= yearEnd;
+  });
+
   for (const workingDay of remainingWorkingDays) {
     const availability = calculateDateAvailability(
       team,
@@ -333,17 +668,275 @@ export const calculateUsableDays = (
         return reqStart >= today && reqStart <= yearEnd;
       });
       
-      debug(`[calculateUsableDays] ${user.username} - Concurrent leave: ${team.settings.concurrentLeave}, Usable: ${usableDays}, Blocked: ${blockedDays}`);
-      debug(`[calculateUsableDays] ${user.username} - Availability distribution:`, availabilityCounts);
-      debug(`[calculateUsableDays] ${user.username} - Sample dates:`, sampleDates);
-      debug(`[calculateUsableDays] ${user.username} - Future approved requests: ${futureRequests.length}, Total approved requests: ${allApprovedRequests.length}`);
-      debug(`[calculateUsableDays] ${user.username} - Members in same group: ${allMembers.length}, User subgroup: ${userSubgroupTag || 'none'}, User shift: ${userShiftTag || 'none'}`);
+      console.log(`[TERMINAL] [calculateUsableDays] ${user.username} - Concurrent leave: ${team.settings.concurrentLeave}, Usable: ${usableDays}, Blocked: ${blockedDays}`);
+      console.log(`[TERMINAL] [calculateUsableDays] ${user.username} - Availability distribution:`, JSON.stringify(availabilityCounts));
+      console.log(`[TERMINAL] [calculateUsableDays] ${user.username} - Sample dates:`, sampleDates);
+      console.log(`[TERMINAL] [calculateUsableDays] ${user.username} - Future approved requests: ${futureApprovedRequests.length}, Total approved requests: ${allApprovedRequests.length}`);
+      console.log(`[TERMINAL] [calculateUsableDays] ${user.username} - Members in same group: ${allMembers.length}, User subgroup: ${userSubgroupTag || 'none'}, User shift: ${userShiftTag || 'none'}`);
+      
+      // Debug: Log sample of approved requests to verify they're being counted
+      if (futureApprovedRequests.length > 0) {
+        const sampleRequests = futureApprovedRequests.slice(0, 5).map(req => ({
+          userId: req.userId,
+          startDate: req.startDate,
+          endDate: req.endDate,
+          status: req.status,
+          reason: req.reason
+        }));
+        console.log(`[TERMINAL] [calculateUsableDays] ${user.username} - Sample approved requests:`, JSON.stringify(sampleRequests, null, 2));
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (global as any)[logKey] = now;
     }
   }
   
   return usableDays;
+};
+
+/**
+ * Detect if two shift schedules have ANY intersecting working days (partial overlap)
+ * Checks over a specified period (default 30 days) to find at least one day where both work
+ * 
+ * @param schedule1 - First shift schedule
+ * @param schedule2 - Second shift schedule
+ * @param checkPeriodDays - Number of days to check (default: 30)
+ * @returns true if schedules have at least one intersecting working day, false otherwise
+ */
+export const detectPartialOverlap = (
+  schedule1: ShiftSchedule | undefined,
+  schedule2: ShiftSchedule | undefined,
+  checkPeriodDays: number = 30
+): boolean => {
+  // If either schedule is missing, no overlap
+  if (!schedule1 || !schedule2) {
+    return false;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Check each day in the period
+  for (let i = 0; i < checkPeriodDays; i++) {
+    const checkDate = new Date(today);
+    checkDate.setDate(today.getDate() + i);
+    
+    const works1 = isWorkingDay(checkDate, schedule1);
+    const works2 = isWorkingDay(checkDate, schedule2);
+    
+    // If both work on this day, we have partial overlap
+    if (works1 && works2) {
+      return true;
+    }
+  }
+  
+  // No overlap found in the check period
+  return false;
+};
+
+/**
+ * Find members who have partial overlap with a given user
+ * 
+ * @param user - User to check overlap for
+ * @param allMembers - List of all team members
+ * @param checkPeriodDays - Number of days to check (default: 30)
+ * @returns Array of members who have partial overlap with the user
+ */
+export const findMembersWithPartialOverlap = (
+  user: User,
+  allMembers: User[],
+  checkPeriodDays: number = 30
+): User[] => {
+  if (!user.shiftSchedule) {
+    return [];
+  }
+
+  const overlappingMembers: User[] = [];
+  
+  for (const member of allMembers) {
+    // Skip the user themselves
+    if (member._id === user._id) {
+      continue;
+    }
+    
+    // Skip members without shift schedules
+    if (!member.shiftSchedule) {
+      continue;
+    }
+    
+    // Check for partial overlap
+    if (detectPartialOverlap(user.shiftSchedule, member.shiftSchedule, checkPeriodDays)) {
+      overlappingMembers.push(member);
+    }
+  }
+  
+  return overlappingMembers;
+};
+
+/**
+ * Group members by partial overlap (transitive grouping)
+ * Members with partial overlap are grouped together, even if they don't directly overlap
+ * Example: A overlaps B, B overlaps C → A, B, C are in the same group
+ * 
+ * @param members - List of all team members
+ * @param checkPeriodDays - Number of days to check for overlap (default: 30)
+ * @returns Map of group IDs to arrays of members in that group
+ */
+export const groupMembersByPartialOverlap = (
+  members: User[],
+  checkPeriodDays: number = 30
+): Map<string, User[]> => {
+  const groups = new Map<string, User[]>();
+  const processed = new Set<string>();
+  
+  for (const member of members) {
+    // Skip if already processed
+    if (!member._id || processed.has(member._id)) {
+      continue;
+    }
+    
+    // Skip members without shift schedules
+    if (!member.shiftSchedule) {
+      continue;
+    }
+    
+    // Start a new group with this member
+    const group: User[] = [member];
+    processed.add(member._id);
+    
+    // Find all members with partial overlap (transitive)
+    const toCheck: User[] = [member];
+    while (toCheck.length > 0) {
+      const current = toCheck.pop()!;
+      if (!current.shiftSchedule) continue;
+      
+      for (const other of members) {
+        // Skip if already processed or no ID
+        if (!other._id || processed.has(other._id)) {
+          continue;
+        }
+        
+        // Skip if no shift schedule
+        if (!other.shiftSchedule) {
+          continue;
+        }
+        
+        // Check for partial overlap
+        if (detectPartialOverlap(current.shiftSchedule, other.shiftSchedule, checkPeriodDays)) {
+          group.push(other);
+          toCheck.push(other);
+          processed.add(other._id);
+        }
+      }
+    }
+    
+    // Assign group ID (use first member's ID)
+    const groupId = member._id;
+    groups.set(groupId, group);
+  }
+  
+  return groups;
+};
+
+/**
+ * Suggest subgroup assignments based on partial overlap
+ * Groups members with partial overlap together and suggests subgroup assignments
+ * 
+ * @param members - List of all team members
+ * @param existingSubgroups - List of existing subgroup names
+ * @param checkPeriodDays - Number of days to check for overlap (default: 30)
+ * @returns Object containing suggested assignments and conflicts
+ */
+export interface SubgroupSuggestion {
+  memberId: string;
+  suggestedSubgroup: string;
+  reason: 'partial-overlap' | 'manual-override';
+  overlappingMembers: string[]; // IDs of members with partial overlap
+}
+
+export interface SubgroupSuggestions {
+  suggestions: SubgroupSuggestion[];
+  conflicts: Array<{
+    memberId: string;
+    currentSubgroup: string;
+    suggestedSubgroup: string;
+    reason: string;
+  }>;
+}
+
+export const suggestSubgroupAssignments = (
+  members: User[],
+  existingSubgroups: string[],
+  checkPeriodDays: number = 30
+): SubgroupSuggestions => {
+  // Group members by partial overlap
+  const overlapGroups = groupMembersByPartialOverlap(members, checkPeriodDays);
+  
+  // If no subgroups exist, return empty suggestions
+  if (!existingSubgroups || existingSubgroups.length === 0) {
+    return {
+      suggestions: [],
+      conflicts: [],
+    };
+  }
+  
+  const suggestions: SubgroupSuggestion[] = [];
+  const conflicts: Array<{
+    memberId: string;
+    currentSubgroup: string;
+    suggestedSubgroup: string;
+    reason: string;
+  }> = [];
+  
+  // Create a map of member ID to current subgroup
+  const memberSubgroupMap = new Map<string, string>();
+  for (const member of members) {
+    if (member._id) {
+      memberSubgroupMap.set(member._id, member.subgroupTag || 'Ungrouped');
+    }
+  }
+  
+  // Assign each overlap group to a subgroup
+  let subgroupIndex = 0;
+  for (const [groupId, groupMembers] of overlapGroups.entries()) {
+    // Assign to next available subgroup (round-robin if more groups than subgroups)
+    const suggestedSubgroup = existingSubgroups[subgroupIndex % existingSubgroups.length];
+    
+    for (const member of groupMembers) {
+      if (!member._id) continue;
+      
+      const currentSubgroup = memberSubgroupMap.get(member._id) || 'Ungrouped';
+      
+      // Get IDs of overlapping members
+      const overlappingMemberIds = groupMembers
+        .filter(m => m._id !== member._id && m._id)
+        .map(m => m._id!);
+      
+      // Add suggestion
+      suggestions.push({
+        memberId: member._id,
+        suggestedSubgroup,
+        reason: 'partial-overlap',
+        overlappingMembers: overlappingMemberIds,
+      });
+      
+      // Check for conflicts (member in different subgroup than suggested)
+      if (currentSubgroup !== suggestedSubgroup && currentSubgroup !== 'Ungrouped') {
+        conflicts.push({
+          memberId: member._id,
+          currentSubgroup,
+          suggestedSubgroup,
+          reason: `Has partial overlap with members in ${suggestedSubgroup}`,
+        });
+      }
+    }
+    
+    subgroupIndex++;
+  }
+  
+  return {
+    suggestions,
+    conflicts,
+  };
 };
 
 // Check if two shift schedules have overlapping working days
@@ -369,6 +962,7 @@ export const schedulesHaveOverlappingWorkingDays = (
 
 // Calculate how many members share the same working days (for competition context)
 // Uses workingDaysTag to identify members who work on exactly the same days (100% overlap)
+// Also includes members with partial overlap (some intersecting working days)
 // Also considers shiftTag (day/night/mixed) to separate shift types
 export const calculateMembersSharingSameShift = (
   user: User,
@@ -386,8 +980,8 @@ export const calculateMembersSharingSameShift = (
   // Ensure allMembers only contains members (filter out leaders if any)
   const memberList = allMembers.filter(m => m.role === 'member');
   
-  // Count members who have the exact same working days tag, shift tag, and subgroup tag
-  // IMPORTANT: All conditions must be true - working days AND shift tag AND subgroup
+  // Count members who have the exact same working days tag OR partial overlap, shift tag, and subgroup tag
+  // IMPORTANT: All conditions must be true - (working days OR partial overlap) AND shift tag AND subgroup
   const membersWithSameTag = memberList.filter(member => {
     // Skip self - use both _id comparison and ensure we're not comparing to self
     if (!member._id || !user._id) return false;
@@ -402,8 +996,19 @@ export const calculateMembersSharingSameShift = (
     const memberShiftTag = member.shiftTag;
     const memberSubgroupTag = member.subgroupTag;
     
-    // FIRST: Must have exact same working days pattern (this is the primary filter)
-    if (memberWorkingDaysTag !== userWorkingDaysTag) {
+    // FIRST: Must have exact same working days pattern OR partial overlap
+    let hasWorkingDaysOverlap = false;
+    if (memberWorkingDaysTag === userWorkingDaysTag) {
+      // Exact match (100% overlap)
+      hasWorkingDaysOverlap = true;
+    } else {
+      // Check for partial overlap (some intersecting working days)
+      if (user.shiftSchedule && member.shiftSchedule) {
+        hasWorkingDaysOverlap = detectPartialOverlap(user.shiftSchedule, member.shiftSchedule, 30);
+      }
+    }
+    
+    if (!hasWorkingDaysOverlap) {
       return false;
     }
     
@@ -471,13 +1076,14 @@ export const calculateGroupRemainderDays = (
     .filter(m => m.remainingBalance > 0); // Only include members with balance > 0
   
   if (availableMembers.length === 0) {
-    return groupUsableDays; // All members have 0 balance, all days are remainder
+    return 0; // All members have 0 balance, no one can use days - no remainder to allocate
   }
   
   let pool = groupUsableDays; // Days available for allocation
   
-  // Phase 1: Base allocation - give each member floor(pool / totalMembers)
-  const baseAllocation = Math.floor(pool / groupMembers.length);
+  // Phase 1: Base allocation - give each member floor(pool / availableMembers)
+  // Only allocate to members with balance > 0 (zero-balance members are excluded)
+  const baseAllocation = Math.floor(pool / availableMembers.length);
   
   for (const memberData of availableMembers) {
     const canAllocate = Math.min(baseAllocation, memberData.remainingBalance);
@@ -591,11 +1197,14 @@ export interface MemberAnalytics {
   carryoverLimitedToMonths?: number[]; // Array of month indices (0-11) where carryover can be used
   carryoverMaxDays?: number; // Maximum days that can carry over
   carryoverExpiryDate?: Date; // Date when carryover days expire
-  membersSharingSameShift: number; // Total members competing for same days
+  membersSharingSameShift: number; // Total members competing for same days (includes exact match and partial overlap)
   averageDaysPerMember: number; // Average realistic days per member in same shift (whole days)
   surplusBalance: number; // Surplus balance when manual balance exceeds team max
   remainderDays: number; // Extra days that need allocation decisions (remainder from usableDays / membersSharingSameShift)
   realisticCarryoverUsableDays?: number; // Realistic usable days for carryover balance, considering limitations (if any)
+  hasPartialCompetition: boolean; // True if there are members with partial overlap (not exact workingDaysTag match)
+  partialOverlapMembersCount: number; // Number of members with partial overlap (not exact match)
+  partialOverlapMembersWithBalance: number; // Number of partial overlap members who have leave balances
 }
 
 // Analytics data structure for maternity leave (simpler, no competition metrics)
@@ -745,11 +1354,58 @@ export const getMemberAnalytics = (
     !req.reason || !isMaternityLeave(req.reason)
   );
   
+  // Calculate remaining leave balance first (needed for filtering)
+  // Note: approvedRequests parameter should already be filtered to approved requests
+  // But we filter again here for safety and consistency with leave balance page
+  // Include reason field so calculateLeaveBalance can filter out maternity leave
+  const approvedRequestsForCalculation = approvedRequests
+    .filter(req => req.status === 'approved')
+    .map(req => ({
+      startDate: new Date(req.startDate),
+      endDate: new Date(req.endDate),
+      reason: req.reason
+    }));
+  
+  // Calculate base balance (same simplified logic as calculateLeaveBalance):
+  // - If manualLeaveBalance is set, always use it as base (whether above or below maxLeavePerYear)
+  // - If manualLeaveBalance is not set, use maxLeavePerYear
+  const baseLeaveBalance = user.manualLeaveBalance !== undefined ? user.manualLeaveBalance : team.settings.maxLeavePerYear;
+  
+  // Use User object to support historical schedules for past dates
+  const remainingLeaveBalance = calculateLeaveBalance(
+    team.settings.maxLeavePerYear,
+    approvedRequestsForCalculation,
+    user,
+    user.manualLeaveBalance,
+    user.manualYearToDateUsed
+  );
+  
+  // Filter members to only include those with remaining balance > 0 for competition calculations
+  // Members with 0 remaining balance should not affect realistic usable days calculations
+  // This ensures partial overlap members with zero balance don't dilute the allocation
+  const membersWithRemainingBalance = membersWithNonZeroBase.filter(member => {
+    const memberRemainingBalance = calculateLeaveBalance(
+      team.settings.maxLeavePerYear,
+      allApprovedRequests.filter(req => req.userId === member._id),
+      member,
+      member.manualLeaveBalance,
+      member.manualYearToDateUsed
+    );
+    return memberRemainingBalance > 0;
+  });
+  
+  // Calculate usable days using all filtered members (same subgroup)
+  // This includes members with zero base balance because their approved requests still block days
+  // However, only members with remaining balance > 0 will be counted in membersSharingSameShift
+  // This ensures:
+  // 1. Approved requests from ALL members in the same subgroup block days (correct availability)
+  // 2. Only members who can actually use days are counted in competition (correct allocation)
+  // IMPORTANT: Use filteredMembers (not membersWithNonZeroBase) so requests from members with 0 balance still block days
   const usableDays = calculateUsableDays(
     user,
     team,
     regularApprovedRequests, // Only regular leave requests (exclude maternity/paternity)
-    membersWithNonZeroBase, // Use members with non-zero base balance
+    filteredMembers, // Include ALL members in same subgroup (their requests block days, even if they have 0 balance)
     shiftSchedule
   );
   
@@ -792,38 +1448,80 @@ export const getMemberAnalytics = (
     ? user.manualYearToDateUsed 
     : yearToDateWorkingDays;
   
-  // Calculate remaining leave balance
-  // Note: approvedRequests parameter should already be filtered to approved requests
-  // But we filter again here for safety and consistency with leave balance page
-  // Include reason field so calculateLeaveBalance can filter out maternity leave
-  const approvedRequestsForCalculation = approvedRequests
-    .filter(req => req.status === 'approved')
-    .map(req => ({
-      startDate: new Date(req.startDate),
-      endDate: new Date(req.endDate),
-      reason: req.reason
-    }));
-  
-  // Calculate base balance (same simplified logic as calculateLeaveBalance):
-  // - If manualLeaveBalance is set, always use it as base (whether above or below maxLeavePerYear)
-  // - If manualLeaveBalance is not set, use maxLeavePerYear
-  const baseLeaveBalance = user.manualLeaveBalance !== undefined ? user.manualLeaveBalance : team.settings.maxLeavePerYear;
-  
-  // Use User object to support historical schedules for past dates
-  const remainingLeaveBalance = calculateLeaveBalance(
-    team.settings.maxLeavePerYear,
-    approvedRequestsForCalculation,
-    user,
-    user.manualLeaveBalance,
-    user.manualYearToDateUsed
-  );
-  
   // Calculate surplus balance
   const surplusBalance = calculateSurplusBalance(user.manualLeaveBalance, team.settings.maxLeavePerYear);
   
   // Calculate competition metrics (using filtered members if subgrouping is enabled)
-  // Only include members with non-zero base balance in competition calculations
-  const membersSharingSameShift = calculateMembersSharingSameShift(user, membersWithNonZeroBase);
+  // Only include members with remaining balance > 0 in competition calculations
+  // This ensures members with zero balance (including partial overlap members) don't affect calculations
+  const membersSharingSameShift = calculateMembersSharingSameShift(user, membersWithRemainingBalance);
+  
+  // Calculate partial overlap members (members with partial overlap but not exact workingDaysTag match)
+  const userWorkingDaysTag = user.shiftSchedule?.type === 'rotating'
+    ? generateWorkingDaysTag(user.shiftSchedule)
+    : (user.workingDaysTag || generateWorkingDaysTag(user.shiftSchedule));
+  const userShiftTag = user.shiftTag;
+  const userSubgroupTag = user.subgroupTag;
+  
+  const partialOverlapMembers: User[] = [];
+  const partialOverlapMembersWithBalance: User[] = [];
+  
+  // Calculate partial overlap members - only check members with remaining balance > 0
+  // Members with zero balance should not be counted in partial overlap competition
+  for (const member of membersWithRemainingBalance) {
+    // Skip self
+    if (!member._id || !user._id || String(member._id).trim() === String(user._id).trim()) {
+      continue;
+    }
+    
+    // Get member's working days tag
+    const memberWorkingDaysTag = member.shiftSchedule?.type === 'rotating'
+      ? generateWorkingDaysTag(member.shiftSchedule)
+      : (member.workingDaysTag || generateWorkingDaysTag(member.shiftSchedule));
+    const memberShiftTag = member.shiftTag;
+    const memberSubgroupTag = member.subgroupTag;
+    
+    // Check if they have exact match - if so, skip (not partial overlap)
+    if (memberWorkingDaysTag === userWorkingDaysTag) {
+      continue;
+    }
+    
+    // Check for partial overlap
+    if (user.shiftSchedule && member.shiftSchedule) {
+      if (detectPartialOverlap(user.shiftSchedule, member.shiftSchedule, 30)) {
+        // Check shift tag match
+        let shiftTagMatches = false;
+        if (userShiftTag !== undefined) {
+          shiftTagMatches = memberShiftTag === userShiftTag;
+        } else {
+          shiftTagMatches = memberShiftTag === undefined;
+        }
+        
+        if (!shiftTagMatches) {
+          continue;
+        }
+        
+        // Check subgroup match (if subgrouping is enabled)
+        if (team.settings.enableSubgrouping) {
+          const userSubgroup = userSubgroupTag || 'Ungrouped';
+          const memberSubgroup = memberSubgroupTag || 'Ungrouped';
+          if (userSubgroup !== memberSubgroup) {
+            continue;
+          }
+        }
+        
+        // This member has partial overlap and has remaining balance > 0
+        partialOverlapMembers.push(member);
+        
+        // Member already has remaining balance > 0 (filtered above)
+        partialOverlapMembersWithBalance.push(member);
+      }
+    }
+  }
+  
+  const hasPartialCompetition = partialOverlapMembers.length > 0;
+  const partialOverlapMembersCount = partialOverlapMembers.length;
+  const partialOverlapMembersWithBalanceCount = partialOverlapMembersWithBalance.length;
   
   // Calculate realistic usable days - factors in members sharing same schedule
   // This accounts for concurrent leave limit - if members <= concurrentLeave,
@@ -941,7 +1639,10 @@ export const getMemberAnalytics = (
     averageDaysPerMember,
     surplusBalance,
     remainderDays,
-    realisticCarryoverUsableDays
+    realisticCarryoverUsableDays,
+    hasPartialCompetition,
+    partialOverlapMembersCount,
+    partialOverlapMembersWithBalance: partialOverlapMembersWithBalanceCount
   };
 };
 
@@ -1139,7 +1840,11 @@ export const getTeamAnalytics = (
   let totalRealisticUsableDays = 0;
   for (const [, groupMembers] of groupsMap.entries()) {
     // All members in the same group should see the same usableDays (same shift, same tags)
-    const groupUsableDays = groupMembers.length > 0 ? groupMembers[0].analytics.usableDays : 0;
+    // However, members might have different shift schedules (different start dates for rotating schedules)
+    // which can result in different working days in the date range, leading to different usable days.
+    // To ensure consistency, we use the minimum usable days across all members in the group.
+    const allUsableDays = groupMembers.map(m => m.analytics.usableDays);
+    const groupUsableDays = groupMembers.length > 0 ? Math.min(...allUsableDays) : 0;
     totalUsableDays += groupUsableDays; // Add each group's pool once (not per member)
     // Calculate remainder using iterative allocation that accounts for member constraints
     // Note: groupUsableDays already accounts for concurrent leave constraints
@@ -1336,10 +2041,57 @@ export const getGroupedTeamAnalytics = (
     }
     
     const groupTotalMembers = groupMembers.length;
-    // All members in the same group should see the same usableDays (same shift, same tags)
-    // So we should use the usableDays from one member, not sum them
-    // If we sum, we're multiplying the same value by number of members
-    const groupUsableDays = groupMembers.length > 0 ? groupMembers[0].analytics.usableDays : 0;
+    // All members in the same group share the same working days and schedule
+    // Therefore, they should all have the same usable days.
+    // Use the minimum usable days across all members in the group to ensure consistency.
+    // This represents the shared pool of available days for the group.
+    let groupUsableDays = 0;
+    if (groupMembers.length > 0) {
+      const allUsableDays = groupMembers.map(m => m.analytics.usableDays);
+      groupUsableDays = Math.min(...allUsableDays);
+      
+      // Normalize all members in the group to have the same usable days
+      // Since they share the same working days and schedule, they should all see the same value
+      for (const memberAnalytic of groupMembers) {
+        memberAnalytic.analytics.usableDays = groupUsableDays;
+      }
+      
+      // Recalculate realistic usable days based on the shared pool
+      // This ensures fair distribution of the shared pool among members based on their remaining balance
+      const concurrentLeave = team.settings.concurrentLeave || 1;
+      const membersWithBalance = groupMembers.filter(m => m.analytics.remainingLeaveBalance > 0);
+      
+      if (membersWithBalance.length > 0) {
+        // Calculate base allocation per member from the shared pool
+        let baseAllocationPerMember: number;
+        if (membersWithBalance.length <= concurrentLeave) {
+          // Enough slots per day for all members - each can use all usable days
+          baseAllocationPerMember = groupUsableDays;
+        } else {
+          // More members than slots - divide slots proportionally
+          baseAllocationPerMember = Math.floor((groupUsableDays * concurrentLeave) / membersWithBalance.length);
+        }
+        
+        // Allocate realistic days to each member based on their remaining balance
+        for (const memberAnalytic of groupMembers) {
+          if (memberAnalytic.analytics.remainingLeaveBalance > 0) {
+            // Cap by remaining leave balance
+            memberAnalytic.analytics.realisticUsableDays = Math.min(
+              baseAllocationPerMember,
+              memberAnalytic.analytics.remainingLeaveBalance
+            );
+          } else {
+            // Members with zero balance get zero realistic days
+            memberAnalytic.analytics.realisticUsableDays = 0;
+          }
+        }
+      } else {
+        // All members have zero balance - set realistic days to 0
+        for (const memberAnalytic of groupMembers) {
+          memberAnalytic.analytics.realisticUsableDays = 0;
+        }
+      }
+    }
     const groupTotalUsableDays = groupUsableDays; // This is the shared pool, not a sum
     const groupTotalRealisticUsableDays = groupMembers.reduce((sum, m) => sum + m.analytics.realisticUsableDays, 0);
     // Calculate remainder using iterative allocation that accounts for member constraints
@@ -1356,9 +2108,13 @@ export const getGroupedTeamAnalytics = (
       workingDaysTag,
       aggregate: {
         groupTotalMembers,
-        groupAverageRealisticUsableDays: groupTotalMembers > 0
-          ? Math.floor(groupTotalRealisticUsableDays / groupTotalMembers)
-          : 0,
+        groupAverageRealisticUsableDays: (() => {
+          // Only count members with realisticUsableDays > 0 in average calculation
+          // This gives a more accurate average of what members can actually use
+          const membersWithRealisticDays = groupMembers.filter(m => m.analytics.realisticUsableDays > 0);
+          if (membersWithRealisticDays.length === 0) return 0;
+          return Math.floor(groupTotalRealisticUsableDays / membersWithRealisticDays.length);
+        })(),
         groupTotalUsableDays,
         groupTotalRealisticUsableDays,
         groupTotalRemainderDays,
@@ -1367,7 +2123,7 @@ export const getGroupedTeamAnalytics = (
           : 0,
         groupTotalLeaveBalance,
         groupAverageUsableDays: groupTotalMembers > 0
-          ? Math.round((groupTotalUsableDays / groupTotalMembers) * 10) / 10
+          ? Math.round((groupMembers.reduce((sum, m) => sum + m.analytics.usableDays, 0) / groupTotalMembers) * 10) / 10
           : 0,
       },
       members: groupMembers.map(m => ({
