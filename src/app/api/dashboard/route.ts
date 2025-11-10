@@ -55,9 +55,10 @@ export async function GET(request: NextRequest) {
       const groupedAnalytics = getGroupedTeamAnalytics(memberList, team, allRequests);
       
       // Find the member's analytics from the grouped result
+      // IMPORTANT: Convert both to strings for comparison to handle ObjectId vs string mismatches
       let memberAnalytics = null;
       for (const group of groupedAnalytics.groups) {
-        const memberInGroup = group.members.find(m => m.userId === user.id);
+        const memberInGroup = group.members.find(m => String(m.userId) === String(user.id));
         if (memberInGroup) {
           memberAnalytics = memberInGroup.analytics;
           break;
@@ -107,6 +108,8 @@ export async function GET(request: NextRequest) {
         manualMaternityLeaveBalance: currentUser.manualMaternityLeaveBalance,
         manualMaternityYearToDateUsed: currentUser.manualMaternityYearToDateUsed,
         maternityPaternityType: currentUser.maternityPaternityType,
+        carryoverFromPreviousYear: currentUser.carryoverFromPreviousYear,
+        carryoverExpiryDate: currentUser.carryoverExpiryDate,
       } : null,
       members: members.map(member => {
         const baseMember = {

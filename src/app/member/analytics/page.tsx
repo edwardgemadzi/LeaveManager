@@ -39,10 +39,12 @@ export default function MemberAnalyticsPage() {
       setUser(userData);
 
       // Fetch dashboard data (which includes requests)
-      const dashboardResponse = await fetch('/api/dashboard', {
+      // Add cache-busting query parameter to prevent Vercel caching issues
+      const dashboardResponse = await fetch(`/api/dashboard?t=${Date.now()}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
+        cache: 'no-store',
       });
 
       if (!dashboardResponse.ok) {
@@ -626,6 +628,15 @@ export default function MemberAnalyticsPage() {
                       >
                         <InformationCircleIcon className="h-4 w-4" />
                       </button>
+                      {analytics.hasPartialCompetition && (
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                          analytics.partialOverlapMembersWithBalance > 0
+                            ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                        }`}>
+                          {analytics.partialOverlapMembersWithBalance > 0 ? '⚠️' : 'ℹ️'} {analytics.partialOverlapMembersCount}
+                        </span>
+                      )}
                     </div>
                     <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
                       {analytics.membersSharingSameShift ?? 0}
@@ -668,7 +679,18 @@ export default function MemberAnalyticsPage() {
                   <UsersIcon className="h-6 w-6 text-blue-700 dark:text-blue-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-indigo-900 dark:text-indigo-300 mb-2">Competition Context</p>
+                  <div className="flex items-center gap-2 mb-2">
+                    <p className="font-semibold text-indigo-900 dark:text-indigo-300">Competition Context</p>
+                    {analytics.hasPartialCompetition && (
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        analytics.partialOverlapMembersWithBalance > 0
+                          ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border border-orange-300 dark:border-orange-700'
+                          : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                      }`}>
+                        {analytics.partialOverlapMembersWithBalance > 0 ? '⚠️' : 'ℹ️'} {analytics.partialOverlapMembersCount} partial overlap
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-indigo-700 dark:text-indigo-400 mb-2 leading-relaxed">
                     <strong>{analytics.membersSharingSameShift}</strong> team member{analytics.membersSharingSameShift !== 1 ? 's' : ''} 
                     {' '}with the <strong>same working days pattern</strong>{(() => {
@@ -681,6 +703,16 @@ export default function MemberAnalyticsPage() {
                     })()} and <strong>shift type</strong> need to coordinate use of 
                     {' '}<strong>{Math.round(analytics.usableDays ?? 0)}</strong> available days.
                   </p>
+                  {analytics.hasPartialCompetition && analytics.partialOverlapMembersWithBalance > 0 && (
+                    <p className="text-sm text-orange-700 dark:text-orange-400 mb-2 leading-relaxed font-medium">
+                      ⚠️ <strong>{analytics.partialOverlapMembersWithBalance}</strong> member{analytics.partialOverlapMembersWithBalance !== 1 ? 's' : ''} with <strong>different shift patterns</strong> but <strong>overlapping working days</strong> {analytics.partialOverlapMembersWithBalance > 1 ? 'have' : 'has'} leave balances and may compete for the same dates.
+                    </p>
+                  )}
+                  {analytics.hasPartialCompetition && analytics.partialOverlapMembersWithBalance === 0 && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 leading-relaxed">
+                      ℹ️ {analytics.partialOverlapMembersCount} member{analytics.partialOverlapMembersCount !== 1 ? 's' : ''} with different shift patterns but overlapping working days (no active leave balances).
+                    </p>
+                  )}
                   <p className="text-sm text-indigo-700 dark:text-indigo-400 leading-relaxed">
                     Average of <strong>{Math.round(analytics.averageDaysPerMember)}</strong> days per member available.
                     You can realistically use <strong>{Math.round(analytics.realisticUsableDays ?? 0)}</strong> days.
