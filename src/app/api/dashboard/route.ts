@@ -7,6 +7,10 @@ import { getMemberAnalytics, getGroupedTeamAnalytics } from '@/lib/analyticsCalc
 import { error as logError } from '@/lib/logger';
 import { internalServerError } from '@/lib/errors';
 
+// Disable caching for this API route to ensure fresh data
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(request: NextRequest) {
   try {
     const token = getTokenFromRequest(request);
@@ -43,20 +47,39 @@ export async function GET(request: NextRequest) {
     // Calculate analytics based on role
     let analytics;
     if (user.role === 'member') {
-      // Return member's own analytics
-      const memberRequests = allRequests.filter(req => 
-        req.userId === user.id && req.status === 'approved'
-      );
+      // IMPORTANT: Use grouped analytics to ensure members see the same normalized values as leaders
+      // This ensures consistency between member and leader views
       const memberList = members.filter(m => m.role === 'member');
-      const allApprovedRequests = allRequests.filter(req => req.status === 'approved');
       
-      analytics = getMemberAnalytics(
-        currentUser,
-        team,
-        memberRequests,
-        allApprovedRequests,
-        memberList
-      );
+      // Calculate grouped analytics first (this normalizes usableDays and recalculates realisticUsableDays)
+      const groupedAnalytics = getGroupedTeamAnalytics(memberList, team, allRequests);
+      
+      // Find the member's analytics from the grouped result
+      let memberAnalytics = null;
+      for (const group of groupedAnalytics.groups) {
+        const memberInGroup = group.members.find(m => m.userId === user.id);
+        if (memberInGroup) {
+          memberAnalytics = memberInGroup.analytics;
+          break;
+        }
+      }
+      
+      // Fallback to individual calculation if member not found in groups (shouldn't happen, but safety)
+      if (!memberAnalytics) {
+        const memberRequests = allRequests.filter(req => 
+          req.userId === user.id && req.status === 'approved'
+        );
+        const allApprovedRequests = allRequests.filter(req => req.status === 'approved');
+        memberAnalytics = getMemberAnalytics(
+          currentUser,
+          team,
+          memberRequests,
+          allApprovedRequests,
+          memberList
+        );
+      }
+      
+      analytics = memberAnalytics;
     } else if (user.role === 'leader') {
       // Return grouped team analytics for leaders
       analytics = getGroupedTeamAnalytics(members, team, allRequests);
@@ -117,7 +140,13 @@ export async function GET(request: NextRequest) {
       analytics: user.role === 'leader' ? analytics : { analytics },
     };
     
-    return NextResponse.json(response);
+    return NextResponse.json(response, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
   } catch (error) {
     logError('Dashboard API error:', error);
     return internalServerError();
