@@ -61,9 +61,9 @@ export async function PATCH(
     }
     
     const body = await request.json();
-    const { fullName, shiftTag, subgroupTag, manualLeaveBalance, manualYearToDateUsed, manualMaternityLeaveBalance, manualMaternityYearToDateUsed, newPassword, maternityPaternityType } = body;
+    const { fullName, shiftTag, subgroupTag, manualLeaveBalance, manualYearToDateUsed, manualMaternityLeaveBalance, manualMaternityYearToDateUsed, newPassword, maternityPaternityType, carryoverFromPreviousYear, carryoverExpiryDate } = body;
 
-    if (!fullName && shiftTag === undefined && subgroupTag === undefined && manualLeaveBalance === undefined && manualYearToDateUsed === undefined && manualMaternityLeaveBalance === undefined && manualMaternityYearToDateUsed === undefined && !newPassword && maternityPaternityType === undefined) {
+    if (!fullName && shiftTag === undefined && subgroupTag === undefined && manualLeaveBalance === undefined && manualYearToDateUsed === undefined && manualMaternityLeaveBalance === undefined && manualMaternityYearToDateUsed === undefined && !newPassword && maternityPaternityType === undefined && carryoverFromPreviousYear === undefined && carryoverExpiryDate === undefined) {
       return badRequestError('At least one field is required');
     }
 
@@ -137,9 +137,37 @@ export async function PATCH(
       }
     }
 
+    // Validate carryoverFromPreviousYear if provided
+    if (carryoverFromPreviousYear !== undefined) {
+      if (carryoverFromPreviousYear !== null) {
+        if (typeof carryoverFromPreviousYear !== 'number' || carryoverFromPreviousYear < 0) {
+          return badRequestError('carryoverFromPreviousYear must be a non-negative number');
+        }
+        
+        // Validate maximum limit to prevent abuse (1000 days = ~2.7 years, more than enough)
+        const MAX_CARRYOVER = 1000;
+        if (carryoverFromPreviousYear > MAX_CARRYOVER) {
+          return badRequestError(`carryoverFromPreviousYear cannot exceed ${MAX_CARRYOVER} days`);
+        }
+      }
+    }
+
+    // Validate carryoverExpiryDate if provided
+    if (carryoverExpiryDate !== undefined) {
+      if (carryoverExpiryDate !== null) {
+        if (typeof carryoverExpiryDate !== 'string') {
+          return badRequestError('carryoverExpiryDate must be a string (ISO date format)');
+        }
+        const expiryDate = new Date(carryoverExpiryDate);
+        if (isNaN(expiryDate.getTime())) {
+          return badRequestError('carryoverExpiryDate must be a valid date');
+        }
+      }
+    }
+
     // Build update object
-    const updateData: { fullName?: string; shiftTag?: string; subgroupTag?: string; manualLeaveBalance?: number; manualYearToDateUsed?: number; manualMaternityLeaveBalance?: number; manualMaternityYearToDateUsed?: number; password?: string; maternityPaternityType?: 'maternity' | 'paternity' | null } = {};
-    const unsetData: { manualLeaveBalance?: string; manualYearToDateUsed?: string; manualMaternityLeaveBalance?: string; manualMaternityYearToDateUsed?: string } = {};
+    const updateData: { fullName?: string; shiftTag?: string; subgroupTag?: string; manualLeaveBalance?: number; manualYearToDateUsed?: number; manualMaternityLeaveBalance?: number; manualMaternityYearToDateUsed?: number; password?: string; maternityPaternityType?: 'maternity' | 'paternity' | null; carryoverFromPreviousYear?: number; carryoverExpiryDate?: Date } = {};
+    const unsetData: { manualLeaveBalance?: string; manualYearToDateUsed?: string; manualMaternityLeaveBalance?: string; manualMaternityYearToDateUsed?: string; carryoverFromPreviousYear?: string; carryoverExpiryDate?: string } = {};
     let shouldUnset = false;
     
     if (fullName) updateData.fullName = fullName;
@@ -235,6 +263,24 @@ export async function PATCH(
       // Hash the new password
       const hashedPassword = await bcrypt.hash(newPassword, 12);
       updateData.password = hashedPassword;
+    }
+    if (carryoverFromPreviousYear !== undefined) {
+      // If carryoverFromPreviousYear is null, remove it
+      if (carryoverFromPreviousYear === null) {
+        unsetData.carryoverFromPreviousYear = '';
+        shouldUnset = true;
+      } else {
+        updateData.carryoverFromPreviousYear = carryoverFromPreviousYear;
+      }
+    }
+    if (carryoverExpiryDate !== undefined) {
+      // If carryoverExpiryDate is null, remove it
+      if (carryoverExpiryDate === null) {
+        unsetData.carryoverExpiryDate = '';
+        shouldUnset = true;
+      } else {
+        updateData.carryoverExpiryDate = new Date(carryoverExpiryDate);
+      }
     }
 
     // Update user

@@ -250,12 +250,44 @@ export function calculateLeaveBalance(
   // Simplified base balance logic:
   // - If manualLeaveBalance is set, always use it as base (whether above or below maxLeavePerYear)
   // - If manualLeaveBalance is not set, use maxLeavePerYear
-  const baseBalance = manualLeaveBalance !== undefined ? manualLeaveBalance : maxLeavePerYear;
+  let baseBalance = manualLeaveBalance !== undefined ? manualLeaveBalance : maxLeavePerYear;
+  
+  // Add carryover from previous year if exists and not expired
+  // Only check if userOrSchedule is a User object (has carryoverFromPreviousYear field)
+  if ('carryoverFromPreviousYear' in userOrSchedule && userOrSchedule.carryoverFromPreviousYear) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const isExpired = userOrSchedule.carryoverExpiryDate && 
+      new Date(userOrSchedule.carryoverExpiryDate).setHours(0, 0, 0, 0) < today.getTime();
+    
+    if (!isExpired && userOrSchedule.carryoverFromPreviousYear > 0) {
+      // Add carryover to base balance
+      baseBalance += userOrSchedule.carryoverFromPreviousYear;
+    }
+  }
   
   // If manualYearToDateUsed is set, use it instead of calculated approved working days
   const daysUsed = manualYearToDateUsed !== undefined ? manualYearToDateUsed : approvedWorkingDays;
-  const remainingBalance = baseBalance - daysUsed;
+  let remainingBalance = baseBalance - daysUsed;
   
+  // If carryover has expired, check if we need to reduce balance
+  if ('carryoverFromPreviousYear' in userOrSchedule && userOrSchedule.carryoverFromPreviousYear) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const isExpired = userOrSchedule.carryoverExpiryDate && 
+      new Date(userOrSchedule.carryoverExpiryDate).setHours(0, 0, 0, 0) < today.getTime();
+    
+    if (isExpired) {
+      // If carryover expired and remainingBalance > maxLeavePerYear, reduce to maxLeavePerYear
+      // This means the carryover days were not used and are lost
+      if (remainingBalance > maxLeavePerYear) {
+        remainingBalance = maxLeavePerYear;
+      }
+      // If remainingBalance <= maxLeavePerYear, keep as is (carryover was used)
+    }
+  }
   
   return remainingBalance;
 };

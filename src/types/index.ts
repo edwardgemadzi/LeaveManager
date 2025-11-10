@@ -15,6 +15,8 @@ export interface User {
   manualMaternityLeaveBalance?: number; // Manual maternity leave balance override
   manualMaternityYearToDateUsed?: number; // Manual maternity year-to-date used days override
   maternityPaternityType?: 'maternity' | 'paternity' | null; // Type of parental leave assigned by leader
+  carryoverFromPreviousYear?: number; // Days carried over from previous year
+  carryoverExpiryDate?: Date; // Date when carryover days expire
   createdAt: Date;
 }
 
