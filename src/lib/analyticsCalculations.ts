@@ -1550,7 +1550,15 @@ export const getMemberAnalytics = (
   
   // Cap by remaining leave balance (this is the only member-specific constraint)
   // Realistic usable days for current year - NOT adjusted for carryover limitations
-  const realisticUsableDays = Math.min(baseAllocationPerMember, remainingLeaveBalance);
+  // If baseAllocationPerMember is 0 but member has balance > 0 and there are usable days,
+  // ensure they get at least 1 day (if their balance allows)
+  let realisticUsableDays = Math.min(baseAllocationPerMember, remainingLeaveBalance);
+  
+  // If the calculation resulted in 0 but member has balance > 0 and there are usable days,
+  // give them at least 1 day (if their balance allows)
+  if (realisticUsableDays === 0 && usableDays > 0 && remainingLeaveBalance > 0) {
+    realisticUsableDays = Math.min(1, remainingLeaveBalance);
+  }
   
   // Calculate remainder days - extra slots that need allocation decisions
   // Remainder is the leftover slots after allocating slots proportionally
@@ -2058,28 +2066,45 @@ export const getGroupedTeamAnalytics = (
       
       // Recalculate realistic usable days based on the shared pool
       // This ensures fair distribution of the shared pool among members based on their remaining balance
+      // IMPORTANT: Use the same logic as getMemberAnalytics - membersSharingSameShift includes self
+      // So we need to count members with balance > 0, which represents the competition pool
       const concurrentLeave = team.settings.concurrentLeave || 1;
       const membersWithBalance = groupMembers.filter(m => m.analytics.remainingLeaveBalance > 0);
+      // membersSharingSameShift includes self, so for a group it's the count of members with balance > 0
+      // Since we're already in a group (same working days, shift, subgroup), we just need the count
+      const membersSharingSameShift = membersWithBalance.length;
       
-      if (membersWithBalance.length > 0) {
+      if (membersSharingSameShift > 0) {
         // Calculate base allocation per member from the shared pool
+        // Use the same formula as getMemberAnalytics: usableDays * (concurrentLeave / membersSharingSameShift)
         let baseAllocationPerMember: number;
-        if (membersWithBalance.length <= concurrentLeave) {
+        if (membersSharingSameShift <= concurrentLeave) {
           // Enough slots per day for all members - each can use all usable days
           baseAllocationPerMember = groupUsableDays;
         } else {
           // More members than slots - divide slots proportionally
-          baseAllocationPerMember = Math.floor((groupUsableDays * concurrentLeave) / membersWithBalance.length);
+          // Formula: usableDays * (concurrentLeave / membersSharingSameShift)
+          baseAllocationPerMember = Math.floor((groupUsableDays * concurrentLeave) / membersSharingSameShift);
         }
         
         // Allocate realistic days to each member based on their remaining balance
         for (const memberAnalytic of groupMembers) {
           if (memberAnalytic.analytics.remainingLeaveBalance > 0) {
             // Cap by remaining leave balance
-            memberAnalytic.analytics.realisticUsableDays = Math.min(
+            // If baseAllocationPerMember is 0 but member has balance > 0 and there are usable days,
+            // ensure they get at least 1 day (if their balance allows)
+            let realisticDays = Math.min(
               baseAllocationPerMember,
               memberAnalytic.analytics.remainingLeaveBalance
             );
+            
+            // If the calculation resulted in 0 but member has balance > 0 and there are usable days,
+            // give them at least 1 day (if their balance allows)
+            if (realisticDays === 0 && groupUsableDays > 0 && memberAnalytic.analytics.remainingLeaveBalance > 0) {
+              realisticDays = Math.min(1, memberAnalytic.analytics.remainingLeaveBalance);
+            }
+            
+            memberAnalytic.analytics.realisticUsableDays = realisticDays;
           } else {
             // Members with zero balance get zero realistic days
             memberAnalytic.analytics.realisticUsableDays = 0;

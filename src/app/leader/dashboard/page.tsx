@@ -1210,7 +1210,7 @@ export default function LeaderDashboard() {
               
               {/* Aggregate Stats - Enhanced Cards with Gradients - Better Horizontal Layout */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6 sm:gap-8 mb-8">
-                {/* Realistic Usable Days */}
+                {/* Realistic Available Days */}
                 <Link href="/leader/analytics" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
                   <div className="p-5 sm:p-6">
                     <div className="flex items-start justify-between mb-3">
@@ -1342,14 +1342,60 @@ export default function LeaderDashboard() {
                         <UsersIcon className="h-6 w-6 text-blue-700 dark:text-blue-400" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-indigo-900 dark:text-indigo-300 mb-2">Team Competition Context</p>
+                        <div className="flex items-center gap-2 mb-2">
+                          <p className="font-semibold text-indigo-900 dark:text-indigo-300">Team Competition Context</p>
+                          {(() => {
+                            if (!analytics || !analytics.groups) return null;
+                            
+                            // Check if any member has partial competition
+                            const allMembers = analytics.groups.flatMap(g => g.members);
+                            const hasAnyPartialCompetition = allMembers.some(m => m.analytics.hasPartialCompetition);
+                            const totalPartialOverlapWithBalance = allMembers.reduce((sum, m) => 
+                              sum + (m.analytics.partialOverlapMembersWithBalance || 0), 0
+                            );
+                            const totalPartialOverlapCount = allMembers.reduce((sum, m) => 
+                              sum + (m.analytics.partialOverlapMembersCount || 0), 0
+                            );
+                            
+                            if (hasAnyPartialCompetition) {
+                              return (
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                  totalPartialOverlapWithBalance > 0
+                                    ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border border-orange-300 dark:border-orange-700'
+                                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                                }`}>
+                                  {totalPartialOverlapWithBalance > 0 ? '⚠️' : 'ℹ️'} Partial overlap detected
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
                         <p className="text-sm text-indigo-700 dark:text-indigo-400 mb-2 leading-relaxed">
                           <strong>{analytics.aggregate.membersCount}</strong> team member{analytics.aggregate.membersCount !== 1 ? 's' : ''} 
-                          {' '}need to coordinate use of <strong>{Math.round(analytics.aggregate.totalRealisticUsableDays)}</strong> realistic usable days.
+                          {' '}need to coordinate use of <strong>{Math.round(analytics.aggregate.totalRealisticUsableDays)}</strong> realistic available days.
                           {analytics.aggregate.totalRemainderDays > 0 && (
                             <> <strong className="text-indigo-600 dark:text-indigo-400">+{analytics.aggregate.totalRemainderDays}</strong> day(s) need allocation decisions</>
                           )}
                         </p>
+                        {(() => {
+                          if (!analytics || !analytics.groups) return null;
+                          
+                          const allMembers = analytics.groups.flatMap(g => g.members);
+                          const totalPartialOverlapWithBalance = allMembers.reduce((sum, m) => 
+                            sum + (m.analytics.partialOverlapMembersWithBalance || 0), 0
+                          );
+                          const membersWithPartialCompetition = allMembers.filter(m => m.analytics.hasPartialCompetition);
+                          
+                          if (membersWithPartialCompetition.length > 0 && totalPartialOverlapWithBalance > 0) {
+                            return (
+                              <p className="text-sm text-orange-700 dark:text-orange-400 mb-2 leading-relaxed font-medium">
+                                ⚠️ Some team members have <strong>different shift patterns</strong> but <strong>overlapping working days</strong> with active leave balances, which may create competition for the same dates.
+                              </p>
+                            );
+                          }
+                          return null;
+                        })()}
                         <p className="text-sm text-indigo-700 dark:text-indigo-400 leading-relaxed">
                           Average of <strong>{Math.round(analytics.aggregate.averageDaysPerMemberAcrossTeam)}</strong> days per member available across the team.
                         </p>
@@ -1475,11 +1521,11 @@ export default function LeaderDashboard() {
                               </p>
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-3">
                                 <div className="bg-white dark:bg-gray-900 p-3 rounded-md border border-gray-200 dark:border-gray-800">
-                                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Avg. Usable Days</p>
+                                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Avg. Available Days</p>
                                   <p className="text-lg font-semibold text-gray-900 dark:text-white">{Math.round(group.aggregate.groupAverageUsableDays)}</p>
                                 </div>
                                 <div className="bg-white dark:bg-gray-900 p-3 rounded-md border border-gray-200 dark:border-gray-800">
-                                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Avg. Realistic Usable Days</p>
+                                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Avg. Realistic Available Days</p>
                                   <p className="text-lg font-semibold text-gray-900 dark:text-white">{Math.round(group.aggregate.groupAverageRealisticUsableDays)}</p>
                                 </div>
                                 <div className="bg-white dark:bg-gray-900 p-3 rounded-md border border-gray-200 dark:border-gray-800">

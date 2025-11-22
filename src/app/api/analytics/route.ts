@@ -92,25 +92,39 @@ export async function GET(request: NextRequest) {
     // Return analytics based on role
     if (user.role === 'member') {
       // Return member's own analytics
-      // Filter to only approved requests (matching leave balance page logic)
-      const memberRequests = allRequests.filter(req => 
-        req.userId === user.id && req.status === 'approved'
-      );
+      // IMPORTANT: Use grouped analytics to ensure members see the same normalized values as leaders
+      // This ensures consistency between member and leader views
       const members = await UserModel.findByTeamId(user.teamId);
-      
-      // Ensure we only pass members (not leaders) - findByTeamId should already filter this
-      // but double-check to be safe and ensure no duplicates or incorrect entries
       const memberList = members.filter(m => m.role === 'member');
       
-      const analytics = getMemberAnalytics(
-        currentUser,
-        team,
-        memberRequests,
-        allApprovedRequests,
-        memberList
-      );
+      // Calculate grouped analytics first (this normalizes usableDays and recalculates realisticUsableDays)
+      const groupedAnalytics = getGroupedTeamAnalytics(memberList, team, allRequests);
       
-      return NextResponse.json({ analytics }, {
+      // Find the member's analytics from the grouped result
+      let memberAnalytics = null;
+      for (const group of groupedAnalytics.groups) {
+        const memberInGroup = group.members.find(m => m.userId === user.id);
+        if (memberInGroup) {
+          memberAnalytics = memberInGroup.analytics;
+          break;
+        }
+      }
+      
+      // Fallback to individual calculation if member not found in groups (shouldn't happen, but safety)
+      if (!memberAnalytics) {
+        const memberRequests = allRequests.filter(req => 
+          req.userId === user.id && req.status === 'approved'
+        );
+        memberAnalytics = getMemberAnalytics(
+          currentUser,
+          team,
+          memberRequests,
+          allApprovedRequests,
+          memberList
+        );
+      }
+      
+      return NextResponse.json({ analytics: memberAnalytics }, {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
           'Pragma': 'no-cache',

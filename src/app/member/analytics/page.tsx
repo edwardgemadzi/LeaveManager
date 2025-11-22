@@ -533,7 +533,7 @@ export default function MemberAnalyticsPage() {
                     <p className="text-xs text-gray-500 dark:text-gray-500">With constraints</p>
                     {expandedSections.has('realistic-usable') && (
                       <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-xs text-gray-700 dark:text-gray-300">
-                        <p className="font-semibold mb-1">Realistic Usable Days:</p>
+                        <p className="font-semibold mb-1">Realistic Available Days:</p>
                         <p>This is the number of days you can realistically use, considering team competition and concurrent leave limits. It accounts for carryover limitations if set.</p>
                       </div>
                     )}
@@ -552,7 +552,7 @@ export default function MemberAnalyticsPage() {
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Usable Days</p>
+                      <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Available Days</p>
                       <button
                         onClick={() => toggleSection('usable-days')}
                         className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -567,7 +567,7 @@ export default function MemberAnalyticsPage() {
                     <p className="text-xs text-gray-500 dark:text-gray-500">Available</p>
                     {expandedSections.has('usable-days') && (
                       <div className="mt-2 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg text-xs text-gray-700 dark:text-gray-300">
-                        <p className="font-semibold mb-1">Usable Days:</p>
+                        <p className="font-semibold mb-1">Available Days:</p>
                         <p>Days that can be used when shared among members who can use them, adjusted for concurrent leave limits.</p>
                       </div>
                     )}
@@ -755,7 +755,7 @@ export default function MemberAnalyticsPage() {
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-orange-900 dark:text-orange-300 mb-2">Concurrent Leave Constraint</p>
                       <p className="text-sm text-orange-700 dark:text-orange-400 leading-relaxed">
-                        Due to concurrent leave limits, you have <strong>{Math.round(analytics.usableDays ?? 0)}</strong> usable days of <strong>{Math.round(analytics.theoreticalWorkingDays)}</strong> remaining working days.
+                        Due to concurrent leave limits, you have <strong>{Math.round(analytics.usableDays ?? 0)}</strong> available days of <strong>{Math.round(analytics.theoreticalWorkingDays)}</strong> remaining working days.
                         Some days are already booked by other team members.
                       </p>
                     </div>

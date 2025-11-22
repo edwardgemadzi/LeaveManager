@@ -1149,7 +1149,7 @@ export default function MemberDashboard() {
                   <div className="p-5 sm:p-6">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-1">Usable Days</p>
+                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-1">Available Days</p>
                         <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
                           {Math.round(analytics.usableDays ?? 0)}
                         </p>
@@ -1217,7 +1217,18 @@ export default function MemberDashboard() {
                       <UsersIcon className="h-6 w-6 text-blue-700 dark:text-blue-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-indigo-900 dark:text-indigo-300 mb-2">Competition Context</p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <p className="font-semibold text-indigo-900 dark:text-indigo-300">Competition Context</p>
+                        {analytics.hasPartialCompetition && (
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            analytics.partialOverlapMembersWithBalance > 0
+                              ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border border-orange-300 dark:border-orange-700'
+                              : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                          }`}>
+                            {analytics.partialOverlapMembersWithBalance > 0 ? '⚠️' : 'ℹ️'} {analytics.partialOverlapMembersCount} partial overlap
+                          </span>
+                        )}
+                      </div>
                       <p className="text-sm text-indigo-700 dark:text-indigo-400 mb-2 leading-relaxed">
                         <strong>{analytics.membersSharingSameShift}</strong> team member{analytics.membersSharingSameShift !== 1 ? 's' : ''} 
                         {' '}with the <strong>same working days pattern</strong>{(() => {
@@ -1230,6 +1241,16 @@ export default function MemberDashboard() {
                         })()} and <strong>shift type</strong> need to coordinate use of 
                         {' '}<strong>{Math.round(analytics.usableDays ?? 0)}</strong> available days.
                       </p>
+                      {analytics.hasPartialCompetition && analytics.partialOverlapMembersWithBalance > 0 && (
+                        <p className="text-sm text-orange-700 dark:text-orange-400 mb-2 leading-relaxed font-medium">
+                          ⚠️ <strong>{analytics.partialOverlapMembersWithBalance}</strong> member{analytics.partialOverlapMembersWithBalance !== 1 ? 's' : ''} with <strong>different shift patterns</strong> but <strong>overlapping working days</strong> {analytics.partialOverlapMembersWithBalance > 1 ? 'have' : 'has'} leave balances and may compete for the same dates.
+                        </p>
+                      )}
+                      {analytics.hasPartialCompetition && analytics.partialOverlapMembersWithBalance === 0 && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 leading-relaxed">
+                          ℹ️ {analytics.partialOverlapMembersCount} member{analytics.partialOverlapMembersCount !== 1 ? 's' : ''} with different shift patterns but overlapping working days (no active leave balances).
+                        </p>
+                      )}
                       <p className="text-sm text-indigo-700 dark:text-indigo-400 leading-relaxed">
                         Average of <strong>{Math.round(analytics.averageDaysPerMember)}</strong> days per member available.
                         You can realistically use <strong>{Math.round(analytics.realisticUsableDays ?? 0)}</strong> days.
@@ -1272,7 +1293,7 @@ export default function MemberDashboard() {
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-orange-900 dark:text-orange-300 mb-2">Concurrent Leave Constraint</p>
                           <p className="text-sm text-orange-700 dark:text-orange-400 leading-relaxed">
-                            Due to concurrent leave limits, you have <strong>{Math.round(analytics.usableDays ?? 0)}</strong> usable days of <strong>{Math.round(analytics.theoreticalWorkingDays)}</strong> remaining working days.
+                            Due to concurrent leave limits, you have <strong>{Math.round(analytics.usableDays ?? 0)}</strong> available days of <strong>{Math.round(analytics.theoreticalWorkingDays)}</strong> remaining working days.
                             Some days are already booked by other team members.
                           </p>
                         </div>
