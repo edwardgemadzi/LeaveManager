@@ -533,7 +533,7 @@ export default function MemberAnalyticsPage() {
                     <p className="text-xs text-gray-500 dark:text-gray-500">With constraints</p>
                     {expandedSections.has('realistic-usable') && (
                       <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-xs text-gray-700 dark:text-gray-300">
-                        <p className="font-semibold mb-1">Realistic Available Days:</p>
+                        <p className="font-semibold mb-1">Realistic Usable Days:</p>
                         <p>This is the number of days you can realistically use, considering team competition and concurrent leave limits. It accounts for carryover limitations if set.</p>
                       </div>
                     )}
