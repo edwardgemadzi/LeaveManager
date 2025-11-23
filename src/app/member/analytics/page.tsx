@@ -518,7 +518,7 @@ export default function MemberAnalyticsPage() {
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Realistic Usable</p>
+                      <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Realistic Days</p>
                       <button
                         onClick={() => toggleSection('realistic-usable')}
                         className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -533,7 +533,7 @@ export default function MemberAnalyticsPage() {
                     <p className="text-xs text-gray-500 dark:text-gray-500">With constraints</p>
                     {expandedSections.has('realistic-usable') && (
                       <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-xs text-gray-700 dark:text-gray-300">
-                        <p className="font-semibold mb-1">Realistic Usable Days:</p>
+                        <p className="font-semibold mb-1">Realistic Days:</p>
                         <p>This is the number of days you can realistically use, considering team competition and concurrent leave limits. It accounts for carryover limitations if set.</p>
                       </div>
                     )}

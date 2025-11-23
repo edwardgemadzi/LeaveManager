@@ -425,7 +425,7 @@ export default function LeaderAnalyticsPage() {
               <div className="p-5 sm:p-6">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Realistic Usable</p>
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Realistic Days</p>
                     <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
                       {Math.round(totalRealisticUsableDays)}
                     </p>
@@ -476,7 +476,7 @@ export default function LeaderAnalyticsPage() {
                   <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wider mb-2">Projected Usage</p>
                   <p className="text-3xl sm:text-4xl font-bold text-blue-900 dark:text-blue-300 mb-2">{Math.round(projectionUsage)}</p>
                   <p className="text-xs text-blue-600 dark:text-blue-400">
-                    Based on realistic usable days available
+                    Based on realistic days available
                   </p>
                 </div>
                 
@@ -854,7 +854,7 @@ export default function LeaderAnalyticsPage() {
                       </div>
 
                             <div className="bg-gray-50/50 dark:bg-gray-900/50 rounded-xl p-4 border border-gray-200 dark:border-gray-800">
-                              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Realistic Usable Days</p>
+                              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Realistic Days</p>
                         <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">
                           {Math.round(group.aggregate.groupTotalRealisticUsableDays)}
                         </p>

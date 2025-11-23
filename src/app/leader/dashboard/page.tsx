@@ -1210,12 +1210,12 @@ export default function LeaderDashboard() {
               
               {/* Aggregate Stats - Enhanced Cards with Gradients - Better Horizontal Layout */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6 sm:gap-8 mb-8">
-                {/* Realistic Usable Days */}
+                {/* Realistic Days */}
                 <Link href="/leader/analytics" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
                   <div className="p-5 sm:p-6">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-1">Realistic Usable</p>
+                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-1">Realistic Days</p>
                         <p className="text-2xl sm:text-3xl font-bold text-indigo-700 dark:text-indigo-400 mb-1 fade-in">
                           {Math.round(analytics.aggregate.totalRealisticUsableDays ?? 0)}
                         </p>
@@ -1373,7 +1373,7 @@ export default function LeaderDashboard() {
                         </div>
                         <p className="text-sm text-indigo-700 dark:text-indigo-400 mb-2 leading-relaxed">
                           <strong>{analytics.aggregate.membersCount}</strong> team member{analytics.aggregate.membersCount !== 1 ? 's' : ''} 
-                          {' '}need to coordinate use of <strong>{Math.round(analytics.aggregate.totalRealisticUsableDays)}</strong> realistic usable days.
+                          {' '}need to coordinate use of <strong>{Math.round(analytics.aggregate.totalRealisticUsableDays)}</strong> realistic days.
                           {analytics.aggregate.totalRemainderDays > 0 && (
                             <> <strong className="text-indigo-600 dark:text-indigo-400">+{analytics.aggregate.totalRemainderDays}</strong> day(s) need allocation decisions</>
                           )}
@@ -1525,7 +1525,7 @@ export default function LeaderDashboard() {
                                   <p className="text-lg font-semibold text-gray-900 dark:text-white">{Math.round(group.aggregate.groupAverageUsableDays)}</p>
                                 </div>
                                 <div className="bg-white dark:bg-gray-900 p-3 rounded-md border border-gray-200 dark:border-gray-800">
-                                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Avg. Realistic Usable Days</p>
+                                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Avg. Realistic Days</p>
                                   <p className="text-lg font-semibold text-gray-900 dark:text-white">{Math.round(group.aggregate.groupAverageRealisticUsableDays)}</p>
                                 </div>
                                 <div className="bg-white dark:bg-gray-900 p-3 rounded-md border border-gray-200 dark:border-gray-800">

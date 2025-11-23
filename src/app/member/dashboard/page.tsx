@@ -1130,7 +1130,7 @@ export default function MemberDashboard() {
                   <div className="p-5 sm:p-6">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-1">Realistic Usable</p>
+                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-1">Realistic Days</p>
                         <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
                           {Math.round(analytics.realisticUsableDays ?? 0)}
                         </p>
