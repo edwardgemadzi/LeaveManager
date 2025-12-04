@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { CalendarIcon, SunIcon, MoonIcon } from '@heroicons/react/24/outline';
+import { CalendarIcon, SunIcon, MoonIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
 import { useTheme } from '@/contexts/ThemeContext';
 
 interface User {
@@ -117,6 +117,13 @@ export default function Navbar() {
 
           {/* Desktop User Actions - Enhanced */}
           <div className="hidden lg:flex items-center space-x-3 ml-6">
+            <Link
+              href="/contact"
+              className="p-2.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100/80 dark:hover:bg-gray-800/80 transition-all duration-200 hover:scale-110"
+              title="Contact Developer"
+            >
+              <ChatBubbleLeftRightIcon className="h-5 w-5" />
+            </Link>
             <button
               onClick={toggleTheme}
               className="p-2.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100/80 dark:hover:bg-gray-800/80 transition-all duration-200 hover:scale-110"
@@ -208,6 +215,18 @@ export default function Navbar() {
                 );
               })}
               
+              {/* Contact link */}
+              <Link
+                href="/contact"
+                onClick={() => setIsOpen(false)}
+                className="block px-4 py-3 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-gray-800/80 transition-all duration-200"
+              >
+                <div className="flex items-center gap-2">
+                  <ChatBubbleLeftRightIcon className="h-5 w-5" />
+                  Contact Developer
+                </div>
+              </Link>
+
               {/* User info and logout section */}
               <div className="border-t border-gray-200/50 dark:border-gray-800/50 mt-3 pt-3">
                 <div className="px-4 py-2.5 bg-gray-50/50 dark:bg-gray-800/50 rounded-lg mb-2">

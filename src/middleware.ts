@@ -8,6 +8,12 @@ export function middleware(request: NextRequest) {
   // Public routes that don't require authentication
   const publicRoutes = ['/login', '/register-leader', '/register-member', '/'];
   
+  // Admin routes are handled by admin-helpers (localhost + env var check)
+  // Skip normal authentication for admin routes
+  if (pathname.startsWith('/admin') || pathname.startsWith('/api/admin')) {
+    return NextResponse.next();
+  }
+  
   if (publicRoutes.includes(pathname)) {
     return NextResponse.next();
   }

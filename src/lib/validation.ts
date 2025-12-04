@@ -339,6 +339,51 @@ export const schemas = {
           'any.only': 'Counting method must be either "calendar" or "working"'
         })
     }).optional()
+  }),
+  contact: Joi.object({
+    name: Joi.string()
+      .min(1)
+      .max(100)
+      .required()
+      .messages({
+        'string.min': 'Name is required',
+        'string.max': 'Name must be no more than 100 characters',
+        'any.required': 'Name is required'
+      }),
+    email: Joi.string()
+      .email()
+      .required()
+      .messages({
+        'string.email': 'Please enter a valid email address',
+        'any.required': 'Email is required'
+      }),
+    subject: Joi.string()
+      .min(3)
+      .max(200)
+      .required()
+      .messages({
+        'string.min': 'Subject must be at least 3 characters long',
+        'string.max': 'Subject must be no more than 200 characters',
+        'any.required': 'Subject is required'
+      }),
+    message: Joi.string()
+      .min(10)
+      .max(5000)
+      .required()
+      .messages({
+        'string.min': 'Message must be at least 10 characters long',
+        'string.max': 'Message must be no more than 5000 characters',
+        'any.required': 'Message is required'
+      }),
+    type: Joi.string()
+      .valid('feedback', 'bug', 'feature', 'other')
+      .required()
+      .messages({
+        'any.only': 'Type must be one of: feedback, bug, feature, other',
+        'any.required': 'Type is required'
+      }),
+    userId: Joi.string().optional(),
+    username: Joi.string().optional()
   })
 };
 
