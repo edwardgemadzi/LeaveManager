@@ -10,7 +10,7 @@ import { LEAVE_REASONS, isEmergencyReason } from '@/lib/leaveReasons';
 import { CheckCircleIcon, ClockIcon, XCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useNotification } from '@/hooks/useNotification';
 import { useBrowserNotification } from '@/hooks/useBrowserNotification';
-import { parseDateSafe } from '@/lib/dateUtils';
+import { parseDateSafe, formatDateSafe } from '@/lib/dateUtils';
 
 const localizer = momentLocalizer(moment);
 
@@ -588,8 +588,8 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            startDate: startDate.toISOString().split('T')[0],
-            endDate: endDate.toISOString().split('T')[0],
+            startDate: formatDateSafe(startDate),
+            endDate: formatDateSafe(endDate),
             reason: reason,
           }),
         });
@@ -631,8 +631,8 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              startDate: date.toISOString().split('T')[0],
-              endDate: date.toISOString().split('T')[0],
+              startDate: formatDateSafe(date),
+              endDate: formatDateSafe(date),
               reason: reason,
             }),
           });

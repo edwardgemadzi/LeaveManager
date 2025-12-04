@@ -10,6 +10,7 @@ import { getClient } from '@/lib/mongodb';
 import { broadcastTeamUpdate } from '@/lib/teamEvents';
 import { error as logError, info } from '@/lib/logger';
 import { internalServerError } from '@/lib/errors';
+import { parseDateSafe } from '@/lib/dateUtils';
 
 export async function GET(request: NextRequest) {
   try {
@@ -114,8 +115,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    // Parse dates safely to avoid timezone shifts
+    // When a date string like "2026-01-22" is parsed, JavaScript interprets it as UTC midnight
+    // parseDateSafe normalizes it to local midnight to preserve the intended date
+    const start = parseDateSafe(startDate);
+    const end = parseDateSafe(endDate);
 
     if (start > end) {
       return NextResponse.json(

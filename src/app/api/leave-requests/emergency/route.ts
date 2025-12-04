@@ -8,6 +8,7 @@ import { teamIdsMatch } from '@/lib/helpers';
 import { error as logError } from '@/lib/logger';
 import { internalServerError, badRequestError, notFoundError, unauthorizedError, forbiddenError } from '@/lib/errors';
 import { requireLeader } from '@/lib/api-helpers';
+import { parseDateSafe } from '@/lib/dateUtils';
 
 export async function POST(request: NextRequest) {
   try {
@@ -56,9 +57,9 @@ export async function POST(request: NextRequest) {
       return forbiddenError('Member does not belong to your team');
     }
 
-    // Validate dates
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    // Validate dates - parse safely to avoid timezone shifts
+    const start = parseDateSafe(startDate);
+    const end = parseDateSafe(endDate);
     
     if (start > end) {
       return badRequestError('Start date must be before end date');

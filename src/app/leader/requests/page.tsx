@@ -8,7 +8,7 @@ import { LEAVE_REASONS, EMERGENCY_REASONS, isEmergencyReason } from '@/lib/leave
 import { ExclamationTriangleIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import { useNotification } from '@/hooks/useNotification';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
-import { parseDateSafe } from '@/lib/dateUtils';
+import { parseDateSafe, formatDateSafe } from '@/lib/dateUtils';
 
 export default function LeaderRequestsPage() {
   const { showSuccess, showError, showInfo } = useNotification();
@@ -310,8 +310,8 @@ export default function LeaderRequestsPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            startDate: range.startDate.toISOString().split('T')[0],
-            endDate: range.endDate.toISOString().split('T')[0],
+            startDate: formatDateSafe(range.startDate),
+            endDate: formatDateSafe(range.endDate),
             reason: finalReason,
             requestedFor: migrationForm.memberId,
             isHistorical: true
