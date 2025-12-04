@@ -727,6 +727,90 @@ p {
   border: 2px dashed rgba(79, 70, 229, 0.5) !important;
 }
 
+/* Dark mode styles for React Big Calendar */
+.dark .rbc-calendar {
+  background: #1f2937;
+  border-color: #374151;
+}
+
+.dark .rbc-toolbar {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+}
+
+.dark .rbc-header {
+  color: #d1d5db;
+  border-bottom-color: #374151;
+  background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+}
+
+.dark .rbc-month-view,
+.dark .rbc-time-view {
+  border-color: #374151;
+  background: #1f2937;
+}
+
+.dark .rbc-date-cell {
+  color: #d1d5db;
+}
+
+.dark .rbc-date-cell:hover {
+  background: rgba(79, 70, 229, 0.2);
+}
+
+.dark .rbc-today {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+  color: #93c5fd;
+}
+
+.dark .rbc-today .rbc-date-cell {
+  color: #93c5fd;
+}
+
+.dark .rbc-off-range {
+  color: #6b7280;
+}
+
+.dark .rbc-off-range-bg {
+  background: #111827;
+}
+
+.dark .rbc-time-slot {
+  color: #9ca3af;
+}
+
+.dark .rbc-time-header-content {
+  border-left-color: #374151;
+}
+
+.dark .rbc-show-more {
+  color: #818cf8;
+}
+
+.dark .rbc-show-more:hover {
+  color: #a5b4fc;
+}
+
+.dark .rbc-slot-selection {
+  background: rgba(79, 70, 229, 0.2) !important;
+  border-color: rgba(79, 70, 229, 0.6) !important;
+}
+
+/* Working days highlight - better contrast */
+.rbc-working-day {
+  position: relative;
+}
+
+/* Dark mode for working days */
+.dark .rbc-working-day {
+  background-color: rgba(30, 58, 138, 0.3) !important;
+  color: #93c5fd !important;
+}
+
+.dark .rbc-selected-date.rbc-working-day {
+  background-color: rgba(37, 99, 235, 0.4) !important;
+  color: #bfdbfe !important;
+}
+
 /* Enhanced Animation Classes */
 .fade-in {
   animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);

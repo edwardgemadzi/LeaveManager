@@ -403,20 +403,24 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
     const isWorking = currentUser && currentUser.role === 'member' && currentUser.shiftSchedule && isWorkingDay(date, currentUser);
 
     if (isSelected) {
-      style.backgroundColor = '#dbeafe'; // Light blue for selected
+      style.backgroundColor = '#bfdbfe'; // Medium blue for selected (better contrast)
+      style.color = '#1e40af'; // Dark blue text for better visibility
       style.borderTop = '2px solid #3b82f6';
       style.borderRight = '2px solid #3b82f6';
       style.borderBottom = '2px solid #3b82f6';
       // If also a working day, use thicker left border; otherwise use same thickness as other borders
       style.borderLeft = isWorking ? '3px solid #3b82f6' : '2px solid #3b82f6';
       style.borderRadius = '4px';
+      style.fontWeight = '600';
       classNames.push('rbc-selected-date');
       if (isWorking) {
         classNames.push('rbc-working-day');
       }
     } else if (isWorking) {
-      style.backgroundColor = '#f0f9ff'; // Light blue background
+      style.backgroundColor = '#dbeafe'; // Medium blue background (better contrast than #f0f9ff)
+      style.color = '#1e3a8a'; // Dark blue text for better visibility
       style.borderLeft = '3px solid #3b82f6'; // Blue left border
+      style.fontWeight = '600';
       classNames.push('rbc-working-day');
     }
 
@@ -838,12 +842,12 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
       {/* Event Details Modal */}
       {showModal && selectedEvent && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-6">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-gray-900">Leave Request Details</h3>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Leave Request Details</h3>
               <button
                 onClick={closeModal}
-                className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+                className="text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl font-bold"
               >
                 ×
               </button>
@@ -866,13 +870,13 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
               });
               
               const statusConfig = {
-                'approved': { color: 'text-green-600', bg: 'bg-green-100', Icon: CheckCircleIcon },
-                'pending': { color: 'text-yellow-600', bg: 'bg-yellow-100', Icon: ClockIcon },
-                'rejected': { color: 'text-red-600', bg: 'bg-red-100', Icon: XCircleIcon }
+                'approved': { color: 'text-green-600 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-900/30', Icon: CheckCircleIcon },
+                'pending': { color: 'text-yellow-600 dark:text-yellow-400', bg: 'bg-yellow-100 dark:bg-yellow-900/30', Icon: ClockIcon },
+                'rejected': { color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30', Icon: XCircleIcon }
               };
               
               const status = selectedEvent.resource.isEmergency 
-                ? { color: 'text-red-600', bg: 'bg-red-100', Icon: ExclamationTriangleIcon }
+                ? { color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30', Icon: ExclamationTriangleIcon }
                 : statusConfig[selectedEvent.resource.status as keyof typeof statusConfig];
               
               const StatusIcon = status.Icon;
@@ -880,28 +884,28 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
               return (
                 <div className="space-y-4">
                   <div className="flex items-center space-x-3">
-                    <StatusIcon className="h-8 w-8 text-gray-700" />
+                    <StatusIcon className="h-8 w-8 text-gray-700 dark:text-gray-300" />
                     <div>
-                      <p className="font-semibold text-gray-900">{memberName}</p>
-                      <p className="text-sm text-gray-600">@{selectedEvent.resource.username}</p>
+                      <p className="font-semibold text-gray-900 dark:text-gray-100">{memberName}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">@{selectedEvent.resource.username}</p>
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status.bg} ${status.color}`}>
                         {selectedEvent.resource.isEmergency ? 'EMERGENCY' : selectedEvent.resource.status.toUpperCase()}
                       </span>
                     </div>
                   </div>
                   
-                  <div className="border-t pt-4">
-                    <p className="text-sm text-gray-600 mb-2"><strong>Reason:</strong></p>
-                    <p className="text-gray-900 mb-4">{selectedEvent.title.split(' - ')[1] || 'N/A'}</p>
+                  <div className="border-t dark:border-gray-700 pt-4">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2"><strong>Reason:</strong></p>
+                    <p className="text-gray-900 dark:text-gray-100 mb-4">{selectedEvent.title.split(' - ')[1] || 'N/A'}</p>
                     
                     <div className="grid grid-cols-1 gap-3">
                       <div>
-                        <p className="text-sm text-gray-600"><strong>Start Date:</strong></p>
-                        <p className="text-gray-900">{startDate}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400"><strong>Start Date:</strong></p>
+                        <p className="text-gray-900 dark:text-gray-100">{startDate}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-600"><strong>End Date:</strong></p>
-                        <p className="text-gray-900">{endDate}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400"><strong>End Date:</strong></p>
+                        <p className="text-gray-900 dark:text-gray-100">{endDate}</p>
                       </div>
                     </div>
                   </div>
@@ -909,7 +913,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
                   <div className="flex justify-end pt-4">
                     <button
                       onClick={closeModal}
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                      className="px-4 py-2 bg-indigo-600 dark:bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-700 transition-colors"
                     >
                       Close
                     </button>
@@ -924,12 +928,12 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
       {/* Leave Request Modal */}
       {showRequestModal && isMember && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-6">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-gray-900">Request Leave</h3>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Request Leave</h3>
               <button
                 onClick={closeRequestModal}
-                className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+                className="text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl font-bold"
               >
                 ×
               </button>
@@ -938,15 +942,15 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
             <div className="space-y-4">
               {/* Selected Dates Display */}
               <div>
-                <p className="text-sm font-medium text-gray-700 mb-2">Selected Dates:</p>
-                <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Selected Dates:</p>
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
                   {selectedDates.length === 0 ? (
-                    <p className="text-sm text-gray-500">No dates selected</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No dates selected</p>
                   ) : (
                     <div className="space-y-1">
                       {requestAsRange && selectedDates.length > 1 ? (
                         <>
-                          <p className="text-sm text-gray-900">
+                          <p className="text-sm text-gray-900 dark:text-gray-100">
                             <strong>Start:</strong> {selectedDates[0].toLocaleDateString('en-US', {
                               weekday: 'long',
                               year: 'numeric',
@@ -954,7 +958,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
                               day: 'numeric'
                             })}
                           </p>
-                          <p className="text-sm text-gray-900">
+                          <p className="text-sm text-gray-900 dark:text-gray-100">
                             <strong>End:</strong> {selectedDates[selectedDates.length - 1].toLocaleDateString('en-US', {
                               weekday: 'long',
                               year: 'numeric',
@@ -962,16 +966,16 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
                               day: 'numeric'
                             })}
                           </p>
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                             (Range from {selectedDates[0].toLocaleDateString()} to {selectedDates[selectedDates.length - 1].toLocaleDateString()})
                           </p>
                         </>
                       ) : (
                         <>
-                          <p className="text-sm font-medium text-gray-900 mb-1">Individual Dates ({selectedDates.length}):</p>
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">Individual Dates ({selectedDates.length}):</p>
                           <div className="space-y-1 max-h-32 overflow-y-auto">
                             {selectedDates.map((date, index) => (
-                              <p key={index} className="text-sm text-gray-900">
+                              <p key={index} className="text-sm text-gray-900 dark:text-gray-100">
                                 {date.toLocaleDateString('en-US', {
                                   weekday: 'short',
                                   year: 'numeric',
@@ -990,7 +994,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
 
               {/* Reason Selection */}
               <div>
-                <label htmlFor="reason" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="reason" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Reason for Leave
                 </label>
                 <select
@@ -1003,11 +1007,11 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
                       setCustomReason('');
                     }
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 >
-                  <option value="">Select a reason...</option>
+                  <option value="" className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">Select a reason...</option>
                   {leaveReasons.map((reason) => (
-                    <option key={reason.value} value={reason.value}>
+                    <option key={reason.value} value={reason.value} className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100">
                       {reason.label}
                     </option>
                   ))}
@@ -1015,7 +1019,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
 
                 {selectedReasonType === 'other' && (
                   <div className="mt-3">
-                    <label htmlFor="customReason" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="customReason" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Please specify
                     </label>
                     <textarea
@@ -1023,15 +1027,15 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
                       rows={3}
                       value={customReason}
                       onChange={(e) => setCustomReason(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
                       placeholder="Please provide details for your leave request..."
                     />
                   </div>
                 )}
 
                 {teamSettings?.minimumNoticePeriod && teamSettings.minimumNoticePeriod > 0 && (
-                  <p className="mt-2 text-xs text-gray-500 flex items-center gap-2">
-                    <ExclamationTriangleIcon className="h-4 w-4 text-orange-600" />
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                    <ExclamationTriangleIcon className="h-4 w-4 text-orange-600 dark:text-orange-400" />
                     Leave requests must be submitted at least {teamSettings.minimumNoticePeriod} day(s) in advance
                   </p>
                 )}
@@ -1039,19 +1043,19 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
 
               {/* Request Option Checkbox - only show if multiple dates selected */}
               {selectedDates.length > 1 && (
-                <div className="border-t pt-4">
+                <div className="border-t dark:border-gray-700 pt-4">
                   <label className="flex items-center space-x-2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={requestAsRange}
                       onChange={(e) => setRequestAsRange(e.target.checked)}
-                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                      className="w-4 h-4 text-indigo-600 border-gray-300 dark:border-gray-600 rounded focus:ring-indigo-500 dark:bg-gray-700"
                     />
-                    <span className="text-sm text-gray-700">
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
                       Request as a single range
                     </span>
                   </label>
-                  <p className="text-xs text-gray-500 mt-1 ml-6">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-6">
                     {requestAsRange 
                       ? `Creates one request covering all ${selectedDates.length} days (from ${selectedDates[0].toLocaleDateString()} to ${selectedDates[selectedDates.length - 1].toLocaleDateString()}).`
                       : `Creates ${selectedDates.length} separate requests, one for each selected day.`
@@ -1064,14 +1068,14 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
               <div className="flex justify-end space-x-3 pt-4">
                 <button
                   onClick={closeRequestModal}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSubmitLeaveRequest}
                   disabled={submitting || !selectedReasonType || (selectedReasonType === 'other' && !customReason.trim())}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-indigo-600 dark:bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 dark:hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submitting ? 'Submitting...' : 'Submit Request'}
                 </button>
