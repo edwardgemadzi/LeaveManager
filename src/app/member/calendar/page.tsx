@@ -8,7 +8,7 @@ import { useTeamEvents } from '@/hooks/useTeamEvents';
 import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
 import { FunnelIcon } from '@heroicons/react/24/outline';
 
-type CalendarFilter = 'all' | 'my-leave' | 'same-working-days' | 'entire-shift-group';
+type CalendarFilter = 'all' | 'my-leave' | 'same-working-days';
 
 export default function MemberCalendarPage() {
   const [team, setTeam] = useState<Team | null>(null);
@@ -117,8 +117,6 @@ export default function MemberCalendarPage() {
     const userWorkingDaysTag = user.shiftSchedule?.type === 'rotating'
       ? generateWorkingDaysTag(user.shiftSchedule)
       : (user.workingDaysTag || generateWorkingDaysTag(user.shiftSchedule) || 'no-schedule');
-    const userShiftTag = user.shiftTag;
-    const userSubgroupTag = user.subgroupTag;
 
     // Create a map of userId -> member for quick lookup
     const memberMap = new Map<string, User>();
@@ -144,32 +142,6 @@ export default function MemberCalendarPage() {
           ? generateWorkingDaysTag(requestMember.shiftSchedule)
           : (requestMember.workingDaysTag || generateWorkingDaysTag(requestMember.shiftSchedule) || 'no-schedule');
         return memberWorkingDaysTag === userWorkingDaysTag;
-      }
-
-      // Entire Shift Group - show requests from members with same shiftTag AND workingDaysTag
-      // If subgrouping is enabled, also require same subgroupTag
-      if (filter === 'entire-shift-group') {
-        if (!requestMember) return false;
-        
-        // If subgrouping is enabled, check subgroup first
-        if (team?.settings?.enableSubgrouping) {
-          const memberSubgroupTag = requestMember.subgroupTag || 'Ungrouped';
-          if (memberSubgroupTag !== (userSubgroupTag || 'Ungrouped')) {
-            return false;
-          }
-        }
-
-        // Check working days tag
-        const memberWorkingDaysTag = requestMember.shiftSchedule?.type === 'rotating'
-          ? generateWorkingDaysTag(requestMember.shiftSchedule)
-          : (requestMember.workingDaysTag || generateWorkingDaysTag(requestMember.shiftSchedule) || 'no-schedule');
-        if (memberWorkingDaysTag !== userWorkingDaysTag) {
-          return false;
-        }
-
-        // Check shift tag
-        const memberShiftTag = requestMember.shiftTag;
-        return memberShiftTag === userShiftTag;
       }
 
       return true;
@@ -237,7 +209,6 @@ export default function MemberCalendarPage() {
                 <option value="all">All Leave Requests</option>
                 <option value="my-leave">My Leave Days</option>
                 <option value="same-working-days">Same Working Days</option>
-                <option value="entire-shift-group">Entire Shift Group</option>
               </select>
             </div>
           </div>
