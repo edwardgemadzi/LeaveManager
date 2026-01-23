@@ -1,5 +1,6 @@
 import { ShiftSchedule, User, Team, LeaveRequest } from '@/types';
 import { countWorkingDays, calculateLeaveBalance, isWorkingDay, getWorkingDays, calculateSurplusBalance, calculateMaternityLeaveBalance, calculateMaternitySurplusBalance, isMaternityLeave, countMaternityLeaveDays, calculateCarryoverBalance } from './leaveCalculations';
+import { parseDateSafe } from './dateUtils';
 import { debug } from './logger';
 
 // Check if bypass notice period is active for a given team and date
@@ -9,19 +10,22 @@ export const isBypassNoticePeriodActive = (team: Team, date: Date = new Date()):
   }
   
   const bypass = team.settings.bypassNoticePeriod;
-  const checkDate = new Date(date);
-  checkDate.setHours(0, 0, 0, 0);
   
-  if (bypass.startDate && bypass.endDate) {
-    const startDate = new Date(bypass.startDate);
-    startDate.setHours(0, 0, 0, 0);
-    const endDate = new Date(bypass.endDate);
-    endDate.setHours(23, 59, 59, 999);
-    
-    return checkDate >= startDate && checkDate <= endDate;
+  // Use parseDateSafe to handle both Date objects and strings safely
+  if (!bypass.startDate || !bypass.endDate) {
+    return false;
   }
   
-  return false;
+  const checkDate = parseDateSafe(date);
+  const startDate = parseDateSafe(bypass.startDate);
+  const endDate = parseDateSafe(bypass.endDate);
+  
+  // Normalize all dates to midnight for consistent comparison
+  checkDate.setHours(0, 0, 0, 0);
+  startDate.setHours(0, 0, 0, 0);
+  endDate.setHours(23, 59, 59, 999);
+  
+  return checkDate >= startDate && checkDate <= endDate;
 };
 
 // Generate a unique tag for working days pattern
