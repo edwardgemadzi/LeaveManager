@@ -146,7 +146,7 @@ export default function MemberCalendarPage() {
 
       return true;
     });
-  }, [allRequests, filter, user, allMembers, team]);
+  }, [allRequests, filter, user, allMembers]);
 
   // Update members list based on filtered requests
   const filteredMembers = useMemo(() => {

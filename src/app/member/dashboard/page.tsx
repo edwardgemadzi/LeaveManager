@@ -411,7 +411,7 @@ export default function MemberDashboard() {
     const balance = calculateLeaveBalance(
       team.settings.maxLeavePerYear,
       approvedRequests,
-      user.shiftSchedule || { pattern: [true, true, true, true, true, false, false], startDate: new Date(), type: 'rotating' },
+      user,
       user.manualLeaveBalance,
       user.manualYearToDateUsed
     );
@@ -585,7 +585,7 @@ export default function MemberDashboard() {
           </div>
 
           {/* Stats Cards - Enhanced */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 mb-8">
+          <div className={`grid grid-cols-1 sm:grid-cols-2 ${team?.settings.allowCarryover ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-6 sm:gap-8 mb-8`}>
             {/* Pending Requests Card */}
             <Link href="/member/requests" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
               <div className="p-5 sm:p-6">
@@ -703,6 +703,11 @@ export default function MemberDashboard() {
                           +{Math.round(leaveBalance.surplus)} surplus
                         </p>
                       )}
+                      {analytics && analytics.carryoverBalance > 0 && (
+                        <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                          {Math.round(analytics.carryoverBalance)} carryover from previous year
+                        </p>
+                      )}
                       {analytics && analytics.remainingLeaveBalance >= 0 && (() => {
                         const realisticUsableDays = analytics.realisticUsableDays ?? 0;
                         const remainingBalance = analytics.remainingLeaveBalance ?? leaveBalance.balance;
@@ -771,6 +776,115 @@ export default function MemberDashboard() {
             </Link>
               );
             })()}
+
+            {/* Carryover Balance Card */}
+            {team?.settings.allowCarryover && (
+              <Link href="/member/analytics" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
+                <div className="p-5 sm:p-6">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Carryover Balance</p>
+                      <p className={`text-3xl sm:text-4xl font-bold mb-1 fade-in ${
+                        analytics?.carryoverBalance && analytics.carryoverBalance > 0
+                          ? 'text-indigo-600 dark:text-indigo-400'
+                          : 'text-gray-900 dark:text-white'
+                      }`}>
+                        {analytics?.carryoverBalance ? Math.round(analytics.carryoverBalance) : 0}
+                      </p>
+                      <div className="mt-2 space-y-1">
+                        {analytics?.carryoverBalance && analytics.carryoverBalance > 0 ? (
+                          <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">
+                            Available from previous year
+                          </p>
+                        ) : (
+                          <p className="text-xs text-gray-500 dark:text-gray-500">No carryover available</p>
+                        )}
+                        {analytics?.carryoverExpiryDate && (() => {
+                          const expiryDate = new Date(analytics.carryoverExpiryDate);
+                          const today = new Date();
+                          const daysUntilExpiry = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                          const isExpiringSoon = daysUntilExpiry <= 30 && daysUntilExpiry > 0;
+                          const isExpired = daysUntilExpiry <= 0;
+                          
+                          return (
+                            <p className={`text-xs font-medium ${
+                              isExpired
+                                ? 'text-red-600 dark:text-red-400'
+                                : isExpiringSoon
+                                ? 'text-orange-600 dark:text-orange-400'
+                                : 'text-gray-600 dark:text-gray-400'
+                            }`}>
+                              {isExpired 
+                                ? `Expired on ${expiryDate.toLocaleDateString()}`
+                                : isExpiringSoon
+                                ? `Expires in ${daysUntilExpiry} day${daysUntilExpiry !== 1 ? 's' : ''}`
+                                : `Expires ${expiryDate.toLocaleDateString()}`
+                              }
+                            </p>
+                          );
+                        })()}
+                        {analytics?.carryoverLimitedToMonths && analytics.carryoverLimitedToMonths.length > 0 && (
+                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                            Limited to: {analytics.carryoverLimitedToMonths.map(m => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m]).join(', ')}
+                          </p>
+                        )}
+                        {analytics?.carryoverMaxDays && (
+                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                            Max: {analytics.carryoverMaxDays} days
+                          </p>
+                        )}
+                        {analytics?.willCarryover && analytics.willCarryover > 0 && (
+                          <p className="text-xs text-green-600 dark:text-green-400 font-medium">
+                            {Math.round(analytics.willCarryover)} will carry over
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex-shrink-0 ml-4">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                        analytics?.carryoverBalance && analytics.carryoverBalance > 0
+                          ? (() => {
+                              const expiryDate = analytics.carryoverExpiryDate ? new Date(analytics.carryoverExpiryDate) : null;
+                              const today = new Date();
+                              const daysUntilExpiry = expiryDate ? Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
+                              const isExpiringSoon = expiryDate && daysUntilExpiry !== null && daysUntilExpiry <= 30 && daysUntilExpiry > 0;
+                              const isExpired = expiryDate && daysUntilExpiry !== null && daysUntilExpiry <= 0;
+                              
+                              if (isExpired) {
+                                return 'bg-red-100 dark:bg-red-900/30';
+                              } else if (isExpiringSoon) {
+                                return 'bg-orange-100 dark:bg-orange-900/30';
+                              } else {
+                                return 'bg-indigo-100 dark:bg-indigo-900/30';
+                              }
+                            })()
+                          : 'bg-gray-100 dark:bg-gray-800'
+                      }`}>
+                        <ArrowTrendingUpIcon className={`h-6 w-6 ${
+                          analytics?.carryoverBalance && analytics.carryoverBalance > 0
+                            ? (() => {
+                                const expiryDate = analytics.carryoverExpiryDate ? new Date(analytics.carryoverExpiryDate) : null;
+                                const today = new Date();
+                                const daysUntilExpiry = expiryDate ? Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
+                                const isExpiringSoon = expiryDate && daysUntilExpiry !== null && daysUntilExpiry <= 30 && daysUntilExpiry > 0;
+                                const isExpired = expiryDate && daysUntilExpiry !== null && daysUntilExpiry <= 0;
+                                
+                                if (isExpired) {
+                                  return 'text-red-700 dark:text-red-400';
+                                } else if (isExpiringSoon) {
+                                  return 'text-orange-700 dark:text-orange-400';
+                                } else {
+                                  return 'text-indigo-700 dark:text-indigo-400';
+                                }
+                              })()
+                            : 'text-gray-700 dark:text-gray-300'
+                        }`} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            )}
 
             {/* Working Days Taken Card */}
             <Link href="/member/analytics" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
@@ -1316,6 +1430,40 @@ export default function MemberDashboard() {
                   
                   {analytics.allowCarryover ? (
                     <div>
+                      {/* Current Carryover from Last Year */}
+                      {analytics.carryoverBalance > 0 && (
+                        <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+                          <div className="flex items-center space-x-3 mb-2">
+                            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
+                              <CalendarIcon className="h-6 w-6 text-blue-700 dark:text-blue-400" />
+                            </div>
+                            <div>
+                              <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">{Math.round(analytics.carryoverBalance)} days</p>
+                              <p className="text-sm text-blue-600 dark:text-blue-400">available from last year</p>
+                            </div>
+                          </div>
+                          {analytics.carryoverExpiryDate && (
+                            <div className="ml-16 mt-2">
+                              <p className="text-xs text-blue-600 dark:text-blue-400">
+                                {(() => {
+                                  const expiryDate = new Date(analytics.carryoverExpiryDate);
+                                  const today = new Date();
+                                  today.setHours(0, 0, 0, 0);
+                                  expiryDate.setHours(0, 0, 0, 0);
+                                  
+                                  if (expiryDate < today) {
+                                    return `Expired on ${expiryDate.toLocaleDateString()}`;
+                                  } else {
+                                    return `Expires on ${expiryDate.toLocaleDateString()}`;
+                                  }
+                                })()}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Future Carryover - Will Carry Over to Next Year */}
                       {analytics.willCarryover > 0 ? (
                         <div className="flex items-center space-x-3 mb-2">
                           <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center">
@@ -1337,9 +1485,19 @@ export default function MemberDashboard() {
                           </div>
                         </div>
                       )}
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
-                        Your team allows leave carryover. Unused days will be available next year.
-                      </p>
+                      {analytics.willCarryover > 0 ? (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
+                          Your team allows leave carryover. Unused days will be available next year.
+                        </p>
+                      ) : analytics.allowCarryover ? (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
+                          Your team allows leave carryover, but you don&apos;t have any days that will carry over.
+                        </p>
+                      ) : (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
+                          Your team does not allow leave carryover. Unused days will be lost at year end.
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <div>

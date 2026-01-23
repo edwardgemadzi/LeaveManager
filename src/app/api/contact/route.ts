@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
  * Get contact submissions (admin only - for future use)
  * This could be used by the admin panel to view feedback
  */
-export async function GET(_request: NextRequest) {
+export async function GET() {
   try {
     // For now, this endpoint is not implemented
     // In the future, this could be used by the admin panel

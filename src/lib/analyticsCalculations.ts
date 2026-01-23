@@ -1,5 +1,5 @@
 import { ShiftSchedule, User, Team, LeaveRequest } from '@/types';
-import { countWorkingDays, calculateLeaveBalance, isWorkingDay, getWorkingDays, calculateSurplusBalance, calculateMaternityLeaveBalance, calculateMaternitySurplusBalance, isMaternityLeave, countMaternityLeaveDays } from './leaveCalculations';
+import { countWorkingDays, calculateLeaveBalance, isWorkingDay, getWorkingDays, calculateSurplusBalance, calculateMaternityLeaveBalance, calculateMaternitySurplusBalance, isMaternityLeave, countMaternityLeaveDays, calculateCarryoverBalance } from './leaveCalculations';
 import { debug } from './logger';
 
 // Check if bypass notice period is active for a given team and date
@@ -75,15 +75,15 @@ export const generateWorkingDaysTag = (shiftSchedule?: ShiftSchedule): string =>
   return next10Days.map(working => working ? '1' : '0').join('');
 };
 
-// Get start and end dates of current calendar year
-const getYearStart = (): Date => {
-  const now = new Date();
-  return new Date(now.getFullYear(), 0, 1);
+// Get start and end dates of a calendar year (defaults to current year)
+const getYearStart = (year?: number): Date => {
+  const targetYear = year ?? new Date().getFullYear();
+  return new Date(targetYear, 0, 1);
 };
 
-const getYearEnd = (): Date => {
-  const now = new Date();
-  return new Date(now.getFullYear(), 11, 31);
+const getYearEnd = (year?: number): Date => {
+  const targetYear = year ?? new Date().getFullYear();
+  return new Date(targetYear, 11, 31);
 };
 
 // Calculate theoretical working days remaining from today to end of year
@@ -577,19 +577,27 @@ export const calculateUsableDays = (
   team: Team,
   allApprovedRequests: LeaveRequest[],
   allMembers: User[],
-  shiftSchedule: ShiftSchedule
+  shiftSchedule: ShiftSchedule,
+  targetYear?: number // Optional year parameter for historical data
 ): number => {
+  const currentYear = targetYear ?? new Date().getFullYear();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const yearEnd = getYearEnd();
+  const yearStart = getYearStart(currentYear);
+  yearStart.setHours(0, 0, 0, 0);
+  const yearEnd = getYearEnd(currentYear);
   yearEnd.setHours(23, 59, 59, 999);
   
-  // Check if bypass notice period is active
-  const bypassActive = isBypassNoticePeriodActive(team, today);
+  // For historical years, calculate from start of year to end of year
+  // For current year, calculate from today (or earliest requestable date) to end of year
+  const isHistoricalYear = currentYear < today.getFullYear();
   
-  // Calculate earliest requestable date based on notice period (unless bypass is active)
-  let earliestRequestableDate = today;
-  if (!bypassActive) {
+  // Check if bypass notice period is active (only relevant for current year)
+  const bypassActive = !isHistoricalYear && isBypassNoticePeriodActive(team, today);
+  
+  // Calculate earliest requestable date based on notice period (unless bypass is active or historical year)
+  let earliestRequestableDate = isHistoricalYear ? yearStart : today;
+  if (!isHistoricalYear && !bypassActive) {
     earliestRequestableDate = new Date(today);
     earliestRequestableDate.setDate(today.getDate() + team.settings.minimumNoticePeriod);
     earliestRequestableDate.setHours(0, 0, 0, 0);
@@ -604,7 +612,7 @@ export const calculateUsableDays = (
   const userShiftTag = user.shiftTag;
   const userSubgroupTag = user.subgroupTag;
   
-  // Get all remaining working days in the year (starting from earliest requestable date)
+  // Get all working days in the period (from earliest requestable date to end of year)
   const remainingWorkingDays = getWorkingDays(earliestRequestableDate, yearEnd, shiftSchedule);
   
   // Count days that have availability (slots > 0) among members with same tag
@@ -660,13 +668,6 @@ export const calculateUsableDays = (
       today.setHours(0, 0, 0, 0);
       const yearEnd = getYearEnd();
       yearEnd.setHours(23, 59, 59, 999);
-      
-      // Count approved requests that could affect these dates
-      const futureRequests = allApprovedRequests.filter(req => {
-        const reqStart = new Date(req.startDate);
-        reqStart.setHours(0, 0, 0, 0);
-        return reqStart >= today && reqStart <= yearEnd;
-      });
       
       console.log(`[TERMINAL] [calculateUsableDays] ${user.username} - Concurrent leave: ${team.settings.concurrentLeave}, Usable: ${usableDays}, Blocked: ${blockedDays}`);
       console.log(`[TERMINAL] [calculateUsableDays] ${user.username} - Availability distribution:`, JSON.stringify(availabilityCounts));
@@ -897,7 +898,7 @@ export const suggestSubgroupAssignments = (
   
   // Assign each overlap group to a subgroup
   let subgroupIndex = 0;
-  for (const [groupId, groupMembers] of overlapGroups.entries()) {
+  for (const [, groupMembers] of overlapGroups.entries()) {
     // Assign to next available subgroup (round-robin if more groups than subgroups)
     const suggestedSubgroup = existingSubgroups[subgroupIndex % existingSubgroups.length];
     
@@ -1159,6 +1160,47 @@ export const calculateCarryoverDays = (
     };
   }
 
+  // Check if carryover has an expiry date that has already passed
+  // If expiry date is in the past, no days will carry over
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  if (carryoverSettings?.expiryDate) {
+    const expiryDate = new Date(carryoverSettings.expiryDate);
+    expiryDate.setHours(0, 0, 0, 0);
+    
+    // If expiry date is in the past, all unused days will be lost
+    if (expiryDate < today) {
+      return {
+        willCarryover: 0,
+        willLose: unusedDays,
+        limitedToMonths: carryoverSettings.limitedToMonths,
+        maxCarryoverDays: carryoverSettings.maxCarryoverDays,
+        expiryDate: carryoverSettings.expiryDate
+      };
+    }
+  }
+  
+  // Check if carryover is limited to months and those months have already passed
+  // If all limited months are in the past, no days will carry over
+  if (carryoverSettings?.limitedToMonths && carryoverSettings.limitedToMonths.length > 0) {
+    const nextYear = new Date().getFullYear() + 1;
+    const lastAllowedMonth = Math.max(...carryoverSettings.limitedToMonths);
+    const lastAllowedMonthEnd = new Date(nextYear, lastAllowedMonth + 1, 0);
+    lastAllowedMonthEnd.setHours(23, 59, 59, 999);
+    
+    // If the last allowed month has already passed, no days will carry over
+    if (lastAllowedMonthEnd < today) {
+      return {
+        willCarryover: 0,
+        willLose: unusedDays,
+        limitedToMonths: carryoverSettings.limitedToMonths,
+        maxCarryoverDays: carryoverSettings.maxCarryoverDays,
+        expiryDate: carryoverSettings.expiryDate
+      };
+    }
+  }
+
   // Apply max carryover days limit if set
   if (carryoverSettings?.maxCarryoverDays !== undefined && unusedDays > carryoverSettings.maxCarryoverDays) {
     const willLose = unusedDays - carryoverSettings.maxCarryoverDays;
@@ -1189,6 +1231,7 @@ export interface MemberAnalytics {
   realisticUsableDays: number; // Realistic days factoring in members sharing same schedule who also need to use remaining leave days (whole days per member)
   remainingLeaveBalance: number; // Remaining balance after subtracting approved requests
   baseLeaveBalance: number; // Base balance (manualLeaveBalance if set, otherwise maxLeavePerYear) - before subtracting approved requests
+  carryoverBalance: number; // Available carryover balance from previous year (separate stat)
   workingDaysUsed: number;
   workingDaysInYear: number;
   willCarryover: number;
@@ -1287,8 +1330,10 @@ export const getMemberAnalytics = (
   team: Team,
   approvedRequests: LeaveRequest[],
   allApprovedRequests: LeaveRequest[],
-  allMembers: User[]
+  allMembers: User[],
+  targetYear?: number // Optional year parameter for historical data
 ): MemberAnalytics => {
+  const currentYear = targetYear ?? new Date().getFullYear();
   const shiftSchedule = user.shiftSchedule || {
     pattern: [true, true, true, true, true, false, false],
     startDate: new Date(),
@@ -1318,9 +1363,20 @@ export const getMemberAnalytics = (
     return memberBaseBalance > 0;
   });
 
+  // Calculate year start and end dates first (needed for multiple calculations)
+  const yearStart = getYearStart(currentYear);
+  yearStart.setHours(0, 0, 0, 0);
+  const yearEnd = getYearEnd(currentYear);
+  yearEnd.setHours(23, 59, 59, 999);
+  
   // Calculate theoretical remaining working days in year
   // This is the raw count of working days remaining - NOT adjusted for concurrent leave sharing
-  const theoreticalWorkingDays = calculateRemainingWorkingDaysInYear(shiftSchedule);
+  // For historical years, calculate from start to end of year (not "remaining")
+  const today = new Date();
+  const isHistoricalYear = currentYear < today.getFullYear();
+  const theoreticalWorkingDays = isHistoricalYear
+    ? countWorkingDays(yearStart, yearEnd, shiftSchedule)
+    : calculateRemainingWorkingDaysInYear(shiftSchedule);
   
   // Calculate usable days - adjusted for concurrent leave constraints
   // This shows how many days can be used when shared among members who can use them
@@ -1406,14 +1462,11 @@ export const getMemberAnalytics = (
     team,
     regularApprovedRequests, // Only regular leave requests (exclude maternity/paternity)
     filteredMembers, // Include ALL members in same subgroup (their requests block days, even if they have 0 balance)
-    shiftSchedule
+    shiftSchedule,
+    currentYear
   );
   
   // Calculate total working days in year
-  const yearStart = getYearStart();
-  yearStart.setHours(0, 0, 0, 0);
-  const yearEnd = getYearEnd();
-  yearEnd.setHours(23, 59, 59, 999);
   const workingDaysInYear = countWorkingDays(yearStart, yearEnd, shiftSchedule);
   
   // Calculate working days used year-to-date from approved requests
@@ -1447,6 +1500,9 @@ export const getMemberAnalytics = (
   const workingDaysUsed = user.manualYearToDateUsed !== undefined 
     ? user.manualYearToDateUsed 
     : yearToDateWorkingDays;
+  
+  // Calculate carryover balance separately
+  const carryoverBalance = calculateCarryoverBalance(user, workingDaysUsed);
   
   // Calculate surplus balance
   const surplusBalance = calculateSurplusBalance(user.manualLeaveBalance, team.settings.maxLeavePerYear);
@@ -1635,6 +1691,7 @@ export const getMemberAnalytics = (
     realisticUsableDays,
     remainingLeaveBalance,
     baseLeaveBalance,
+    carryoverBalance,
     workingDaysUsed,
     workingDaysInYear,
     willCarryover: carryoverResult.willCarryover,
@@ -1783,7 +1840,8 @@ export const getMaternityMemberAnalytics = (
 export const getTeamAnalytics = (
   members: User[],
   team: Team,
-  allRequests: LeaveRequest[]
+  allRequests: LeaveRequest[],
+  targetYear?: number // Optional year parameter for historical data
 ): TeamAnalytics => {
   const memberMembers = members.filter(m => m.role === 'member');
   
@@ -1800,7 +1858,8 @@ export const getTeamAnalytics = (
       team,
       memberRequests,
       allApprovedRequests,
-      members
+      members,
+      targetYear
     );
     
     return {
@@ -1904,7 +1963,8 @@ export const getTeamAnalytics = (
 export const getGroupedTeamAnalytics = (
   members: User[],
   team: Team,
-  allRequests: LeaveRequest[]
+  allRequests: LeaveRequest[],
+  targetYear?: number // Optional year parameter for historical data
 ): GroupedTeamAnalytics => {
   // Validate team.settings before calculation
   if (!team || !team.settings) {
@@ -1948,7 +2008,8 @@ export const getGroupedTeamAnalytics = (
       team,
       memberRequests,
       allApprovedRequests,
-      members
+      members,
+      targetYear
     );
     
     return {

@@ -30,9 +30,11 @@ export default function MemberAnalyticsPage() {
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const fetchData = async () => {
+  const fetchData = async (year?: number) => {
+    const targetYear = year ?? selectedYear;
     try {
       const token = localStorage.getItem('token');
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
@@ -73,7 +75,19 @@ export default function MemberAnalyticsPage() {
         const userId = String(currentUserId || '').trim();
         return reqUserId === userId;
       });
-      setLeaveRequests(userRequests);
+      
+      // Filter leave requests to selected year
+      const yearStart = new Date(targetYear, 0, 1);
+      yearStart.setHours(0, 0, 0, 0);
+      const yearEnd = new Date(targetYear, 11, 31);
+      yearEnd.setHours(23, 59, 59, 999);
+      
+      const yearRequests = userRequests.filter((req: LeaveRequest) => {
+        const reqStart = parseDateSafe(req.startDate);
+        const reqEnd = parseDateSafe(req.endDate);
+        return reqStart <= yearEnd && reqEnd >= yearStart;
+      });
+      setLeaveRequests(yearRequests);
 
       // Calculate maternity analytics if user has maternity/paternity type assigned and it's enabled
       if (data.currentUser?.maternityPaternityType && data.team) {
@@ -83,7 +97,7 @@ export default function MemberAnalyticsPage() {
           : data.team.settings.maternityLeave?.enabled;
         
         if (isTypeEnabled) {
-          const approvedRequests = userRequests.filter((req: LeaveRequest) => req.status === 'approved');
+          const approvedRequests = yearRequests.filter((req: LeaveRequest) => req.status === 'approved');
           const maternityAnalyticsData = getMaternityMemberAnalytics(
             data.currentUser,
             data.team,
@@ -114,12 +128,12 @@ export default function MemberAnalyticsPage() {
   };
 
   useEffect(() => {
-    fetchData();
+    fetchData(selectedYear);
     
     // Listen for settings updates to refresh analytics
     const handleSettingsUpdated = () => {
       setTimeout(() => {
-        fetchData();
+        fetchData(selectedYear);
       }, 200);
     };
     
@@ -127,7 +141,8 @@ export default function MemberAnalyticsPage() {
     return () => {
       window.removeEventListener('teamSettingsUpdated', handleSettingsUpdated);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedYear]);
 
   // Real-time updates using SSE
   useTeamEvents(team?._id || null, {
@@ -140,7 +155,7 @@ export default function MemberAnalyticsPage() {
           clearTimeout(refreshTimeoutRef.current);
         }
         refreshTimeoutRef.current = setTimeout(() => {
-          fetchData();
+          fetchData(selectedYear);
         }, 300);
       }
     },
@@ -177,12 +192,19 @@ export default function MemberAnalyticsPage() {
     );
   }
 
-  const currentYear = new Date().getFullYear();
-  const yearStart = new Date(currentYear, 0, 1);
-  const yearEnd = new Date(currentYear, 11, 31);
+  // Use selectedYear for calculations (not current year)
+  const yearStart = new Date(selectedYear, 0, 1);
+  const yearEnd = new Date(selectedYear, 11, 31);
   const today = new Date();
-  const daysElapsed = Math.floor((today.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24));
-  const daysRemaining = Math.floor((yearEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const isHistoricalYear = selectedYear < today.getFullYear();
+  
+  // For historical years, calculate full year; for current year, calculate from start to today
+  const daysElapsed = isHistoricalYear
+    ? Math.floor((yearEnd.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+    : Math.floor((today.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24));
+  const daysRemaining = isHistoricalYear
+    ? 0
+    : Math.floor((yearEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
   // Helper functions for analytics calculations
   const shiftSchedule: ShiftSchedule = user?.shiftSchedule || {
@@ -393,7 +415,15 @@ export default function MemberAnalyticsPage() {
     
     if (willCarryover > 0 && carryoverExpiryDate) {
       const expiryDate = new Date(carryoverExpiryDate);
-      recommendations.push(`⏰ Carryover days expire on ${expiryDate.toLocaleDateString()}. Use them before this date.`);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      expiryDate.setHours(0, 0, 0, 0);
+      
+      if (expiryDate < today) {
+        recommendations.push(`⏰ Your carryover days have expired as of ${expiryDate.toLocaleDateString()}. They will not be available.`);
+      } else {
+        recommendations.push(`⏰ Carryover days expire on ${expiryDate.toLocaleDateString()}. Use them before this date.`);
+      }
     }
     
     // Competition recommendations
@@ -411,14 +441,16 @@ export default function MemberAnalyticsPage() {
       recommendations.push(`💡 You can realistically use ${Math.round(realisticUsable)} of your ${Math.round(remainingBalance)} remaining days due to competition and constraints.`);
     }
     
-    // Year progress recommendations
-    const yearProgress = daysElapsed / (daysElapsed + daysRemaining);
-    // Calculate percentage of leave used (not working days)
-    const baseBalance = analytics.baseLeaveBalance ?? (team?.settings.maxLeavePerYear || 20);
-    const used = baseBalance - (analytics.remainingLeaveBalance ?? 0);
-    const usageProgress = baseBalance > 0 ? used / baseBalance : 0;
-    if (yearProgress > 0.5 && usageProgress < yearProgress * 0.7) {
-      recommendations.push(`📈 You're ${Math.round(yearProgress * 100)}% through the year but have only used ${Math.round(usageProgress * 100)}% of your leave. Consider planning more leave.`);
+    // Year progress recommendations (only for current year, not historical)
+    if (!isHistoricalYear) {
+      const yearProgress = daysElapsed / (daysElapsed + daysRemaining);
+      // Calculate percentage of leave used (not working days)
+      const baseBalance = analytics.baseLeaveBalance ?? (team?.settings.maxLeavePerYear || 20);
+      const used = baseBalance - (analytics.remainingLeaveBalance ?? 0);
+      const usageProgress = baseBalance > 0 ? used / baseBalance : 0;
+      if (yearProgress > 0.5 && usageProgress < yearProgress * 0.7) {
+        recommendations.push(`📈 You're ${Math.round(yearProgress * 100)}% through the year but have only used ${Math.round(usageProgress * 100)}% of your leave. Consider planning more leave.`);
+      }
     }
     
     return recommendations;
@@ -502,13 +534,38 @@ export default function MemberAnalyticsPage() {
         <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12">
           {/* Header Section - Enhanced */}
           <div className="mb-8 fade-in">
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">My Leave Analytics</h1>
-            <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400 mb-2">
-              Detailed analytics and insights for {currentYear}
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-500">
-              {daysElapsed} days elapsed, {daysRemaining} days remaining in the year
-            </p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+              <div>
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">My Leave Analytics</h1>
+                <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400">
+                  Detailed insights into your leave usage and patterns for {selectedYear}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <label htmlFor="year-select" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Year:
+                </label>
+                <select
+                  id="year-select"
+                  value={selectedYear}
+                  onChange={(e) => {
+                    const year = parseInt(e.target.value);
+                    setSelectedYear(year);
+                    fetchData(year);
+                  }}
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  {Array.from({ length: 5 }, (_, i) => {
+                    const year = new Date().getFullYear() - i;
+                    return (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            </div>
           </div>
 
           {/* Analytics Cards - Enhanced */}
@@ -772,6 +829,40 @@ export default function MemberAnalyticsPage() {
               
               {analytics.allowCarryover ? (
                 <div>
+                  {/* Current Carryover from Last Year */}
+                  {analytics.carryoverBalance > 0 && (
+                    <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
+                          <CalendarIcon className="h-6 w-6 text-blue-700 dark:text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">{Math.round(analytics.carryoverBalance)} days</p>
+                          <p className="text-sm text-blue-600 dark:text-blue-400">available from last year</p>
+                        </div>
+                      </div>
+                      {analytics.carryoverExpiryDate && (
+                        <div className="ml-16 mt-2">
+                          <p className="text-xs text-blue-600 dark:text-blue-400">
+                            {(() => {
+                              const expiryDate = new Date(analytics.carryoverExpiryDate);
+                              const today = new Date();
+                              today.setHours(0, 0, 0, 0);
+                              expiryDate.setHours(0, 0, 0, 0);
+                              
+                              if (expiryDate < today) {
+                                return `Expired on ${expiryDate.toLocaleDateString()}`;
+                              } else {
+                                return `Expires on ${expiryDate.toLocaleDateString()}`;
+                              }
+                            })()}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Future Carryover - Will Carry Over to Next Year */}
                   {analytics.willCarryover > 0 ? (
                     <div className="mb-4">
                       <div className="flex items-center space-x-3 mb-2">
@@ -800,14 +891,14 @@ export default function MemberAnalyticsPage() {
                               <p className="text-xs text-teal-700 dark:text-teal-400 leading-relaxed">
                                 {analytics.carryoverLimitedToMonths && analytics.carryoverLimitedToMonths.length > 0 ? (
                                   <>
-                                    Effective days you can realistically use from your carryover balance, considering the limited usage period. 
-                                    Since carryover days can only be used in{' '}
-                                    {analytics.carryoverLimitedToMonths.map(m => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m]).join(', ')}, 
-                                    the effective value is reduced.
+                                    Effective days you can realistically use from the days that will carry over to next year, considering the limited usage period. 
+                                    Since these carryover days can only be used in{' '}
+                                    {analytics.carryoverLimitedToMonths.map(m => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m]).join(', ')}{' '}
+                                    of next year, the effective value is reduced.
                                   </>
                                 ) : (
                                   <>
-                                    Effective days you can realistically use from your carryover balance next year.
+                                    Effective days you can realistically use from the days that will carry over to next year.
                                   </>
                                 )}
                               </p>
@@ -835,8 +926,8 @@ export default function MemberAnalyticsPage() {
                         return null;
                       })()}
                       
-                      {/* Carryover Limitations */}
-                      {analytics.carryoverLimitedToMonths && analytics.carryoverLimitedToMonths.length > 0 && (
+                      {/* Carryover Limitations - Only show if there's actual carryover */}
+                      {analytics.willCarryover > 0 && analytics.carryoverLimitedToMonths && analytics.carryoverLimitedToMonths.length > 0 && (
                         <div className="ml-16 mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
                           <p className="text-xs font-semibold text-yellow-900 dark:text-yellow-300 mb-1">⚠️ Limited Usage Period:</p>
                           <p className="text-xs text-yellow-800 dark:text-yellow-400">
@@ -853,11 +944,22 @@ export default function MemberAnalyticsPage() {
                           </p>
                         </div>
                       )}
-                      {analytics.carryoverExpiryDate && (
+                      {analytics.willCarryover > 0 && analytics.carryoverExpiryDate && (
                         <div className="ml-16 mt-2 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                           <p className="text-xs font-semibold text-orange-900 dark:text-orange-300 mb-1">⏰ Expiry Date:</p>
                           <p className="text-xs text-orange-800 dark:text-orange-400">
-                            Carryover days expire on {new Date(analytics.carryoverExpiryDate).toLocaleDateString()}
+                            {(() => {
+                              const expiryDate = new Date(analytics.carryoverExpiryDate);
+                              const today = new Date();
+                              today.setHours(0, 0, 0, 0);
+                              expiryDate.setHours(0, 0, 0, 0);
+                              
+                              if (expiryDate < today) {
+                                return `Carryover days expired on ${expiryDate.toLocaleDateString()}. They are no longer available.`;
+                              } else {
+                                return `Carryover days expire on ${expiryDate.toLocaleDateString()}. Use them before this date.`;
+                              }
+                            })()}
                           </p>
                         </div>
                       )}
@@ -873,9 +975,19 @@ export default function MemberAnalyticsPage() {
                       </div>
                     </div>
                   )}
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
-                    Your team allows leave carryover. Unused days will be available next year.
-                  </p>
+                  {analytics.willCarryover > 0 ? (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
+                      Your team allows leave carryover. Unused days will be available next year.
+                    </p>
+                  ) : analytics.allowCarryover ? (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
+                      Your team allows leave carryover, but you don&apos;t have any days that will carry over.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
+                      Your team does not allow leave carryover. Unused days will be lost at year end.
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div>
@@ -947,7 +1059,7 @@ export default function MemberAnalyticsPage() {
           <div className="card mb-8">
             <div className="p-5 sm:p-6">
               <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Leave Balance Summary</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
                   <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Remaining Balance</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white">
@@ -955,6 +1067,15 @@ export default function MemberAnalyticsPage() {
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">out of {team?.settings.maxLeavePerYear || 20} days</p>
                 </div>
+                {analytics.carryoverBalance > 0 && (
+                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Carryover Balance</p>
+                    <p className="text-3xl font-bold text-blue-900 dark:text-blue-300">
+                      {Math.round(analytics.carryoverBalance)}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">from previous year</p>
+                  </div>
+                )}
                 <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
                   <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Working Days Used</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white">

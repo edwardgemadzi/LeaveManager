@@ -5,9 +5,7 @@ import { TeamModel } from '@/models/Team';
 import { getDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { 
-  suggestSubgroupAssignments, 
-  findMembersWithPartialOverlap,
-  SubgroupSuggestions 
+  suggestSubgroupAssignments
 } from '@/lib/analyticsCalculations';
 import { error as logError } from '@/lib/logger';
 import { internalServerError, badRequestError, notFoundError } from '@/lib/errors';

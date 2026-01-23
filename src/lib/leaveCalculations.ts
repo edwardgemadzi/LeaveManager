@@ -247,50 +247,100 @@ export function calculateLeaveBalance(
     return total;
     }, 0);
 
-  // Simplified base balance logic:
+  // New year base balance logic:
   // - If manualLeaveBalance is set, always use it as base (whether above or below maxLeavePerYear)
   // - If manualLeaveBalance is not set, use maxLeavePerYear
-  let baseBalance = manualLeaveBalance !== undefined ? manualLeaveBalance : maxLeavePerYear;
+  const newYearBalance = manualLeaveBalance !== undefined ? manualLeaveBalance : maxLeavePerYear;
   
-  // Add carryover from previous year if exists and not expired
+  // Get carryover from previous year if exists and not expired
   // Only check if userOrSchedule is a User object (has carryoverFromPreviousYear field)
+  let carryoverAvailable = 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
   if ('carryoverFromPreviousYear' in userOrSchedule && userOrSchedule.carryoverFromPreviousYear) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
     const isExpired = userOrSchedule.carryoverExpiryDate && 
       new Date(userOrSchedule.carryoverExpiryDate).setHours(0, 0, 0, 0) < today.getTime();
     
+    // Only count carryover if it hasn't expired (as set by leader)
     if (!isExpired && userOrSchedule.carryoverFromPreviousYear > 0) {
-      // Add carryover to base balance
-      baseBalance += userOrSchedule.carryoverFromPreviousYear;
+      carryoverAvailable = userOrSchedule.carryoverFromPreviousYear;
     }
   }
   
   // If manualYearToDateUsed is set, use it instead of calculated approved working days
   const daysUsed = manualYearToDateUsed !== undefined ? manualYearToDateUsed : approvedWorkingDays;
-  let remainingBalance = baseBalance - daysUsed;
   
-  // If carryover has expired, check if we need to reduce balance
+  // IMPORTANT: Consume carryover FIRST, then new year balance
+  // This ensures carryover days are used before touching the new year allocation
+  let remainingCarryover = 0;
+  let remainingNewYearBalance = newYearBalance;
+  
+  if (daysUsed <= carryoverAvailable) {
+    // All days used come from carryover - new year balance untouched
+    remainingCarryover = carryoverAvailable - daysUsed;
+    // remainingNewYearBalance stays at full new year allocation
+  } else {
+    // Carryover exhausted, remaining days come from new year balance
+    remainingCarryover = 0;
+    remainingNewYearBalance = newYearBalance - (daysUsed - carryoverAvailable);
+  }
+  
+  // Total remaining balance
+  let remainingBalance = remainingNewYearBalance + remainingCarryover;
+  
+  // Final check: if carryover has expired (as set by leader), remove any unused carryover
   if ('carryoverFromPreviousYear' in userOrSchedule && userOrSchedule.carryoverFromPreviousYear) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
     const isExpired = userOrSchedule.carryoverExpiryDate && 
       new Date(userOrSchedule.carryoverExpiryDate).setHours(0, 0, 0, 0) < today.getTime();
     
     if (isExpired) {
-      // If carryover expired and remainingBalance > maxLeavePerYear, reduce to maxLeavePerYear
-      // This means the carryover days were not used and are lost
-      if (remainingBalance > maxLeavePerYear) {
-        remainingBalance = maxLeavePerYear;
+      // If carryover expired and we still have remaining carryover, it's lost
+      remainingCarryover = 0;
+      // If remaining balance exceeds new year balance, it means unused carryover expired
+      if (remainingBalance > newYearBalance) {
+        remainingBalance = newYearBalance;
       }
-      // If remainingBalance <= maxLeavePerYear, keep as is (carryover was used)
     }
   }
   
   return remainingBalance;
 };
+
+/**
+ * Calculate carryover balance separately
+ * Returns the remaining carryover after usage (consume carryover first, then new year)
+ */
+export function calculateCarryoverBalance(
+  userOrSchedule: User | ShiftSchedule,
+  daysUsed: number
+): number {
+  // Only check if userOrSchedule is a User object (has carryoverFromPreviousYear field)
+  if (!('carryoverFromPreviousYear' in userOrSchedule) || !userOrSchedule.carryoverFromPreviousYear) {
+    return 0;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const isExpired = userOrSchedule.carryoverExpiryDate && 
+    new Date(userOrSchedule.carryoverExpiryDate).setHours(0, 0, 0, 0) < today.getTime();
+  
+  if (isExpired) {
+    return 0;
+  }
+
+  const originalCarryover = userOrSchedule.carryoverFromPreviousYear;
+  
+  // Calculate remaining carryover: consume carryover first, then new year
+  if (daysUsed <= originalCarryover) {
+    // All days used come from carryover
+    return originalCarryover - daysUsed;
+  } else {
+    // Carryover exhausted
+    return 0;
+  }
+}
 
 // Function to calculate surplus balance (when manual balance exceeds team max)
 export const calculateSurplusBalance = (

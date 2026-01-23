@@ -27,6 +27,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No team assigned' }, { status: 400 });
     }
 
+    // Get year parameter (defaults to current year)
+    const { searchParams } = new URL(request.url);
+    const yearParam = searchParams.get('year');
+    const targetYear = yearParam ? parseInt(yearParam) : new Date().getFullYear();
+    
+    // Validate year (reasonable range: 2020-2100)
+    if (isNaN(targetYear) || targetYear < 2020 || targetYear > 2100) {
+      return NextResponse.json({ error: 'Invalid year parameter' }, { status: 400 });
+    }
+
     // Fetch team data - ensure we get fresh data (no caching)
     // IMPORTANT: This team object is passed to all calculation functions (getMemberAnalytics, getTeamAnalytics, getGroupedTeamAnalytics)
     // to ensure concurrent leave settings are consistently applied throughout the calculation chain
@@ -86,8 +96,21 @@ export async function GET(request: NextRequest) {
     // Fetch all leave requests for the team
     const allRequests = await LeaveRequestModel.findByTeamId(user.teamId);
     
+    // Filter requests to target year if specified
+    const yearStart = new Date(targetYear, 0, 1);
+    yearStart.setHours(0, 0, 0, 0);
+    const yearEnd = new Date(targetYear, 11, 31);
+    yearEnd.setHours(23, 59, 59, 999);
+    
+    // Filter requests that overlap with the target year
+    const yearRequests = allRequests.filter(req => {
+      const reqStart = new Date(req.startDate);
+      const reqEnd = new Date(req.endDate);
+      return reqStart <= yearEnd && reqEnd >= yearStart;
+    });
+    
     // Get all approved requests (needed for realistic calculations)
-    const allApprovedRequests = allRequests.filter(req => req.status === 'approved');
+    const allApprovedRequests = yearRequests.filter(req => req.status === 'approved');
 
     // Return analytics based on role
     if (user.role === 'member') {
@@ -97,22 +120,28 @@ export async function GET(request: NextRequest) {
       const members = await UserModel.findByTeamId(user.teamId);
       const memberList = members.filter(m => m.role === 'member');
       
-      // Calculate grouped analytics first (this normalizes usableDays and recalculates realisticUsableDays)
-      const groupedAnalytics = getGroupedTeamAnalytics(memberList, team, allRequests);
-      
-      // Find the member's analytics from the grouped result
+      // For historical years, use individual calculation (grouped analytics is for current year competition)
+      // For current year, use grouped analytics for consistency
       let memberAnalytics = null;
-      for (const group of groupedAnalytics.groups) {
-        const memberInGroup = group.members.find(m => m.userId === user.id);
-        if (memberInGroup) {
-          memberAnalytics = memberInGroup.analytics;
-          break;
+      const isCurrentYear = targetYear === new Date().getFullYear();
+      
+      if (isCurrentYear) {
+        // Calculate grouped analytics first (this normalizes usableDays and recalculates realisticUsableDays)
+        const groupedAnalytics = getGroupedTeamAnalytics(memberList, team, yearRequests, targetYear);
+        
+        // Find the member's analytics from the grouped result
+        for (const group of groupedAnalytics.groups) {
+          const memberInGroup = group.members.find(m => m.userId === user.id);
+          if (memberInGroup) {
+            memberAnalytics = memberInGroup.analytics;
+            break;
+          }
         }
       }
       
-      // Fallback to individual calculation if member not found in groups (shouldn't happen, but safety)
+      // Fallback to individual calculation if not found in groups or for historical years
       if (!memberAnalytics) {
-        const memberRequests = allRequests.filter(req => 
+        const memberRequests = yearRequests.filter(req => 
           req.userId === user.id && req.status === 'approved'
         );
         memberAnalytics = getMemberAnalytics(
@@ -120,11 +149,16 @@ export async function GET(request: NextRequest) {
           team,
           memberRequests,
           allApprovedRequests,
-          memberList
+          memberList,
+          targetYear
         );
       }
       
-      return NextResponse.json({ analytics: memberAnalytics }, {
+      return NextResponse.json({ 
+        analytics: memberAnalytics,
+        year: targetYear,
+        isHistorical: targetYear < new Date().getFullYear()
+      }, {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
           'Pragma': 'no-cache',
@@ -148,26 +182,45 @@ export async function GET(request: NextRequest) {
           settingsKeys: team.settings ? Object.keys(team.settings) : []
         });
         
-        const groupedAnalytics = getGroupedTeamAnalytics(members, team, allRequests);
+        // For historical years, use regular analytics (grouped is for current year competition)
+        const isCurrentYear = targetYear === new Date().getFullYear();
         
-        debug('[Analytics API] After calculation - Sample usable days:', groupedAnalytics.groups?.[0]?.members?.[0]?.analytics?.usableDays);
-        debug('[Analytics API] After calculation - Total usable days:', groupedAnalytics.aggregate?.totalUsableDays);
-        debug('[Analytics API] After calculation - Total realistic usable days:', groupedAnalytics.aggregate?.totalRealisticUsableDays);
-        debug('Analytics API - Grouped analytics generated:', {
-          hasAggregate: !!groupedAnalytics.aggregate,
-          hasGroups: !!groupedAnalytics.groups,
-          groupsLength: groupedAnalytics.groups?.length || 0
-        });
-        
-        // Return both grouped and regular analytics for backward compatibility
-        const regularAnalytics = getTeamAnalytics(members, team, allRequests);
+        let analyticsResponse;
+        if (isCurrentYear) {
+          const groupedAnalytics = getGroupedTeamAnalytics(members, team, yearRequests, targetYear);
+          
+          debug('[Analytics API] After calculation - Sample usable days:', groupedAnalytics.groups?.[0]?.members?.[0]?.analytics?.usableDays);
+          debug('[Analytics API] After calculation - Total usable days:', groupedAnalytics.aggregate?.totalUsableDays);
+          debug('[Analytics API] After calculation - Total realistic usable days:', groupedAnalytics.aggregate?.totalRealisticUsableDays);
+          debug('Analytics API - Grouped analytics generated:', {
+            hasAggregate: !!groupedAnalytics.aggregate,
+            hasGroups: !!groupedAnalytics.groups,
+            groupsLength: groupedAnalytics.groups?.length || 0
+          });
+          
+          // Return both grouped and regular analytics for backward compatibility
+          const regularAnalytics = getTeamAnalytics(members, team, yearRequests, targetYear);
+          
+          analyticsResponse = { 
+            analytics: groupedAnalytics,
+            regularAnalytics, // Keep for backward compatibility
+            year: targetYear,
+            isHistorical: false
+          };
+        } else {
+          // For historical years, calculate analytics for that specific year
+          const regularAnalytics = getTeamAnalytics(members, team, yearRequests, targetYear);
+          
+          analyticsResponse = {
+            analytics: regularAnalytics,
+            year: targetYear,
+            isHistorical: true
+          };
+        }
         
         debug('[Analytics API] Returning analytics with concurrentLeave:', team.settings.concurrentLeave);
         
-        return NextResponse.json({ 
-          analytics: groupedAnalytics,
-          regularAnalytics // Keep for backward compatibility
-        }, {
+        return NextResponse.json(analyticsResponse, {
           headers: {
             'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
             'Pragma': 'no-cache',

@@ -250,7 +250,7 @@ export default function LeaderLeaveBalancePage() {
     const remainingBalance = analyticsData?.remainingLeaveBalance ?? calculateLeaveBalance(
       team?.settings.maxLeavePerYear || 20,
       approvedRequestsForCalculation,
-      shiftSchedule,
+      member,
       member.manualLeaveBalance,
       member.manualYearToDateUsed
     );
@@ -1327,6 +1327,14 @@ export default function LeaderLeaveBalancePage() {
                                         );
                                       })()}
                                       <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">(remaining)</span>
+                                      {(() => {
+                                        const memberAnalytics = getMemberAnalyticsData(member);
+                                        return memberAnalytics && memberAnalytics.carryoverBalance > 0 ? (
+                                          <div className="mt-1 text-xs text-blue-600 dark:text-blue-400">
+                                            Carryover: {Math.round(memberAnalytics.carryoverBalance)} days
+                                          </div>
+                                        ) : null;
+                                      })()}
                                       {leaveData.remainingBalance < 0 && (() => {
                                         // Check if member has taken compassionate leave (maternity, sick, bereavement, medical, etc.)
                                         const memberCompassionateRequests = allRequests.filter(req => 

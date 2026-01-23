@@ -349,7 +349,7 @@ export default function LeaderDashboard() {
           const remainingBalance = calculateLeaveBalance(
             maxLeavePerYear,
             approvedRequests,
-            member.shiftSchedule,
+            member,
             member.manualLeaveBalance,
             member.manualYearToDateUsed
           );
@@ -732,8 +732,8 @@ export default function LeaderDashboard() {
 
           {/* Stats Cards and On Leave Section - Side by Side Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6">
-            {/* Left: 2x2 Stats Grid */}
-            <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Left: Stats Grid */}
+            <div className={`lg:col-span-2 grid grid-cols-1 ${team?.settings.allowCarryover ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-4`}>
               {/* Team Members Card */}
               <Link href="/leader/members" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
                 <div className="p-3">
@@ -820,6 +820,66 @@ export default function LeaderDashboard() {
                   </div>
                 </div>
               </Link>
+
+              {/* Team Carryover Card */}
+              {team?.settings.allowCarryover && (
+                <Link href="/leader/analytics" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
+                  <div className="p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Team Carryover</p>
+                        <p className={`text-2xl font-bold fade-in ${
+                          analytics?.aggregate.totalWillCarryover && analytics.aggregate.totalWillCarryover > 0
+                            ? 'text-indigo-600 dark:text-indigo-400'
+                            : 'text-gray-900 dark:text-white'
+                        }`}>
+                          {analytics?.aggregate.totalWillCarryover ? Math.round(analytics.aggregate.totalWillCarryover) : 0}
+                        </p>
+                        <div className="mt-1 space-y-0.5">
+                          {analytics?.aggregate.totalWillCarryover && analytics.aggregate.totalWillCarryover > 0 ? (
+                            <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-medium">
+                              Will carry over
+                            </p>
+                          ) : (
+                            <p className="text-[10px] text-gray-500 dark:text-gray-500">No carryover</p>
+                          )}
+                          {(() => {
+                            if (!analytics || !analytics.groups) return null;
+                            const allMembers = analytics.groups.flatMap(g => g.members);
+                            const membersWithCarryover = allMembers.filter(m => (m.analytics.carryoverBalance || 0) > 0).length;
+                            if (membersWithCarryover > 0) {
+                              return (
+                                <p className="text-[10px] text-gray-600 dark:text-gray-400">
+                                  {membersWithCarryover} member{membersWithCarryover !== 1 ? 's' : ''} with balance
+                                </p>
+                              );
+                            }
+                            return null;
+                          })()}
+                          {team.settings.carryoverSettings?.maxCarryoverDays && (
+                            <p className="text-[10px] text-gray-600 dark:text-gray-400">
+                              Max: {team.settings.carryoverSettings.maxCarryoverDays} days
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex-shrink-0 ml-2">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                          analytics?.aggregate.totalWillCarryover && analytics.aggregate.totalWillCarryover > 0
+                            ? 'bg-indigo-100 dark:bg-indigo-900/30'
+                            : 'bg-gray-100 dark:bg-gray-800'
+                        }`}>
+                          <ArrowTrendingUpIcon className={`h-4 w-4 ${
+                            analytics?.aggregate.totalWillCarryover && analytics.aggregate.totalWillCarryover > 0
+                              ? 'text-indigo-700 dark:text-indigo-400'
+                              : 'text-gray-700 dark:text-gray-300'
+                          }`} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              )}
             </div>
 
             {/* Right: Currently On Leave Section */}
@@ -1352,9 +1412,6 @@ export default function LeaderDashboard() {
                             const hasAnyPartialCompetition = allMembers.some(m => m.analytics.hasPartialCompetition);
                             const totalPartialOverlapWithBalance = allMembers.reduce((sum, m) => 
                               sum + (m.analytics.partialOverlapMembersWithBalance || 0), 0
-                            );
-                            const totalPartialOverlapCount = allMembers.reduce((sum, m) => 
-                              sum + (m.analytics.partialOverlapMembersCount || 0), 0
                             );
                             
                             if (hasAnyPartialCompetition) {

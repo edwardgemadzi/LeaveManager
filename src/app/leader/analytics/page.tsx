@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { Team, LeaveRequest, User } from '@/types';
@@ -20,15 +20,17 @@ export default function LeaderAnalyticsPage() {
   const [frequencySubgroup, setFrequencySubgroup] = useState<string>('all');
   const [frequencyWorkingDays, setFrequencyWorkingDays] = useState<string>('all');
   const [frequencyYear, setFrequencyYear] = useState<number>(new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [showFrequencyInfo, setShowFrequencyInfo] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedSubgroup, setSelectedSubgroup] = useState<string>('all');
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const fetchData = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const fetchData = useCallback(async (year?: number) => {
+    const targetYear = year ?? selectedYear;
+    try {
+      const token = localStorage.getItem('token');
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
 
         if (!user.teamId) {
           console.error('No team ID found');
@@ -47,7 +49,7 @@ export default function LeaderAnalyticsPage() {
               'Authorization': `Bearer ${token}`,
             },
           }),
-          fetch(`/api/analytics?t=${Date.now()}`, {
+          fetch(`/api/analytics?year=${targetYear}&t=${Date.now()}`, {
             headers: {
               'Authorization': `Bearer ${token}`,
             },
@@ -92,13 +94,13 @@ export default function LeaderAnalyticsPage() {
         }
       } catch (error) {
         console.error('Error fetching data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedYear]);
 
   useEffect(() => {
-    fetchData();
+    fetchData(selectedYear);
     
     // Listen for settings updates to refresh analytics
     let settingsTimeout: NodeJS.Timeout | null = null;
@@ -108,7 +110,7 @@ export default function LeaderAnalyticsPage() {
         clearTimeout(settingsTimeout);
       }
       settingsTimeout = setTimeout(() => {
-        fetchData();
+        fetchData(selectedYear);
       }, 200);
     };
     
@@ -119,7 +121,7 @@ export default function LeaderAnalyticsPage() {
         clearTimeout(settingsTimeout);
       }
     };
-  }, []);
+  }, [fetchData, selectedYear]);
 
   // Real-time updates using SSE
   useTeamEvents(team?._id || null, {
@@ -132,7 +134,7 @@ export default function LeaderAnalyticsPage() {
           clearTimeout(refreshTimeoutRef.current);
         }
         refreshTimeoutRef.current = setTimeout(() => {
-          fetchData();
+          fetchData(selectedYear);
         }, 500);
       }
     },
@@ -360,10 +362,38 @@ export default function LeaderAnalyticsPage() {
         <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12">
           {/* Header Section - Enhanced */}
           <div className="mb-8 fade-in">
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">End of Year Analytics</h1>
-            <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400 mb-2">
-              Comprehensive analytics and projections for {currentYear}
-            </p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+              <div>
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">Team Analytics</h1>
+                <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400 mb-2">
+                  Comprehensive analytics and projections for {selectedYear}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <label htmlFor="year-select-leader" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Year:
+                </label>
+                <select
+                  id="year-select-leader"
+                  value={selectedYear}
+                  onChange={(e) => {
+                    const year = parseInt(e.target.value);
+                    setSelectedYear(year);
+                    fetchData(year);
+                  }}
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  {Array.from({ length: 5 }, (_, i) => {
+                    const year = new Date().getFullYear() - i;
+                    return (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            </div>
             <p className="text-sm text-gray-500 dark:text-gray-500">
               {daysElapsed} days elapsed, {daysRemaining} days remaining in the year
             </p>
@@ -1081,6 +1111,12 @@ export default function LeaderAnalyticsPage() {
                                     </div>
                                   );
                                 })()}
+                                {/* Show carryover balance if available */}
+                                {member.analytics.carryoverBalance > 0 && (
+                                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+                                    <span className="font-medium">Carryover:</span> {Math.round(member.analytics.carryoverBalance)} days
+                                  </p>
+                                )}
                                 {/* Show base balance if different from remaining balance */}
                                 {Math.round(member.analytics.baseLeaveBalance) !== Math.round(member.analytics.remainingLeaveBalance) && (
                                   <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
