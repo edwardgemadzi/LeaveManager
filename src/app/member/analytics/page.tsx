@@ -50,6 +50,14 @@ export default function MemberAnalyticsPage() {
       });
 
       if (!dashboardResponse.ok) {
+        // Handle 401 (Unauthorized) - token expired or invalid
+        if (dashboardResponse.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          window.location.href = '/login';
+          return;
+        }
+        
         console.error('Failed to fetch dashboard data:', dashboardResponse.status, dashboardResponse.statusText);
         return;
       }

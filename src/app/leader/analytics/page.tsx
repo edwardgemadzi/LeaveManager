@@ -59,6 +59,13 @@ export default function LeaderAnalyticsPage() {
 
         // Process team response
         if (!teamResponse.ok) {
+          // Handle 401 (Unauthorized) - token expired or invalid
+          if (teamResponse.status === 401) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+            return;
+          }
           console.error('Failed to fetch team data:', teamResponse.status);
         } else {
           const teamData = await teamResponse.json();
@@ -67,7 +74,15 @@ export default function LeaderAnalyticsPage() {
         }
 
         // Process requests response
-        if (requestsResponse.ok) {
+        if (!requestsResponse.ok) {
+          // Handle 401 (Unauthorized) - token expired or invalid
+          if (requestsResponse.status === 401) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+            return;
+          }
+        } else {
           const requestsData = await requestsResponse.json();
           // API returns array directly, not wrapped in { requests: [...] }
           const requests = Array.isArray(requestsData) ? requestsData : (requestsData.requests || []);
@@ -75,7 +90,18 @@ export default function LeaderAnalyticsPage() {
         }
 
         // Process analytics response
-        if (analyticsResponse.ok) {
+        if (!analyticsResponse.ok) {
+          // Handle 401 (Unauthorized) - token expired or invalid
+          if (analyticsResponse.status === 401) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+            return;
+          }
+          const errorText = await analyticsResponse.text();
+          console.error('Analytics API error:', analyticsResponse.status, errorText);
+          setAnalytics(null);
+        } else {
           const analyticsData = await analyticsResponse.json();
           
           // The API returns { analytics: groupedAnalytics }
@@ -87,10 +113,6 @@ export default function LeaderAnalyticsPage() {
             console.error('Analytics page - No analytics data found in response');
             setAnalytics(null);
           }
-        } else {
-          const errorText = await analyticsResponse.text();
-          console.error('Analytics API error:', analyticsResponse.status, errorText);
-          setAnalytics(null);
         }
       } catch (error) {
         console.error('Error fetching data:', error);

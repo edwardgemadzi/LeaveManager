@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { isTokenExpired } from '@/lib/api-client';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -20,6 +21,16 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
         const user = localStorage.getItem('user');
 
         if (!token || !user) {
+          router.push('/login');
+          setIsLoading(false);
+          return;
+        }
+
+        // Check if token is expired
+        if (isTokenExpired(token)) {
+          console.log('Token expired, redirecting to login');
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
           router.push('/login');
           setIsLoading(false);
           return;

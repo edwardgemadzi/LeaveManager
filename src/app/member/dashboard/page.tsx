@@ -52,6 +52,14 @@ export default function MemberDashboard() {
         });
 
         if (!response.ok) {
+          // Handle 401 (Unauthorized) - token expired or invalid
+          if (response.status === 401) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+            return;
+          }
+          
           console.error('Failed to fetch dashboard data:', response.status, response.statusText);
           const errorData = await response.json();
           console.error('Error details:', errorData);
@@ -136,6 +144,14 @@ export default function MemberDashboard() {
       });
 
       if (!response.ok) {
+        // Handle 401 (Unauthorized) - token expired or invalid
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          window.location.href = '/login';
+          return;
+        }
+        
         console.error('Failed to fetch dashboard data:', response.status, response.statusText);
         return;
       }
