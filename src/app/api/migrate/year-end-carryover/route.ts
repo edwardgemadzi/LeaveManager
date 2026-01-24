@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { updateAllTeamsCarryover, updateTeamCarryover } from '@/lib/carryoverYearEnd';
 import { TeamModel } from '@/models/Team';
+import { requireLocalhost } from '@/lib/localhost-helpers';
 
 /**
  * API endpoint to update carryover for all teams or a specific team at year end
@@ -12,6 +13,11 @@ import { TeamModel } from '@/models/Team';
  */
 export async function POST(request: NextRequest) {
   try {
+    const localhostResult = requireLocalhost(request, 'ADMIN_ENABLED');
+    if (localhostResult) {
+      return localhostResult;
+    }
+
     const { searchParams } = new URL(request.url);
     const previousYearParam = searchParams.get('previousYear');
     const teamIdParam = searchParams.get('teamId');

@@ -11,6 +11,7 @@ import { broadcastTeamUpdate } from '@/lib/teamEvents';
 import { error as logError, info } from '@/lib/logger';
 import { internalServerError } from '@/lib/errors';
 import { parseDateSafe } from '@/lib/dateUtils';
+import { teamIdsMatch } from '@/lib/helpers';
 
 export async function GET(request: NextRequest) {
   try {
@@ -129,16 +130,49 @@ export async function POST(request: NextRequest) {
     }
 
     // Determine the user ID for the request
+    if (requestedFor && user.role !== 'leader') {
+      return NextResponse.json(
+        { error: 'Only leaders can create requests for other users' },
+        { status: 403 }
+      );
+    }
+
+    if (requestedFor && user.role !== 'leader') {
+      return NextResponse.json({ error: 'Only leaders can request for other users' }, { status: 403 });
+    }
     const requestUserId = requestedFor || user.id;
 
     if (!user.teamId) {
       return NextResponse.json({ error: 'No team assigned' }, { status: 400 });
     }
 
+    if (requestedFor) {
+      const targetUser = await UserModel.findById(requestedFor);
+      if (!targetUser) {
+        return NextResponse.json({ error: 'Requested user not found' }, { status: 404 });
+      }
+
+      if (!teamIdsMatch(targetUser.teamId, user.teamId)) {
+        return NextResponse.json(
+          { error: 'Requested user is not in your team' },
+          { status: 403 }
+        );
+      }
+    }
+
     // Get team settings for validation
     const team = await TeamModel.findById(user.teamId);
     if (!team) {
       return NextResponse.json({ error: 'Team not found' }, { status: 404 });
+    }
+
+    // Validate requested user belongs to the same team (if applicable)
+    const requestUser = await UserModel.findById(requestUserId);
+    if (!requestUser) {
+      return NextResponse.json({ error: 'Requesting user not found' }, { status: 404 });
+    }
+    if (!teamIdsMatch(requestUser.teamId, user.teamId)) {
+      return NextResponse.json({ error: 'Requested user is not in your team' }, { status: 403 });
     }
 
     // Check minimum notice period (skip for historical requests)
@@ -164,9 +198,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the requesting user's shift tag and subgroup tag (needed for both transaction and historical)
-    const requestingUser = await UserModel.findById(requestUserId);
-    const requestingUserShiftTag = requestingUser?.shiftTag;
-    const requestingUserSubgroupTag = requestingUser?.subgroupTag;
+    const requestingUserShiftTag = requestUser?.shiftTag;
+    const requestingUserSubgroupTag = requestUser?.subgroupTag;
 
     // Fetch all team members ONCE to avoid N+1 queries (needed for both transaction and historical)
     const teamMembers = await UserModel.findByTeamId(user.teamId);
@@ -182,9 +215,9 @@ export async function POST(request: NextRequest) {
     });
     
     // Ensure requesting user is in the maps (in case they're not a member)
-    if (requestingUser?._id) {
-      userSubgroupMap.set(requestingUser._id, requestingUserSubgroupTag || 'Ungrouped');
-      userShiftTagMap.set(requestingUser._id, requestingUserShiftTag);
+    if (requestUser?._id) {
+      userSubgroupMap.set(requestUser._id, requestingUserSubgroupTag || 'Ungrouped');
+      userShiftTagMap.set(requestUser._id, requestingUserShiftTag);
     }
 
     // Check concurrent leave limit and create request atomically using MongoDB transaction

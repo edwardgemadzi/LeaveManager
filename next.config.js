@@ -82,13 +82,13 @@ const nextConfig = {
   experimental: {
     // Disable source maps in development to reduce warnings
     esmExternals: true,
-    // Configure Turbopack to match Webpack behavior
-    turbo: {
-      rules: {
-        '*.svg': {
-          loaders: ['@svgr/webpack'],
-          as: '*.js',
-        },
+  },
+  // Configure Turbopack to match Webpack behavior
+  turbopack: {
+    rules: {
+      '*.svg': {
+        loaders: ['@svgr/webpack'],
+        as: '*.js',
       },
     },
   },

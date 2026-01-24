@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { ShiftSchedule, TeamSettings, User } from '@/types';
 import { tagToFixedPattern } from '@/lib/helpers';
 import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
+import { formatDateSafe, parseDateSafe } from '@/lib/dateUtils';
 
 interface ShiftScheduleBuilderProps {
   onScheduleChange: (schedule: ShiftSchedule) => void;
@@ -26,8 +27,8 @@ export default function ShiftScheduleBuilder({
   );
   const [startDate, setStartDate] = useState(
     initialSchedule?.startDate 
-      ? new Date(initialSchedule.startDate).toISOString().split('T')[0]
-      : new Date().toISOString().split('T')[0]
+      ? formatDateSafe(parseDateSafe(initialSchedule.startDate))
+      : formatDateSafe(new Date())
   );
   const [workingDays, setWorkingDays] = useState<boolean[]>(
     initialSchedule?.pattern || [true, true, true, true, true, false, false]
@@ -69,7 +70,7 @@ export default function ShiftScheduleBuilder({
       setPattern(newPattern);
       onScheduleChange({
         pattern: newPattern,
-        startDate: new Date(startDate),
+        startDate: parseDateSafe(startDate),
         type: 'rotating'
       });
     }
@@ -83,7 +84,7 @@ export default function ShiftScheduleBuilder({
     if (scheduleType === 'rotating') {
       onScheduleChange({
         pattern: newPattern,
-        startDate: new Date(startDate),
+        startDate: parseDateSafe(startDate),
         type: 'rotating'
       });
     }
@@ -97,7 +98,7 @@ export default function ShiftScheduleBuilder({
     if (scheduleType === 'fixed') {
       onScheduleChange({
         pattern: newWorkingDays,
-        startDate: new Date(startDate),
+        startDate: parseDateSafe(startDate),
         type: 'fixed'
       });
     }
@@ -107,7 +108,7 @@ export default function ShiftScheduleBuilder({
     setStartDate(date);
     onScheduleChange({
       pattern: scheduleType === 'rotating' ? pattern : workingDays,
-      startDate: new Date(date),
+      startDate: parseDateSafe(date),
       type: scheduleType
     });
   };
@@ -221,11 +222,11 @@ export default function ShiftScheduleBuilder({
                             setPattern(memberPattern);
                             setDaysOn(daysOnCount);
                             setDaysOff(daysOffCount);
-                            setStartDate(new Date(memberStartDate).toISOString().split('T')[0]);
+                            setStartDate(formatDateSafe(parseDateSafe(memberStartDate)));
                             
                             onScheduleChange({
                               pattern: memberPattern,
-                              startDate: new Date(memberStartDate),
+                              startDate: parseDateSafe(memberStartDate),
                               type: 'rotating'
                             });
                           }

@@ -351,7 +351,8 @@ export default function LeaderDashboard() {
             approvedRequests,
             member,
             member.manualLeaveBalance,
-            member.manualYearToDateUsed
+            member.manualYearToDateUsed,
+            team.settings.carryoverSettings
           );
 
           const surplus = calculateSurplusBalance(member.manualLeaveBalance, maxLeavePerYear);

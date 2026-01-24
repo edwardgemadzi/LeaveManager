@@ -208,8 +208,8 @@ export const calculateDateAvailability = (
       return false;
     }
     
-    const reqStart = new Date(req.startDate);
-    const reqEnd = new Date(req.endDate);
+    const reqStart = parseDateSafe(req.startDate);
+    const reqEnd = parseDateSafe(req.endDate);
     reqStart.setHours(0, 0, 0, 0);
     reqEnd.setHours(23, 59, 59, 999);
     
@@ -230,8 +230,8 @@ export const calculateDateAvailability = (
           endDate: req.endDate,
           status: req.status,
           overlaps: (() => {
-            const s = new Date(req.startDate);
-            const e = new Date(req.endDate);
+            const s = parseDateSafe(req.startDate);
+            const e = parseDateSafe(req.endDate);
             s.setHours(0, 0, 0, 0);
             e.setHours(23, 59, 59, 999);
             return checkDate >= s && checkDate <= e;
@@ -543,8 +543,8 @@ export const calculateDateAvailability = (
             reqUserShiftTag: reqUser?.shiftTag || 'none',
             reqUserFound: !!reqUser,
             overlaps: (() => {
-              const s = new Date(req.startDate);
-              const e = new Date(req.endDate);
+              const s = parseDateSafe(req.startDate);
+              const e = parseDateSafe(req.endDate);
               s.setHours(0, 0, 0, 0);
               e.setHours(23, 59, 59, 999);
               return checkDate >= s && checkDate <= e;
@@ -630,7 +630,7 @@ export const calculateUsableDays = (
   // Reuse the 'today' variable already defined above
   const futureApprovedRequests = allApprovedRequests.filter(req => {
     if (req.status !== 'approved') return false;
-    const reqStart = new Date(req.startDate);
+    const reqStart = parseDateSafe(req.startDate);
     reqStart.setHours(0, 0, 0, 0);
     return reqStart >= today && reqStart <= yearEnd;
   });
@@ -1421,8 +1421,8 @@ export const getMemberAnalytics = (
   const approvedRequestsForCalculation = approvedRequests
     .filter(req => req.status === 'approved')
     .map(req => ({
-      startDate: new Date(req.startDate),
-      endDate: new Date(req.endDate),
+      startDate: parseDateSafe(req.startDate),
+      endDate: parseDateSafe(req.endDate),
       reason: req.reason
     }));
   
@@ -1437,7 +1437,8 @@ export const getMemberAnalytics = (
     approvedRequestsForCalculation,
     user,
     user.manualLeaveBalance,
-    user.manualYearToDateUsed
+    user.manualYearToDateUsed,
+    team.settings.carryoverSettings
   );
   
   // Filter members to only include those with remaining balance > 0 for competition calculations
@@ -1449,7 +1450,8 @@ export const getMemberAnalytics = (
       allApprovedRequests.filter(req => req.userId === member._id),
       member,
       member.manualLeaveBalance,
-      member.manualYearToDateUsed
+      member.manualYearToDateUsed,
+      team.settings.carryoverSettings
     );
     return memberRemainingBalance > 0;
   });
@@ -1482,8 +1484,8 @@ export const getMemberAnalytics = (
   // Calculate working days used from approved requests in the current year
   // Use User object to support historical schedules for past dates
   const yearToDateWorkingDays = approvedRegularRequests.reduce((total, req) => {
-    const start = new Date(req.startDate);
-    const end = new Date(req.endDate);
+    const start = parseDateSafe(req.startDate);
+    const end = parseDateSafe(req.endDate);
     start.setHours(0, 0, 0, 0);
     end.setHours(23, 59, 59, 999);
     
@@ -1764,8 +1766,8 @@ export const getMaternityMemberAnalytics = (
 
   // Convert to format expected by calculateMaternityLeaveBalance
   const maternityRequestsForCalculation = maternityRequests.map(req => ({
-    startDate: new Date(req.startDate),
-    endDate: new Date(req.endDate),
+    startDate: parseDateSafe(req.startDate),
+    endDate: parseDateSafe(req.endDate),
     reason: req.reason
   }));
 
@@ -1798,8 +1800,8 @@ export const getMaternityMemberAnalytics = (
     maternityDaysUsed = user.manualMaternityYearToDateUsed;
   } else {
     maternityDaysUsed = maternityRequestsForCalculation.reduce((total, req) => {
-      const reqStart = new Date(req.startDate);
-      const reqEnd = new Date(req.endDate);
+      const reqStart = parseDateSafe(req.startDate);
+      const reqEnd = parseDateSafe(req.endDate);
       reqStart.setHours(0, 0, 0, 0);
       reqEnd.setHours(23, 59, 59, 999);
       
@@ -2306,8 +2308,8 @@ export const calculateLeaveFrequencyByPeriod = (
 
   // Process each request
   for (const request of regularRequests) {
-    let startDate = new Date(request.startDate);
-    let endDate = new Date(request.endDate);
+    let startDate = parseDateSafe(request.startDate);
+    let endDate = parseDateSafe(request.endDate);
     startDate.setHours(0, 0, 0, 0);
     endDate.setHours(23, 59, 59, 999);
 

@@ -51,7 +51,7 @@ This document outlines the comprehensive security features implemented in the Le
 - **Input Sanitization**: All user inputs are validated and sanitized
 - **SQL Injection Prevention**: MongoDB with parameterized queries
 - **XSS Prevention**: Input validation and output encoding
-- **CSRF Protection**: SameSite cookies and origin validation
+- **CSRF Considerations**: JWTs are stored in localStorage (CSRF is not applicable in the same way as cookie-based auth). Consider migrating to httpOnly cookies if CSRF protection is required.
 
 ### 7. Error Handling
 - **Generic Error Messages**: No sensitive information in error responses
@@ -162,7 +162,7 @@ async headers() {
 - ✅ No hardcoded credentials
 - ✅ MongoDB security best practices
 - ✅ XSS prevention
-- ✅ CSRF protection
+- ✅ CSRF considerations documented (JWT in localStorage)
 - ✅ Clickjacking prevention
 - ✅ MIME type sniffing prevention
 

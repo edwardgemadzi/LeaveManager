@@ -64,14 +64,21 @@ export function calculateUserCarryover(
     return total;
   }, 0);
   
-  // Use manualYearToDateUsed if set (for the previous year, this would be stored differently,
-  // but for now we'll use the calculated value)
-  const daysUsed = user.manualYearToDateUsed !== undefined 
-    ? user.manualYearToDateUsed 
-    : workingDaysUsed;
+  // For prior years, rely on calculated usage (manual overrides are not year-specific)
+  const daysUsed = workingDaysUsed;
+  
+  // If carryover is disabled, return zero
+  if (!team.settings.allowCarryover) {
+    return { expectedCarryover: 0, expiryDate: null };
+  }
   
   // Calculate expected carryover
-  const expectedCarryover = Math.max(0, maxLeavePerYear - daysUsed);
+  let expectedCarryover = Math.max(0, maxLeavePerYear - daysUsed);
+  
+  // Apply max carryover cap if configured
+  if (carryoverSettings?.maxCarryoverDays !== undefined && carryoverSettings.maxCarryoverDays >= 0) {
+    expectedCarryover = Math.min(expectedCarryover, carryoverSettings.maxCarryoverDays);
+  }
   
   // Calculate expiry date if carryover settings have expiry and carryover > 0
   let expiryDate: Date | null = null;

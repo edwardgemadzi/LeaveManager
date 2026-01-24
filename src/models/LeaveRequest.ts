@@ -3,6 +3,22 @@ import { ObjectId, ClientSession } from 'mongodb';
 import { LeaveRequest } from '@/types';
 
 export class LeaveRequestModel {
+  private static buildIdQuery(field: 'userId' | 'teamId', id: string): Record<string, unknown> {
+    const idStr = id.toString().trim();
+
+    if (ObjectId.isValid(idStr)) {
+      const objectId = new ObjectId(idStr);
+      return {
+        $or: [
+          { [field]: objectId },
+          { [field]: idStr }
+        ]
+      };
+    }
+
+    return { [field]: idStr };
+  }
+
   static async create(
     request: Omit<LeaveRequest, '_id' | 'createdAt' | 'updatedAt'>,
     session?: ClientSession
@@ -24,19 +40,28 @@ export class LeaveRequestModel {
   static async findByUserId(userId: string): Promise<LeaveRequest[]> {
     const db = await getDatabase();
     const requests = db.collection<LeaveRequest>('leaveRequests');
-    return await requests.find({ userId }).sort({ createdAt: -1 }).toArray();
+    const query = LeaveRequestModel.buildIdQuery('userId', userId);
+    return await requests.find(query).sort({ createdAt: -1 }).toArray();
   }
 
   static async findByTeamId(teamId: string): Promise<LeaveRequest[]> {
     const db = await getDatabase();
     const requests = db.collection<LeaveRequest>('leaveRequests');
-    return await requests.find({ teamId }).sort({ createdAt: -1 }).toArray();
+    const query = LeaveRequestModel.buildIdQuery('teamId', teamId);
+    return await requests.find(query).sort({ createdAt: -1 }).toArray();
   }
 
   static async findPendingByTeamId(teamId: string): Promise<LeaveRequest[]> {
     const db = await getDatabase();
     const requests = db.collection<LeaveRequest>('leaveRequests');
-    return await requests.find({ teamId, status: 'pending' }).sort({ createdAt: -1 }).toArray();
+    const teamQuery = LeaveRequestModel.buildIdQuery('teamId', teamId);
+    const query = {
+      $and: [
+        teamQuery,
+        { status: 'pending' }
+      ]
+    };
+    return await requests.find(query).sort({ createdAt: -1 }).toArray();
   }
 
   static async findById(id: string): Promise<LeaveRequest | null> {
@@ -73,19 +98,34 @@ export class LeaveRequestModel {
     const db = await getDatabase();
     const requests = db.collection<LeaveRequest>('leaveRequests');
     
+    const teamQuery = LeaveRequestModel.buildIdQuery('teamId', teamId);
     const query: Record<string, unknown> = {
-      teamId,
-      status: 'approved',
-      $or: [
+      $and: [
+        teamQuery,
+        { status: 'approved' },
         {
-          startDate: { $lte: endDate },
-          endDate: { $gte: startDate }
+          $or: [
+            {
+              startDate: { $lte: endDate },
+              endDate: { $gte: startDate }
+            }
+          ]
         }
       ]
     };
 
     if (excludeId) {
-      query._id = { $ne: excludeId };
+      if (ObjectId.isValid(excludeId)) {
+        query.$and = [
+          ...(query.$and as Record<string, unknown>[]),
+          { _id: { $ne: new ObjectId(excludeId) } }
+        ];
+      } else {
+        query.$and = [
+          ...(query.$and as Record<string, unknown>[]),
+          { _id: { $ne: excludeId } }
+        ];
+      }
     }
 
     const options = session ? { session } : {};

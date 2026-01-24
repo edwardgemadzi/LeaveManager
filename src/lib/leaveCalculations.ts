@@ -189,7 +189,8 @@ export function calculateLeaveBalance(
   approvedRequests: Array<{ startDate: Date; endDate: Date; reason?: string }>,
   user: User,
   manualLeaveBalance?: number,
-  manualYearToDateUsed?: number
+  manualYearToDateUsed?: number,
+  carryoverSettings?: { limitedToMonths?: number[] }
 ): number;
 // Overload 2: Accepts ShiftSchedule directly (backward compatibility)
 export function calculateLeaveBalance(
@@ -197,7 +198,8 @@ export function calculateLeaveBalance(
   approvedRequests: Array<{ startDate: Date; endDate: Date; reason?: string }>,
   shiftSchedule: ShiftSchedule,
   manualLeaveBalance?: number,
-  manualYearToDateUsed?: number
+  manualYearToDateUsed?: number,
+  carryoverSettings?: { limitedToMonths?: number[] }
 ): number;
 // Implementation
 export function calculateLeaveBalance(
@@ -205,8 +207,17 @@ export function calculateLeaveBalance(
   approvedRequests: Array<{ startDate: Date; endDate: Date; reason?: string }>,
   userOrSchedule: User | ShiftSchedule,
   manualLeaveBalance?: number,
-  manualYearToDateUsed?: number
+  manualYearToDateUsed?: number,
+  carryoverSettings?: { limitedToMonths?: number[] }
 ): number {
+  // Log function entry for debugging - ALWAYS log on server
+  // Use console.error to ensure it shows up even if console.log is filtered
+  if (typeof window === 'undefined') {
+    const username = ('username' in userOrSchedule) ? (userOrSchedule as User).username : 'unknown';
+    console.error(`\n========== [calculateLeaveBalance] ENTRY - User: ${username} ==========`);
+    console.log(`\n========== [calculateLeaveBalance] ENTRY - User: ${username} ==========`);
+  }
+  
   const currentYear = new Date().getFullYear();
   const yearStart = new Date(currentYear, 0, 1);
   yearStart.setHours(0, 0, 0, 0);
@@ -268,26 +279,171 @@ export function calculateLeaveBalance(
     }
   }
   
-  // If manualYearToDateUsed is set, use it instead of calculated approved working days
-  const daysUsed = manualYearToDateUsed !== undefined ? manualYearToDateUsed : approvedWorkingDays;
-  
-  // IMPORTANT: Consume carryover FIRST, then new year balance
-  // This ensures carryover days are used before touching the new year allocation
+  // Helper function to calculate working days for a date range within allowed months
+  const calculateWorkingDaysInAllowedMonths = (
+    startDate: Date,
+    endDate: Date,
+    allowedMonths: number[],
+    schedule: User | ShiftSchedule
+  ): number => {
+    let totalDays = 0;
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    
+    // Iterate through each month that overlaps with the date range
+    const currentMonthStart = new Date(start);
+    currentMonthStart.setDate(1); // Start of the month containing the start date
+    currentMonthStart.setHours(0, 0, 0, 0);
+    
+    // Calculate the last month that overlaps with the date range
+    const lastMonthStart = new Date(end);
+    lastMonthStart.setDate(1);
+    lastMonthStart.setHours(0, 0, 0, 0);
+    
+    // Iterate through each month from start to end
+    const currentMonth = new Date(currentMonthStart);
+    
+    while (currentMonth <= lastMonthStart) {
+      const monthIndex = currentMonth.getMonth();
+      
+      if (allowedMonths.includes(monthIndex)) {
+        // This month is allowed - calculate working days for the portion of the request in this month
+        const monthStart = new Date(Math.max(start.getTime(), currentMonth.getTime()));
+        monthStart.setHours(0, 0, 0, 0);
+        
+        // Last day of current month
+        const monthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+        monthEnd.setHours(23, 59, 59, 999);
+        const monthEndActual = new Date(Math.min(end.getTime(), monthEnd.getTime()));
+        
+        if (monthStart <= monthEndActual) {
+          const workingDays = ('shiftSchedule' in schedule)
+            ? countWorkingDays(monthStart, monthEndActual, schedule as User)
+            : countWorkingDays(monthStart, monthEndActual, schedule as ShiftSchedule);
+          totalDays += workingDays;
+        }
+      }
+      
+      // Move to next month
+      currentMonth.setMonth(currentMonth.getMonth() + 1);
+    }
+    
+    return totalDays;
+  };
+
+  // Calculate days used, splitting by month if carryover is limited to specific months
+  let daysUsedInAllowedMonths = 0;
+  let daysUsedOutsideAllowedMonths = 0;
+
+  // Debug logging for month limits - log all cases to diagnose issues
+  if (typeof window === 'undefined') {
+    const username = ('username' in userOrSchedule) ? (userOrSchedule as User).username : 'unknown';
+    console.log(`[calculateLeaveBalance] User: ${username} - CARRYOVER CHECK:`, {
+      carryoverAvailable,
+      carryoverSettings: carryoverSettings ? JSON.stringify(carryoverSettings) : 'undefined',
+      limitedToMonths: carryoverSettings?.limitedToMonths || 'not set',
+      hasLimitedToMonths: !!(carryoverSettings?.limitedToMonths && carryoverSettings.limitedToMonths.length > 0),
+      manualYearToDateUsed: manualYearToDateUsed !== undefined ? manualYearToDateUsed : 'not set'
+    });
+  }
+
+  if (carryoverSettings?.limitedToMonths && carryoverSettings.limitedToMonths.length > 0 && manualYearToDateUsed === undefined) {
+    // Split requests by month: calculate working days separately for allowed months vs outside
+    const allowedMonths = carryoverSettings.limitedToMonths;
+    
+    // Debug: log requests being processed
+    if (typeof window === 'undefined') {
+      const username = ('username' in userOrSchedule) ? (userOrSchedule as User).username : 'unknown';
+      console.log(`[calculateLeaveBalance] User: ${username} - Processing ${nonMaternityRequests.length} requests with month limits:`, allowedMonths);
+      nonMaternityRequests.forEach((req, idx) => {
+        const reqStart = new Date(req.startDate);
+        const reqEnd = new Date(req.endDate);
+        const startMonth = reqStart.getMonth();
+        const endMonth = reqEnd.getMonth();
+        console.log(`[calculateLeaveBalance] Request ${idx + 1}: ${reqStart.toISOString().split('T')[0]} to ${reqEnd.toISOString().split('T')[0]} (months: ${startMonth}-${endMonth})`);
+      });
+    }
+    
+    nonMaternityRequests.forEach(req => {
+      const reqStart = new Date(req.startDate);
+      const reqEnd = new Date(req.endDate);
+      reqStart.setHours(0, 0, 0, 0);
+      reqEnd.setHours(23, 59, 59, 999);
+      
+      // Check if request overlaps with current year
+      if (reqStart <= yearEnd && reqEnd >= yearStart) {
+        const overlapStart = reqStart > yearStart ? reqStart : yearStart;
+        const overlapEnd = reqEnd < yearEnd ? reqEnd : yearEnd;
+        
+        // Calculate working days in allowed months
+        const daysInAllowed = calculateWorkingDaysInAllowedMonths(
+          overlapStart,
+          overlapEnd,
+          allowedMonths,
+          userOrSchedule
+        );
+        daysUsedInAllowedMonths += daysInAllowed;
+        
+        // Calculate total working days for the request
+        const totalDays = ('shiftSchedule' in userOrSchedule)
+          ? countWorkingDays(overlapStart, overlapEnd, userOrSchedule as User)
+          : countWorkingDays(overlapStart, overlapEnd, userOrSchedule as ShiftSchedule);
+        
+        // Days outside allowed months = total - days in allowed months
+        daysUsedOutsideAllowedMonths += (totalDays - daysInAllowed);
+      }
+    });
+    
+    // Debug logging
+    if (typeof window === 'undefined') {
+      const username = ('username' in userOrSchedule) ? (userOrSchedule as User).username : 'unknown';
+      console.log(`[calculateLeaveBalance] User: ${username}, daysUsedInAllowedMonths: ${daysUsedInAllowedMonths}, daysUsedOutsideAllowedMonths: ${daysUsedOutsideAllowedMonths}`);
+    }
+  } else {
+    // No month limit or manualYearToDateUsed is set: use current behavior
+    const daysUsed = manualYearToDateUsed !== undefined ? manualYearToDateUsed : approvedWorkingDays;
+    daysUsedInAllowedMonths = daysUsed;
+    daysUsedOutsideAllowedMonths = 0;
+  }
+
+  // IMPORTANT: Consume carryover FIRST for days in allowed months, then new year balance
+  // Days outside allowed months always consume new year balance directly
   let remainingCarryover = 0;
   let remainingNewYearBalance = newYearBalance;
-  
-  if (daysUsed <= carryoverAvailable) {
-    // All days used come from carryover - new year balance untouched
-    remainingCarryover = carryoverAvailable - daysUsed;
-    // remainingNewYearBalance stays at full new year allocation
+
+  // First, consume carryover for days in allowed months
+  if (daysUsedInAllowedMonths <= carryoverAvailable) {
+    // All days in allowed months come from carryover
+    remainingCarryover = carryoverAvailable - daysUsedInAllowedMonths;
+    // Days outside allowed months consume new year balance
+    remainingNewYearBalance = newYearBalance - daysUsedOutsideAllowedMonths;
   } else {
-    // Carryover exhausted, remaining days come from new year balance
+    // Carryover exhausted for allowed months, remaining days come from new year balance
     remainingCarryover = 0;
-    remainingNewYearBalance = newYearBalance - (daysUsed - carryoverAvailable);
+    const excessFromAllowedMonths = daysUsedInAllowedMonths - carryoverAvailable;
+    remainingNewYearBalance = newYearBalance - (daysUsedOutsideAllowedMonths + excessFromAllowedMonths);
   }
   
   // Total remaining balance
   let remainingBalance = remainingNewYearBalance + remainingCarryover;
+  
+  // Debug logging for final balance - always log when month limits are active
+  if (typeof window === 'undefined') {
+    const username = ('username' in userOrSchedule) ? (userOrSchedule as User).username : 'unknown';
+    if (carryoverSettings?.limitedToMonths && carryoverSettings.limitedToMonths.length > 0) {
+      console.log(`[calculateLeaveBalance] User: ${username} - FINAL:`, {
+        daysUsedInAllowedMonths,
+        daysUsedOutsideAllowedMonths,
+        remainingCarryover,
+        remainingNewYearBalance,
+        totalBalance: remainingBalance,
+        carryoverAvailable: carryoverAvailable,
+        newYearBalance: newYearBalance
+      });
+    }
+  }
   
   // Final check: if carryover has expired (as set by leader), remove any unused carryover
   if ('carryoverFromPreviousYear' in userOrSchedule && userOrSchedule.carryoverFromPreviousYear) {

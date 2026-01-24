@@ -5,7 +5,7 @@ import Navbar from '@/components/shared/Navbar';
 import { Team } from '@/types';
 import { useToast } from '@/contexts/ToastContext';
 import { MinusIcon, PlusIcon } from '@heroicons/react/24/outline';
-import { parseDateSafe } from '@/lib/dateUtils';
+import { formatDateSafe, parseDateSafe } from '@/lib/dateUtils';
 
 export default function TeamSettingsPage() {
   const { showSuccess } = useToast();
@@ -97,18 +97,18 @@ export default function TeamSettingsPage() {
         if (teamSettings.carryoverSettings?.expiryDate) {
           teamSettings.carryoverSettings.expiryDate = typeof teamSettings.carryoverSettings.expiryDate === 'string' 
             ? teamSettings.carryoverSettings.expiryDate.split('T')[0]
-            : new Date(teamSettings.carryoverSettings.expiryDate).toISOString().split('T')[0];
+            : formatDateSafe(parseDateSafe(teamSettings.carryoverSettings.expiryDate));
         }
         // Convert bypass dates from Date objects to ISO strings for input fields
         if (teamSettings.bypassNoticePeriod?.startDate) {
           teamSettings.bypassNoticePeriod.startDate = typeof teamSettings.bypassNoticePeriod.startDate === 'string' 
             ? teamSettings.bypassNoticePeriod.startDate.split('T')[0]
-            : parseDateSafe(teamSettings.bypassNoticePeriod.startDate).toISOString().split('T')[0];
+            : formatDateSafe(parseDateSafe(teamSettings.bypassNoticePeriod.startDate));
         }
         if (teamSettings.bypassNoticePeriod?.endDate) {
           teamSettings.bypassNoticePeriod.endDate = typeof teamSettings.bypassNoticePeriod.endDate === 'string'
             ? teamSettings.bypassNoticePeriod.endDate.split('T')[0]
-            : parseDateSafe(teamSettings.bypassNoticePeriod.endDate).toISOString().split('T')[0];
+            : formatDateSafe(parseDateSafe(teamSettings.bypassNoticePeriod.endDate));
         }
         setSettings(teamSettings);
       } catch (error) {
@@ -216,12 +216,12 @@ export default function TeamSettingsPage() {
           if (teamSettings.bypassNoticePeriod?.startDate) {
             teamSettings.bypassNoticePeriod.startDate = typeof teamSettings.bypassNoticePeriod.startDate === 'string' 
               ? teamSettings.bypassNoticePeriod.startDate.split('T')[0]
-              : parseDateSafe(teamSettings.bypassNoticePeriod.startDate).toISOString().split('T')[0];
+              : formatDateSafe(parseDateSafe(teamSettings.bypassNoticePeriod.startDate));
           }
           if (teamSettings.bypassNoticePeriod?.endDate) {
             teamSettings.bypassNoticePeriod.endDate = typeof teamSettings.bypassNoticePeriod.endDate === 'string'
               ? teamSettings.bypassNoticePeriod.endDate.split('T')[0]
-              : parseDateSafe(teamSettings.bypassNoticePeriod.endDate).toISOString().split('T')[0];
+              : formatDateSafe(parseDateSafe(teamSettings.bypassNoticePeriod.endDate));
           }
           setSettings(teamSettings);
           

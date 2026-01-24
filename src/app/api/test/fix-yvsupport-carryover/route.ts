@@ -6,6 +6,7 @@ import { getDatabase } from '@/lib/mongodb';
 import { LeaveRequest } from '@/types';
 import { parseDateSafe } from '@/lib/dateUtils';
 import { isMaternityLeave, countWorkingDays } from '@/lib/leaveCalculations';
+import { requireLocalhost } from '@/lib/localhost-helpers';
 
 /**
  * Fix carryover data for yvsupport team members based on their 2025 usage
@@ -15,6 +16,11 @@ import { isMaternityLeave, countWorkingDays } from '@/lib/leaveCalculations';
  */
 export async function POST(request: NextRequest) {
   try {
+    const localhostResult = requireLocalhost(request, 'ADMIN_ENABLED');
+    if (localhostResult) {
+      return localhostResult;
+    }
+
     // Parse optional previousYear from request body (defaults to 2025)
     let previousYear = 2025;
     try {

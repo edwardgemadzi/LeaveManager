@@ -413,7 +413,8 @@ export default function MemberDashboard() {
       approvedRequests,
       user,
       user.manualLeaveBalance,
-      user.manualYearToDateUsed
+      user.manualYearToDateUsed,
+      team.settings.carryoverSettings
     );
     
     const surplus = calculateSurplusBalance(user.manualLeaveBalance, team.settings.maxLeavePerYear);
