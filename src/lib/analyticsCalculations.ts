@@ -148,47 +148,9 @@ export const calculateDateAvailability = (
   
   const concurrentLeave = team.settings.concurrentLeave;
   
-  // Debug: Log concurrent leave setting (only log occasionally to avoid spam)
-  if (typeof window === 'undefined') {
-    // Server-side only - log occasionally to verify it's being used
-    const logKey = `calcAvail_${team._id || 'unknown'}`;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const lastLog = (global as any)[logKey] || 0;
-    const now = Date.now();
-    if (now - lastLog > 2000) { // Log at most once per 2 seconds per team
-      console.log('[Analytics] calculateDateAvailability - team.settings.concurrentLeave:', team.settings.concurrentLeave, 'Using:', concurrentLeave);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (global as any)[logKey] = now;
-    }
-  }
-  
   // Create a normalized copy of the date for comparison (don't mutate original)
   const checkDate = new Date(date);
   checkDate.setHours(0, 0, 0, 0);
-  
-  // Debug: Check if this is Zambia subgroup for enhanced logging
-  const isZambia = (userSubgroupTag || '').toLowerCase().includes('zambia');
-  
-  // Debug: Log for Zambia subgroup to see what's happening
-  if (typeof window === 'undefined' && isZambia) {
-    const logKey = `calcAvail_zambia_${team._id || 'unknown'}_${checkDate.toISOString().split('T')[0]}`;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const lastLog = (global as any)[logKey] || 0;
-    const nowTime = Date.now();
-    if (nowTime - lastLog > 3000) { // Log every 3 seconds for Zambia
-      console.log(`[TERMINAL] [calculateDateAvailability] Zambia - Starting check:`, {
-        date: checkDate.toISOString().split('T')[0],
-        userId,
-        userSubgroup: userSubgroupTag || 'Ungrouped',
-        userShiftTag: userShiftTag || 'none',
-        totalApprovedRequests: allApprovedRequests.length,
-        membersCount: members.length,
-        concurrentLeave
-      });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (global as any)[logKey] = nowTime;
-    }
-  }
   
   // Only consider this date if it's a working day for the user
   if (!isWorkingDay(checkDate, userShiftSchedule)) {
@@ -216,79 +178,8 @@ export const calculateDateAvailability = (
     // Check if date falls within request range
     const overlaps = checkDate >= reqStart && checkDate <= reqEnd;
     
-    // Debug: Log when requests don't overlap (to understand why)
-    if (typeof window === 'undefined' && !overlaps && allApprovedRequests.length > 0) {
-      const logKey = `calcAvail_date_check_${team._id || 'unknown'}_${checkDate.toISOString().split('T')[0]}`;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const lastLog = (global as any)[logKey] || 0;
-      const nowTime = Date.now();
-      if (nowTime - lastLog > 10000) { // Log at most once per 10 seconds per date
-        // Sample a few requests to see their date ranges
-        const sampleRequests = allApprovedRequests.slice(0, 3).map(req => ({
-          userId: req.userId,
-          startDate: req.startDate,
-          endDate: req.endDate,
-          status: req.status,
-          overlaps: (() => {
-            const s = parseDateSafe(req.startDate);
-            const e = parseDateSafe(req.endDate);
-            s.setHours(0, 0, 0, 0);
-            e.setHours(23, 59, 59, 999);
-            return checkDate >= s && checkDate <= e;
-          })()
-        }));
-        console.warn(`[TERMINAL] [calculateDateAvailability] Date range check:`, {
-          checkDate: checkDate.toISOString().split('T')[0],
-          totalApprovedRequests: allApprovedRequests.length,
-          overlappingCount: allApprovedRequests.filter(r => {
-            if (r.status !== 'approved') return false;
-            const s = new Date(r.startDate);
-            const e = new Date(r.endDate);
-            s.setHours(0, 0, 0, 0);
-            e.setHours(23, 59, 59, 999);
-            return checkDate >= s && checkDate <= e;
-          }).length,
-          sampleRequests
-        });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (global as any)[logKey] = nowTime;
-      }
-    }
-    
     return overlaps;
   });
-  
-  // Debug: Log overlapping requests count for Zambia
-  if (typeof window === 'undefined' && isZambia) {
-    const logKey = `calcAvail_zambia_overlap_${team._id || 'unknown'}_${checkDate.toISOString().split('T')[0]}`;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const lastLog = (global as any)[logKey] || 0;
-    const nowTime = Date.now();
-    if (nowTime - lastLog > 3000) {
-      console.log(`[TERMINAL] [calculateDateAvailability] Zambia - Overlapping requests found:`, {
-        date: checkDate.toISOString().split('T')[0],
-        overlappingRequestsCount: overlappingRequests.length,
-        sampleOverlappingRequests: overlappingRequests.slice(0, 3).map(req => {
-          const reqUser = members.find(m => {
-            const mId = m._id ? String(m._id) : '';
-            const reqId = req.userId ? String(req.userId) : '';
-            return mId === reqId;
-          });
-          return {
-            userId: req.userId,
-            startDate: req.startDate,
-            endDate: req.endDate,
-            status: req.status,
-            reqUserSubgroup: reqUser?.subgroupTag || 'Ungrouped',
-            reqUserShiftTag: reqUser?.shiftTag || 'none',
-            reqUserFound: !!reqUser
-          };
-        })
-      });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (global as any)[logKey] = nowTime;
-    }
-  }
   
   // Count only requests from users who:
   // 1. Work on this date (same working days)
@@ -296,21 +187,12 @@ export const calculateDateAvailability = (
   // 3. Have the same shiftTag (day/night/mixed)
   let relevantCount = 0;
   
-  // Debug: Track filtering reasons
-  let skippedSelf = 0;
-  let skippedUserNotFound = 0;
-  let skippedNotWorkingDay = 0;
-  let skippedNoTagOverlap = 0;
-  let skippedShiftTagMismatch = 0;
-  let skippedSubgroupMismatch = 0;
-  
   for (const req of overlappingRequests) {
     // Skip user's own requests (they don't block themselves)
     // Convert both to strings for comparison (handle ObjectId and string types)
     const reqUserId = req.userId ? String(req.userId) : '';
     const checkUserId = userId ? String(userId) : '';
     if (reqUserId === checkUserId) {
-      skippedSelf++;
       continue;
     }
     
@@ -320,31 +202,12 @@ export const calculateDateAvailability = (
       return mId === reqUserId;
     });
     if (!reqUser) {
-      skippedUserNotFound++;
-      // Debug: Log if request user is not found in members array
-      if (typeof window === 'undefined') {
-        const logKey = `calcAvail_missing_${team._id || 'unknown'}`;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const lastLog = (global as any)[logKey] || 0;
-        const now = Date.now();
-        if (now - lastLog > 5000) {
-          console.warn(`[calculateDateAvailability] Request user not found in members array:`, {
-            requestUserId: req.userId,
-            membersCount: members.length,
-            date: checkDate.toISOString().split('T')[0],
-            overlappingRequestsCount: overlappingRequests.length
-          });
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (global as any)[logKey] = now;
-        }
-      }
       continue;
     }
     
     // Only count if the requesting user also works on this date
     // Use User object to support historical schedules for past dates
     if (!isWorkingDay(checkDate, reqUser)) {
-      skippedNotWorkingDay++;
       continue;
     }
     
@@ -376,20 +239,17 @@ export const calculateDateAvailability = (
     
     // If no working days overlap (neither exact nor partial), skip this member
     if (!hasWorkingDaysOverlap) {
-      skippedNoTagOverlap++;
       continue;
     }
     
     // Check if they have the same shiftTag
     if (userShiftTag !== undefined) {
       if (reqUser.shiftTag !== userShiftTag) {
-        skippedShiftTagMismatch++;
         continue;
       }
     } else {
       // User has no shift tag - only count members with no shift tag
       if (reqUser.shiftTag !== undefined) {
-        skippedShiftTagMismatch++;
         continue;
       }
     }
@@ -403,166 +263,12 @@ export const calculateDateAvailability = (
       
       // Only count if they're in the same subgroup
       if (userSubgroup !== reqUserSubgroup) {
-        skippedSubgroupMismatch++;
         continue;
       }
     }
     
     // This member qualifies - they work on this day, have same tag or partial overlap, same shift tag, and same subgroup
     relevantCount++;
-  }
-  
-  // Debug: Log when requests ARE being counted (to verify it's working)
-  // Also log for Zambia subgroup specifically to debug the issue
-  if (typeof window === 'undefined' && overlappingRequests.length > 0) {
-    const logKey = `calcAvail_counted_${team._id || 'unknown'}_${checkDate.toISOString().split('T')[0]}_${userSubgroupTag || 'Ungrouped'}`;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const lastLog = (global as any)[logKey] || 0;
-    const nowTime = Date.now();
-    // Log more frequently for Zambia subgroup to debug
-    const isZambia = (userSubgroupTag || '').toLowerCase().includes('zambia');
-    const throttleTime = isZambia ? 2000 : 5000; // Log every 2 seconds for Zambia, 5 seconds for others
-    if (nowTime - lastLog > throttleTime) {
-      if (relevantCount > 0) {
-        console.log(`[TERMINAL] [calculateDateAvailability] Requests ARE being counted:`, {
-          date: checkDate.toISOString().split('T')[0],
-          overlappingRequestsCount: overlappingRequests.length,
-          relevantCount,
-          availability: Math.max(0, concurrentLeave - relevantCount),
-          userSubgroup: userSubgroupTag || 'Ungrouped',
-          userShiftTag: userShiftTag || 'none',
-          concurrentLeave
-        });
-      } else if (isZambia) {
-        // For Zambia, also log when there are overlapping requests but none are counted
-        const sampleOverlappingRequests = overlappingRequests.slice(0, 3).map(req => {
-          const reqUserId = req.userId ? String(req.userId) : '';
-          const reqUser = members.find(m => {
-            const mId = m._id ? String(m._id) : '';
-            return mId === reqUserId;
-          });
-          return {
-            userId: req.userId,
-            startDate: req.startDate,
-            endDate: req.endDate,
-            status: req.status,
-            reqUserSubgroup: reqUser?.subgroupTag || 'Ungrouped',
-            reqUserShiftTag: reqUser?.shiftTag || 'none',
-            reqUserFound: !!reqUser
-          };
-        });
-        console.warn(`[TERMINAL] [calculateDateAvailability] Zambia - Overlapping requests but none counted:`, {
-          date: checkDate.toISOString().split('T')[0],
-          overlappingRequestsCount: overlappingRequests.length,
-          relevantCount,
-          skippedSelf,
-          skippedUserNotFound,
-          skippedNotWorkingDay,
-          skippedNoTagOverlap,
-          skippedShiftTagMismatch,
-          skippedSubgroupMismatch,
-          userSubgroup: userSubgroupTag || 'Ungrouped',
-          userShiftTag: userShiftTag || 'none',
-          concurrentLeave,
-          sampleOverlappingRequests
-        });
-      }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (global as any)[logKey] = nowTime;
-    }
-  }
-  
-  // Debug: Log filtering details for first few dates to understand why requests aren't blocking
-  // Always log to terminal (not browser console) for debugging
-  if (typeof window === 'undefined') {
-    // Log when there are overlapping requests but none are counted
-    if (overlappingRequests.length > 0 && relevantCount === 0) {
-      const logKey = `calcAvail_filter_${team._id || 'unknown'}_${checkDate.toISOString().split('T')[0]}`;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const lastLog = (global as any)[logKey] || 0;
-      const nowTime = Date.now();
-      if (nowTime - lastLog > 5000) { // Log at most once per 5 seconds per date
-        // Get sample of overlapping requests with their user info
-        const sampleOverlappingRequests = overlappingRequests.slice(0, 3).map(req => {
-          const reqUserId = req.userId ? String(req.userId) : '';
-          const reqUser = members.find(m => {
-            const mId = m._id ? String(m._id) : '';
-            return mId === reqUserId;
-          });
-          return {
-            userId: req.userId,
-            startDate: req.startDate,
-            endDate: req.endDate,
-            status: req.status,
-            reqUserSubgroup: reqUser?.subgroupTag || 'Ungrouped',
-            reqUserShiftTag: reqUser?.shiftTag || 'none',
-            reqUserFound: !!reqUser
-          };
-        });
-        console.warn(`[TERMINAL] [calculateDateAvailability] No requests counted as blocking:`, {
-          date: checkDate.toISOString().split('T')[0],
-          overlappingRequestsCount: overlappingRequests.length,
-          relevantCount,
-          skippedSelf,
-          skippedUserNotFound,
-          skippedNotWorkingDay,
-          skippedNoTagOverlap,
-          skippedShiftTagMismatch,
-          skippedSubgroupMismatch,
-          userSubgroup: userSubgroupTag || 'Ungrouped',
-          userShiftTag: userShiftTag || 'none',
-          concurrentLeave,
-          membersCount: members.length,
-          sampleOverlappingRequests
-        });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (global as any)[logKey] = nowTime;
-      }
-    }
-    
-    // Also log when there are NO overlapping requests at all (to understand why)
-    if (overlappingRequests.length === 0 && allApprovedRequests.length > 0) {
-      const logKey = `calcAvail_no_overlap_${team._id || 'unknown'}_${checkDate.toISOString().split('T')[0]}`;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const lastLog = (global as any)[logKey] || 0;
-      const nowTime = Date.now();
-      if (nowTime - lastLog > 10000) { // Log at most once per 10 seconds per date
-        // Sample a few approved requests to see their dates
-        const sampleRequests = allApprovedRequests.slice(0, 3).map(req => {
-          const reqUserId = req.userId ? String(req.userId) : '';
-          const reqUser = members.find(m => {
-            const mId = m._id ? String(m._id) : '';
-            return mId === reqUserId;
-          });
-          return {
-            userId: req.userId,
-            startDate: req.startDate,
-            endDate: req.endDate,
-            status: req.status,
-            reqUserSubgroup: reqUser?.subgroupTag || 'Ungrouped',
-            reqUserShiftTag: reqUser?.shiftTag || 'none',
-            reqUserFound: !!reqUser,
-            overlaps: (() => {
-              const s = parseDateSafe(req.startDate);
-              const e = parseDateSafe(req.endDate);
-              s.setHours(0, 0, 0, 0);
-              e.setHours(23, 59, 59, 999);
-              return checkDate >= s && checkDate <= e;
-            })()
-          };
-        });
-        console.warn(`[TERMINAL] [calculateDateAvailability] No overlapping requests found:`, {
-          date: checkDate.toISOString().split('T')[0],
-          totalApprovedRequests: allApprovedRequests.length,
-          userSubgroup: userSubgroupTag || 'Ungrouped',
-          userShiftTag: userShiftTag || 'none',
-          membersCount: members.length,
-          sampleRequests
-        });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (global as any)[logKey] = nowTime;
-      }
-    }
   }
   
   // Available slots = concurrent limit - current count
@@ -621,19 +327,6 @@ export const calculateUsableDays = (
   
   // Count days that have availability (slots > 0) among members with same tag
   let usableDays = 0;
-  let blockedDays = 0;
-  
-  // Debug: Count days with different availability levels
-  const availabilityCounts: Record<number, number> = {};
-  
-  // Debug: Track approved requests that should block days
-  // Reuse the 'today' variable already defined above
-  const futureApprovedRequests = allApprovedRequests.filter(req => {
-    if (req.status !== 'approved') return false;
-    const reqStart = parseDateSafe(req.startDate);
-    reqStart.setHours(0, 0, 0, 0);
-    return reqStart >= today && reqStart <= yearEnd;
-  });
 
   for (const workingDay of remainingWorkingDays) {
     const availability = calculateDateAvailability(
@@ -648,50 +341,9 @@ export const calculateUsableDays = (
       userSubgroupTag
     );
     
-    // Track availability distribution
-    availabilityCounts[availability] = (availabilityCounts[availability] || 0) + 1;
-    
     // If there's at least one available slot, this day is usable
     if (availability > 0) {
       usableDays++;
-    } else {
-      blockedDays++;
-    }
-  }
-  
-  // Debug: Log availability distribution and sample dates for first user calculation (to avoid spam)
-  if (typeof window === 'undefined') {
-    const logKey = `usableDays_${team._id || 'unknown'}_${user.username || 'unknown'}`;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const lastLog = (global as any)[logKey] || 0;
-    const now = Date.now();
-    if (now - lastLog > 5000) { // Log at most once per 5 seconds per user
-      // Sample a few dates to see what's happening
-      const sampleDates = remainingWorkingDays.slice(0, 5).map(d => d.toISOString().split('T')[0]);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const yearEnd = getYearEnd();
-      yearEnd.setHours(23, 59, 59, 999);
-      
-      console.log(`[TERMINAL] [calculateUsableDays] ${user.username} - Concurrent leave: ${team.settings.concurrentLeave}, Usable: ${usableDays}, Blocked: ${blockedDays}`);
-      console.log(`[TERMINAL] [calculateUsableDays] ${user.username} - Availability distribution:`, JSON.stringify(availabilityCounts));
-      console.log(`[TERMINAL] [calculateUsableDays] ${user.username} - Sample dates:`, sampleDates);
-      console.log(`[TERMINAL] [calculateUsableDays] ${user.username} - Future approved requests: ${futureApprovedRequests.length}, Total approved requests: ${allApprovedRequests.length}`);
-      console.log(`[TERMINAL] [calculateUsableDays] ${user.username} - Members in same group: ${allMembers.length}, User subgroup: ${userSubgroupTag || 'none'}, User shift: ${userShiftTag || 'none'}`);
-      
-      // Debug: Log sample of approved requests to verify they're being counted
-      if (futureApprovedRequests.length > 0) {
-        const sampleRequests = futureApprovedRequests.slice(0, 5).map(req => ({
-          userId: req.userId,
-          startDate: req.startDate,
-          endDate: req.endDate,
-          status: req.status,
-          reason: req.reason
-        }));
-        console.log(`[TERMINAL] [calculateUsableDays] ${user.username} - Sample approved requests:`, JSON.stringify(sampleRequests, null, 2));
-      }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (global as any)[logKey] = now;
     }
   }
   
@@ -1397,17 +1049,6 @@ export const getMemberAnalytics = (
     // This will cause calculateUsableDays to fail, but it's better to fail explicitly
   }
   
-  if (typeof window === 'undefined') {
-    const logKey = `getMember_${team._id || 'unknown'}_${user.username || 'unknown'}`;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const lastLog = (global as any)[logKey] || 0;
-    const now = Date.now();
-    if (now - lastLog > 2000) { // Log at most once per 2 seconds per team/user
-      debug('[Analytics] getMemberAnalytics - team.settings.concurrentLeave:', { concurrentLeave: team.settings?.concurrentLeave, username: user.username });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (global as any)[logKey] = now;
-    }
-  }
   // Filter out maternity/paternity leave requests from regular leave calculations
   // Maternity/paternity leave uses a separate pool and shouldn't affect regular leave availability
   const regularApprovedRequests = allApprovedRequests.filter(req => 
@@ -1508,7 +1149,13 @@ export const getMemberAnalytics = (
     : yearToDateWorkingDays;
   
   // Calculate carryover balance separately
-  const carryoverBalance = calculateCarryoverBalance(user, workingDaysUsed);
+  // Pass approvedRequests and carryoverSettings to account for month limitations
+  const carryoverBalance = calculateCarryoverBalance(
+    user, 
+    workingDaysUsed,
+    approvedRequestsForCalculation,
+    team.settings.carryoverSettings
+  );
   
   // Calculate surplus balance
   const surplusBalance = calculateSurplusBalance(user.manualLeaveBalance, team.settings.maxLeavePerYear);
@@ -1987,11 +1634,6 @@ export const getGroupedTeamAnalytics = (
       type: typeof team.settings.concurrentLeave
     });
     throw new Error('Invalid concurrent leave setting');
-  }
-  
-  // Debug: Log the concurrent leave value at the start of calculation
-  if (typeof window === 'undefined') {
-    console.log('[Analytics] getGroupedTeamAnalytics - team.settings.concurrentLeave:', team.settings.concurrentLeave);
   }
   
   const memberMembers = members.filter(m => m.role === 'member');

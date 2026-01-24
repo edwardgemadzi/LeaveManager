@@ -164,7 +164,7 @@ export function calculateTimeBasedLeaveScore(
   let bgGradient = 'bg-gradient-to-br from-green-200 to-emerald-200 dark:from-green-900/50 dark:to-emerald-900/50';
   let borderColor = 'border-green-500 dark:border-green-500';
   let textColor = 'text-green-700 dark:text-green-300';
-  let badgeColor = 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200';
+  let badgeColor = 'bg-green-100 dark:bg-green-900 text-green-900 dark:text-white';
   let quote = '';
   let message = '';
   let scoreLabel = 'Excellent';
@@ -178,7 +178,7 @@ export function calculateTimeBasedLeaveScore(
       bgGradient = 'bg-gradient-to-br from-orange-200 to-red-200 dark:from-orange-900/50 dark:to-red-900/50';
       borderColor = 'border-orange-500 dark:border-orange-500';
       textColor = 'text-orange-700 dark:text-orange-300';
-      badgeColor = 'bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-200';
+      badgeColor = 'bg-orange-100 dark:bg-orange-900 text-orange-900 dark:text-white';
       quote = 'Your leave balance has been adjusted.';
       message = `Your leave balance has been manually set to 0 by your team leader. You currently have no remaining leave days available. Please coordinate with your team leader to discuss your leave allocation and any adjustments that may be needed.`;
       scoreLabel = 'No Leave Available';
@@ -189,7 +189,7 @@ export function calculateTimeBasedLeaveScore(
       bgGradient = 'bg-gradient-to-br from-red-200 to-rose-200 dark:from-red-900/50 dark:to-red-900/50';
       borderColor = 'border-red-500 dark:border-red-500';
       textColor = 'text-red-700 dark:text-red-300';
-      badgeColor = 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200';
+      badgeColor = 'bg-red-100 dark:bg-red-900 text-red-900 dark:text-white';
       quote = 'Remember: Taking breaks is essential for productivity and well-being.';
       message = `You have no remaining leave days available. All ${Math.round(baseBalance)} days have been used this year. Consider discussing leave options with your team leader for better planning next year.`;
       scoreLabel = 'No Leave Available';
@@ -204,7 +204,7 @@ export function calculateTimeBasedLeaveScore(
       bgGradient = 'bg-gradient-to-br from-blue-200 to-indigo-200 dark:from-blue-900/50 dark:to-indigo-900/50';
       borderColor = 'border-blue-500 dark:border-blue-500';
       textColor = 'text-blue-700 dark:text-blue-300';
-      badgeColor = 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200';
+      badgeColor = 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-white';
       quote = 'Plan ahead - you\'ve used more leave early in the year.';
       message = `Good availability! You can use all your remaining ${Math.round(remainingBalance)} days. However, you've used ${Math.round(usagePercentage)}% of your leave while we're only ${Math.round(yearProgress * 100)}% through the year. Make sure to save some days for unexpected needs later in the year.`;
       scoreLabel = 'Good - Plan Ahead';
@@ -215,7 +215,7 @@ export function calculateTimeBasedLeaveScore(
       bgGradient = 'bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/40 dark:to-emerald-900/40';
       borderColor = 'border-green-400 dark:border-green-600';
       textColor = 'text-green-700 dark:text-green-300';
-      badgeColor = 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200';
+      badgeColor = 'bg-green-100 dark:bg-green-900 text-green-900 dark:text-white';
       quote = 'Excellent planning! You\'ve saved leave appropriately.';
       message = `Excellent! You can use all your remaining ${Math.round(remainingBalance)} days, and you've saved appropriately for this time of year (${Math.round(usagePercentage)}% used vs ${Math.round(yearProgress * 100)}% through the year). This gives you flexibility for unexpected needs.`;
       scoreLabel = 'Excellent';
@@ -226,7 +226,7 @@ export function calculateTimeBasedLeaveScore(
       bgGradient = 'bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/40 dark:to-emerald-900/40';
       borderColor = 'border-green-400 dark:border-green-600';
       textColor = 'text-green-700 dark:text-green-300';
-      badgeColor = 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200';
+      badgeColor = 'bg-green-100 dark:bg-green-900 text-green-900 dark:text-white';
       quote = 'Take time to recharge. Your well-being matters!';
       message = `Excellent! You can use all your remaining ${Math.round(remainingBalance)} days. Your usage (${Math.round(usagePercentage)}%) is well-balanced for this time of year (${Math.round(yearProgress * 100)}% through).`;
       scoreLabel = 'Excellent';
@@ -241,7 +241,7 @@ export function calculateTimeBasedLeaveScore(
       bgGradient = 'bg-gradient-to-br from-yellow-200 to-amber-200 dark:from-yellow-900/50 dark:to-amber-900/50';
       borderColor = 'border-yellow-500 dark:border-yellow-500';
       textColor = 'text-yellow-700 dark:text-yellow-300';
-      badgeColor = 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200';
+      badgeColor = 'bg-yellow-100 dark:bg-yellow-900 text-yellow-900 dark:text-white';
       quote = 'You\'ve used more leave early in the year. Plan carefully.';
       message = `Fair. You can use most of your remaining ${Math.round(remainingBalance)} days (${Math.round(realisticUsableDays)} usable). However, you've used ${Math.round(usagePercentage)}% of your leave while we're only ${Math.round(yearProgress * 100)}% through the year. Consider saving some days for unexpected needs.`;
       scoreLabel = 'Fair - Plan Carefully';
@@ -252,7 +252,7 @@ export function calculateTimeBasedLeaveScore(
       bgGradient = 'bg-gradient-to-br from-blue-200 to-indigo-200 dark:from-blue-900/50 dark:to-indigo-900/50';
       borderColor = 'border-blue-500 dark:border-blue-500';
       textColor = 'text-blue-700 dark:text-blue-300';
-      badgeColor = 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200';
+      badgeColor = 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-white';
       quote = 'Plan ahead to make the most of your leave days.';
       message = `Good! You can use most of your remaining ${Math.round(remainingBalance)} days (${Math.round(realisticUsableDays)} usable). Plan ahead and coordinate with your team to ensure you can take your well-deserved time off.`;
       scoreLabel = 'Good';
@@ -265,7 +265,7 @@ export function calculateTimeBasedLeaveScore(
     bgGradient = 'bg-gradient-to-br from-yellow-200 to-amber-200 dark:from-yellow-900/50 dark:to-amber-900/50';
     borderColor = 'border-yellow-500 dark:border-yellow-500';
     textColor = 'text-yellow-700 dark:text-yellow-300';
-    badgeColor = 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200';
+    badgeColor = 'bg-yellow-100 dark:bg-yellow-900 text-yellow-900 dark:text-white';
     quote = 'Work-life balance is crucial. Use your leave wisely!';
     message = `Fair. You can use some of your remaining ${Math.round(remainingBalance)} days (${Math.round(realisticUsableDays)} usable). ${isOverUsedEarly ? `Note: You've used ${Math.round(usagePercentage)}% of your leave while we're only ${Math.round(yearProgress * 100)}% through the year. ` : ''}Coordinate early with your team to maximize your opportunities to take time off.`;
     scoreLabel = 'Fair';
@@ -277,7 +277,7 @@ export function calculateTimeBasedLeaveScore(
     bgGradient = 'bg-gradient-to-br from-orange-200 to-red-200 dark:from-orange-900/50 dark:to-red-900/50';
     borderColor = 'border-orange-500 dark:border-orange-500';
     textColor = 'text-orange-700 dark:text-orange-300';
-    badgeColor = 'bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-200';
+    badgeColor = 'bg-orange-100 dark:bg-orange-900 text-orange-900 dark:text-white';
     quote = 'Rest is not a reward for finishing everything. Rest is a vital part of the process.';
     message = `Needs attention. You can realistically use ${Math.round(realisticUsableDays)} days out of ${Math.round(remainingBalance)} remaining. ${isOverUsedEarly ? `You've used ${Math.round(usagePercentage)}% of your leave while we're only ${Math.round(yearProgress * 100)}% through the year. ` : ''}Plan carefully and communicate with your team early.`;
     scoreLabel = 'Needs Attention';
@@ -289,7 +289,7 @@ export function calculateTimeBasedLeaveScore(
     bgGradient = 'bg-gradient-to-br from-red-200 to-rose-200 dark:from-red-900/50 dark:to-rose-900/50';
     borderColor = 'border-red-500 dark:border-red-500';
     textColor = 'text-red-700 dark:text-red-300';
-    badgeColor = 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200';
+    badgeColor = 'bg-red-100 dark:bg-red-900 text-red-900 dark:text-white';
     quote = 'Remember: Taking breaks is essential for productivity and well-being.';
     message = `Limited availability. All usable days are already booked. ${isOverUsedEarly ? `You've used ${Math.round(usagePercentage)}% of your leave while we're only ${Math.round(yearProgress * 100)}% through the year. ` : ''}Consider discussing leave options with your team leader for better planning next year.`;
     scoreLabel = 'Requires Planning';

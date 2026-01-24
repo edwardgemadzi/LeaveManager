@@ -588,6 +588,9 @@ export default function MemberDashboard() {
         surplus: analytics.surplusBalance ?? 0 
       }
     : getLeaveBalance();
+  const annualRemainingBalance = analytics
+    ? analytics.remainingLeaveBalance - (analytics.carryoverBalance ?? 0)
+    : leaveBalance.balance;
 
   return (
     <ProtectedRoute requiredRole="member">
@@ -625,7 +628,7 @@ export default function MemberDashboard() {
 
             {/* Leave Balance Card */}
             {(() => {
-              const isNegative = analytics && analytics.remainingLeaveBalance < 0;
+              const isNegative = analytics && annualRemainingBalance < 0;
               const maternityBalance = getMaternityLeaveBalance();
               const hasCompassionateLeave = isNegative && (
                 maternityBalance.daysUsed > 0 || 
@@ -648,20 +651,20 @@ export default function MemberDashboard() {
                   <div className="flex-1">
                     <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Leave Balance</p>
                     <p className={`text-3xl sm:text-4xl font-bold mb-1 fade-in ${
-                      analytics && analytics.remainingLeaveBalance < 0 
+                      analytics && annualRemainingBalance < 0 
                         ? (hasCompassionateLeave 
                             ? 'text-pink-600 dark:text-pink-400' 
                             : 'text-red-600 dark:text-red-400')
                         : 'text-gray-900 dark:text-white'
                     }`}>
-                      {analytics && analytics.remainingLeaveBalance < 0 ? (
-                        <>-{Math.round(Math.abs(analytics.remainingLeaveBalance))} / {team?.settings.maxLeavePerYear || 20}</>
+                      {analytics && annualRemainingBalance < 0 ? (
+                        <>-{Math.round(Math.abs(annualRemainingBalance))} / {team?.settings.maxLeavePerYear || 20}</>
                       ) : (
-                        <>{Math.round(leaveBalance.balance)} / {team?.settings.maxLeavePerYear || 20}</>
+                        <>{Math.round(annualRemainingBalance)} / {team?.settings.maxLeavePerYear || 20}</>
                       )}
                     </p>
                     <div className="mt-2 space-y-1">
-                      {analytics && analytics.remainingLeaveBalance < 0 && (() => {
+                      {analytics && annualRemainingBalance < 0 && (() => {
                         const maternityBalance = getMaternityLeaveBalance();
                         const hasTakenMaternityLeave = maternityBalance.daysUsed > 0;
                         
@@ -720,11 +723,6 @@ export default function MemberDashboard() {
                           +{Math.round(leaveBalance.surplus)} surplus
                         </p>
                       )}
-                      {analytics && analytics.carryoverBalance > 0 && (
-                        <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                          {Math.round(analytics.carryoverBalance)} carryover from previous year
-                        </p>
-                      )}
                       {analytics && analytics.remainingLeaveBalance >= 0 && (() => {
                         const realisticUsableDays = analytics.realisticUsableDays ?? 0;
                         const remainingBalance = analytics.remainingLeaveBalance ?? leaveBalance.balance;
@@ -744,7 +742,7 @@ export default function MemberDashboard() {
                     {(() => {
                       const realisticUsableDays = analytics?.realisticUsableDays ?? 0;
                       const remainingBalance = analytics?.remainingLeaveBalance ?? leaveBalance.balance;
-                      const isNegative = analytics && analytics.remainingLeaveBalance < 0;
+                      const isNegative = analytics && annualRemainingBalance < 0;
                       
                       // Check for compassionate leave if negative
                       let hasCompassionateLeave = false;
@@ -806,54 +804,17 @@ export default function MemberDashboard() {
                           ? 'text-indigo-600 dark:text-indigo-400'
                           : 'text-gray-900 dark:text-white'
                       }`}>
-                        {analytics?.carryoverBalance ? Math.round(analytics.carryoverBalance) : 0}
+                        {analytics?.carryoverBalance
+                          ? `${Math.round(analytics.carryoverBalance)}/${Math.round(user?.carryoverFromPreviousYear ?? analytics.carryoverBalance)}`
+                          : 0}
                       </p>
                       <div className="mt-2 space-y-1">
                         {analytics?.carryoverBalance && analytics.carryoverBalance > 0 ? (
                           <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">
-                            Available from previous year
+                            available from previous year
                           </p>
                         ) : (
                           <p className="text-xs text-gray-500 dark:text-gray-500">No carryover available</p>
-                        )}
-                        {analytics?.carryoverExpiryDate && (() => {
-                          const expiryDate = new Date(analytics.carryoverExpiryDate);
-                          const today = new Date();
-                          const daysUntilExpiry = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                          const isExpiringSoon = daysUntilExpiry <= 30 && daysUntilExpiry > 0;
-                          const isExpired = daysUntilExpiry <= 0;
-                          
-                          return (
-                            <p className={`text-xs font-medium ${
-                              isExpired
-                                ? 'text-red-600 dark:text-red-400'
-                                : isExpiringSoon
-                                ? 'text-orange-600 dark:text-orange-400'
-                                : 'text-gray-600 dark:text-gray-400'
-                            }`}>
-                              {isExpired 
-                                ? `Expired on ${expiryDate.toLocaleDateString()}`
-                                : isExpiringSoon
-                                ? `Expires in ${daysUntilExpiry} day${daysUntilExpiry !== 1 ? 's' : ''}`
-                                : `Expires ${expiryDate.toLocaleDateString()}`
-                              }
-                            </p>
-                          );
-                        })()}
-                        {analytics?.carryoverLimitedToMonths && analytics.carryoverLimitedToMonths.length > 0 && (
-                          <p className="text-xs text-gray-600 dark:text-gray-400">
-                            Limited to: {analytics.carryoverLimitedToMonths.map(m => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m]).join(', ')}
-                          </p>
-                        )}
-                        {analytics?.carryoverMaxDays && (
-                          <p className="text-xs text-gray-600 dark:text-gray-400">
-                            Max: {analytics.carryoverMaxDays} days
-                          </p>
-                        )}
-                        {analytics?.willCarryover && analytics.willCarryover > 0 && (
-                          <p className="text-xs text-green-600 dark:text-green-400 font-medium">
-                            {Math.round(analytics.willCarryover)} will carry over
-                          </p>
                         )}
                       </div>
                     </div>
@@ -1074,7 +1035,7 @@ export default function MemberDashboard() {
             let bgGradient = 'bg-gradient-to-br from-green-200 to-emerald-200 dark:from-green-900/50 dark:to-emerald-900/50';
             let borderColor = 'border-green-500 dark:border-green-500';
             let textColor = 'text-green-700 dark:text-green-300';
-            let badgeColor = 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200';
+            let badgeColor = 'bg-green-100 dark:bg-green-900 text-green-900 dark:text-white';
             let quote = '';
             let message = '';
             let scoreLabel = 'Excellent';
@@ -1085,7 +1046,7 @@ export default function MemberDashboard() {
               bgGradient = 'bg-gradient-to-br from-gray-200 to-gray-200 dark:from-gray-900/50 dark:to-gray-900/50';
               borderColor = 'border-gray-500 dark:border-gray-500';
               textColor = 'text-gray-700 dark:text-gray-300';
-              badgeColor = 'bg-gray-100 dark:bg-gray-900/50 text-gray-800 dark:text-gray-200';
+              badgeColor = 'bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white';
               quote = 'Loading your leave health score...';
               message = 'Please wait while we calculate your leave analytics.';
               scoreLabel = 'Loading...';
@@ -1116,7 +1077,7 @@ export default function MemberDashboard() {
                 bgGradient = 'bg-gradient-to-br from-pink-200 to-rose-200 dark:from-pink-900/50 dark:to-rose-900/50';
                 borderColor = 'border-pink-500 dark:border-pink-500';
                 textColor = 'text-pink-800 dark:text-pink-200';
-                badgeColor = 'bg-pink-200 dark:bg-pink-900/50 text-pink-900 dark:text-pink-100';
+                badgeColor = 'bg-pink-200 dark:bg-pink-900 text-pink-900 dark:text-white';
                 
                 // Determine specific compassionate reason for message
                 let compassionateReason = '';
@@ -1144,7 +1105,7 @@ export default function MemberDashboard() {
                 bgGradient = 'bg-gradient-to-br from-red-200 to-rose-200 dark:from-red-900/50 dark:to-rose-900/50';
                 borderColor = 'border-red-500 dark:border-red-500';
                 textColor = 'text-red-800 dark:text-red-200';
-                badgeColor = 'bg-red-200 dark:bg-red-900/70 text-red-900 dark:text-red-100';
+                badgeColor = 'bg-red-200 dark:bg-red-900 text-red-900 dark:text-white';
                 
                 quote = 'Taking time off when needed is important.';
                 message = `You've used ${Math.round(negativeBalanceAmount)} more day${negativeBalanceAmount !== 1 ? 's' : ''} than your allocated leave this year. This is understandable - sometimes leave is needed beyond what's allocated. This will be adjusted in your next year's leave allocation. Please coordinate with your team leader to discuss how this will be handled.`;
@@ -1503,9 +1464,9 @@ export default function MemberDashboard() {
                         </div>
                       )}
                       {analytics.willCarryover > 0 ? (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
-                          Your team allows leave carryover. Unused days will be available next year.
-                        </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
+                        Your team allows leave carryover. Unused days will be available next year.
+                      </p>
                       ) : analytics.allowCarryover ? (
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
                           Your team allows leave carryover, but you don&apos;t have any days that will carry over.

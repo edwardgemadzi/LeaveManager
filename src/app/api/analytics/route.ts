@@ -130,11 +130,11 @@ export async function GET(request: NextRequest) {
         const groupedAnalytics = getGroupedTeamAnalytics(memberList, team, yearRequests, targetYear);
         
         // Find the member's analytics from the grouped result
-        for (const group of groupedAnalytics.groups) {
-          const memberInGroup = group.members.find(m => m.userId === user.id);
-          if (memberInGroup) {
-            memberAnalytics = memberInGroup.analytics;
-            break;
+      for (const group of groupedAnalytics.groups) {
+        const memberInGroup = group.members.find(m => m.userId === user.id);
+        if (memberInGroup) {
+          memberAnalytics = memberInGroup.analytics;
+          break;
           }
         }
       }
@@ -188,17 +188,17 @@ export async function GET(request: NextRequest) {
         let analyticsResponse;
         if (isCurrentYear) {
           const groupedAnalytics = getGroupedTeamAnalytics(members, team, yearRequests, targetYear);
-          
-          debug('[Analytics API] After calculation - Sample usable days:', groupedAnalytics.groups?.[0]?.members?.[0]?.analytics?.usableDays);
-          debug('[Analytics API] After calculation - Total usable days:', groupedAnalytics.aggregate?.totalUsableDays);
-          debug('[Analytics API] After calculation - Total realistic usable days:', groupedAnalytics.aggregate?.totalRealisticUsableDays);
-          debug('Analytics API - Grouped analytics generated:', {
-            hasAggregate: !!groupedAnalytics.aggregate,
-            hasGroups: !!groupedAnalytics.groups,
-            groupsLength: groupedAnalytics.groups?.length || 0
-          });
-          
-          // Return both grouped and regular analytics for backward compatibility
+        
+        debug('[Analytics API] After calculation - Sample usable days:', groupedAnalytics.groups?.[0]?.members?.[0]?.analytics?.usableDays);
+        debug('[Analytics API] After calculation - Total usable days:', groupedAnalytics.aggregate?.totalUsableDays);
+        debug('[Analytics API] After calculation - Total realistic usable days:', groupedAnalytics.aggregate?.totalRealisticUsableDays);
+        debug('Analytics API - Grouped analytics generated:', {
+          hasAggregate: !!groupedAnalytics.aggregate,
+          hasGroups: !!groupedAnalytics.groups,
+          groupsLength: groupedAnalytics.groups?.length || 0
+        });
+        
+        // Return both grouped and regular analytics for backward compatibility
           const regularAnalytics = getTeamAnalytics(members, team, yearRequests, targetYear);
           
           analyticsResponse = { 

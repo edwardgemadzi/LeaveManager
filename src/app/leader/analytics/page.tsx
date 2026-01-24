@@ -28,9 +28,9 @@ export default function LeaderAnalyticsPage() {
 
   const fetchData = useCallback(async (year?: number) => {
     const targetYear = year ?? selectedYear;
-    try {
-      const token = localStorage.getItem('token');
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      try {
+        const token = localStorage.getItem('token');
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
 
         if (!user.teamId) {
           console.error('No team ID found');
@@ -116,9 +116,9 @@ export default function LeaderAnalyticsPage() {
         }
       } catch (error) {
         console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
-    }
+      } finally {
+        setLoading(false);
+      }
   }, [selectedYear]);
 
   useEffect(() => {
@@ -387,7 +387,7 @@ export default function LeaderAnalyticsPage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
               <div>
                 <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">Team Analytics</h1>
-                <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400 mb-2">
+            <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400 mb-2">
                   Comprehensive analytics and projections for {selectedYear}
                 </p>
               </div>

@@ -430,7 +430,7 @@ export default function MemberAnalyticsPage() {
       if (expiryDate < today) {
         recommendations.push(`⏰ Your carryover days have expired as of ${expiryDate.toLocaleDateString()}. They will not be available.`);
       } else {
-        recommendations.push(`⏰ Carryover days expire on ${expiryDate.toLocaleDateString()}. Use them before this date.`);
+      recommendations.push(`⏰ Carryover days expire on ${expiryDate.toLocaleDateString()}. Use them before this date.`);
       }
     }
     
@@ -451,13 +451,13 @@ export default function MemberAnalyticsPage() {
     
     // Year progress recommendations (only for current year, not historical)
     if (!isHistoricalYear) {
-      const yearProgress = daysElapsed / (daysElapsed + daysRemaining);
-      // Calculate percentage of leave used (not working days)
-      const baseBalance = analytics.baseLeaveBalance ?? (team?.settings.maxLeavePerYear || 20);
-      const used = baseBalance - (analytics.remainingLeaveBalance ?? 0);
-      const usageProgress = baseBalance > 0 ? used / baseBalance : 0;
-      if (yearProgress > 0.5 && usageProgress < yearProgress * 0.7) {
-        recommendations.push(`📈 You're ${Math.round(yearProgress * 100)}% through the year but have only used ${Math.round(usageProgress * 100)}% of your leave. Consider planning more leave.`);
+    const yearProgress = daysElapsed / (daysElapsed + daysRemaining);
+    // Calculate percentage of leave used (not working days)
+    const baseBalance = analytics.baseLeaveBalance ?? (team?.settings.maxLeavePerYear || 20);
+    const used = baseBalance - (analytics.remainingLeaveBalance ?? 0);
+    const usageProgress = baseBalance > 0 ? used / baseBalance : 0;
+    if (yearProgress > 0.5 && usageProgress < yearProgress * 0.7) {
+      recommendations.push(`📈 You're ${Math.round(yearProgress * 100)}% through the year but have only used ${Math.round(usageProgress * 100)}% of your leave. Consider planning more leave.`);
       }
     }
     
@@ -544,10 +544,10 @@ export default function MemberAnalyticsPage() {
           <div className="mb-8 fade-in">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
               <div>
-                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">My Leave Analytics</h1>
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">My Leave Analytics</h1>
                 <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400">
                   Detailed insights into your leave usage and patterns for {selectedYear}
-                </p>
+            </p>
               </div>
               <div className="flex items-center gap-3">
                 <label htmlFor="year-select" className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -984,9 +984,9 @@ export default function MemberAnalyticsPage() {
                     </div>
                   )}
                   {analytics.willCarryover > 0 ? (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
-                      Your team allows leave carryover. Unused days will be available next year.
-                    </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
+                    Your team allows leave carryover. Unused days will be available next year.
+                  </p>
                   ) : analytics.allowCarryover ? (
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
                       Your team allows leave carryover, but you don&apos;t have any days that will carry over.
