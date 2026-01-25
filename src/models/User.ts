@@ -1,4 +1,5 @@
 import { getDatabase } from '@/lib/mongodb';
+import { debug } from '@/lib/logger';
 import { ObjectId } from 'mongodb';
 import { User, ShiftSchedule } from '@/types';
 import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
@@ -72,13 +73,13 @@ export class UserModel {
       
       // If we got results, return them
       if (results && results.length > 0) {
-        console.log(`UserModel.findByTeamId - found ${results.length} members with direct query`);
+        debug(`UserModel.findByTeamId - found ${results.length} members with direct query`);
         return results;
       }
       
       // Fallback: fetch all members and filter in JavaScript
       // This handles edge cases where teamId might be stored in unexpected formats
-      console.log(`UserModel.findByTeamId - direct query returned 0 results, using fallback for teamId: ${teamIdStr}`);
+      debug(`UserModel.findByTeamId - direct query returned 0 results, using fallback for teamId: ${teamIdStr}`);
       const allMembers = await users.find({ role: 'member' }).toArray();
       const filteredResults = allMembers.filter(u => {
         if (!u.teamId) return false;
@@ -86,7 +87,7 @@ export class UserModel {
         return memberTeamIdStr === teamIdStr;
       });
       
-      console.log(`UserModel.findByTeamId - fallback found ${filteredResults.length} members`);
+      debug(`UserModel.findByTeamId - fallback found ${filteredResults.length} members`);
       return filteredResults;
     } catch (error) {
       console.error('UserModel.findByTeamId error:', error);
@@ -99,7 +100,7 @@ export class UserModel {
           const memberTeamIdStr = String(u.teamId).trim();
           return memberTeamIdStr === teamIdStr;
         });
-        console.log(`UserModel.findByTeamId - error fallback found ${filteredResults.length} members`);
+        debug(`UserModel.findByTeamId - error fallback found ${filteredResults.length} members`);
         return filteredResults;
       } catch (fallbackError) {
         console.error('UserModel.findByTeamId fallback error:', fallbackError);

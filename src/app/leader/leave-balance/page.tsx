@@ -10,6 +10,7 @@ import { UsersIcon, CalendarIcon, ChartBarIcon, ArrowTrendingUpIcon } from '@her
 import { useNotification } from '@/hooks/useNotification';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
 import { parseDateSafe } from '@/lib/dateUtils';
+import { getEffectiveManualYearToDateUsed } from '@/lib/yearOverrides';
 
 export default function LeaderLeaveBalancePage() {
   const { showError, showInfo } = useNotification();
@@ -28,6 +29,8 @@ export default function LeaderLeaveBalancePage() {
   const [tempMaternityBalance, setTempMaternityBalance] = useState<string>('');
   const [editingMaternityDaysTaken, setEditingMaternityDaysTaken] = useState<string | null>(null);
   const [tempMaternityDaysTaken, setTempMaternityDaysTaken] = useState<string>('');
+  const [editingCarryover, setEditingCarryover] = useState<string | null>(null);
+  const [tempCarryover, setTempCarryover] = useState<string>('');
   const [updating, setUpdating] = useState<string | null>(null);
 
   // Extract fetchData function to be reusable
@@ -199,9 +202,10 @@ export default function LeaderLeaveBalancePage() {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const yearStart = new Date(today.getFullYear(), 0, 1);
+    const currentYear = today.getFullYear();
+    const yearStart = new Date(currentYear, 0, 1);
     yearStart.setHours(0, 0, 0, 0);
-    const yearEnd = new Date(today.getFullYear(), 11, 31);
+    const yearEnd = new Date(currentYear, 11, 31);
     yearEnd.setHours(23, 59, 59, 999);
 
     // Calculate total working days in year
@@ -230,9 +234,11 @@ export default function LeaderLeaveBalancePage() {
       return total;
     }, 0);
 
-    // Use manualYearToDateUsed if set, otherwise use calculated value
-    const yearToDateUsed = member.manualYearToDateUsed !== undefined 
-      ? member.manualYearToDateUsed 
+    const effectiveManualYearToDateUsed = getEffectiveManualYearToDateUsed(member, currentYear);
+
+    // Use manualYearToDateUsed if set for the current year, otherwise use calculated value
+    const yearToDateUsed = effectiveManualYearToDateUsed !== undefined 
+      ? effectiveManualYearToDateUsed 
       : yearToDateWorkingDays;
 
     // Calculate total days used (all time, not just this year)
@@ -247,8 +253,8 @@ export default function LeaderLeaveBalancePage() {
     // If manualYearToDateUsed is set, replace the current year's year-to-date portion with manual value
     // Total = (all approved requests) - (calculated current year year-to-date days) + (manualYearToDateUsed)
     // We use yearToDateWorkingDays which already calculates only up to today
-    const totalUsed = member.manualYearToDateUsed !== undefined
-      ? totalFromAllRequests - yearToDateWorkingDays + member.manualYearToDateUsed
+    const totalUsed = effectiveManualYearToDateUsed !== undefined
+      ? totalFromAllRequests - yearToDateWorkingDays + effectiveManualYearToDateUsed
       : totalFromAllRequests;
 
     // Calculate percentage used - use year-to-date used, not total used
@@ -274,7 +280,7 @@ export default function LeaderLeaveBalancePage() {
       approvedRequestsForCalculation,
       member,
       member.manualLeaveBalance,
-      member.manualYearToDateUsed,
+      effectiveManualYearToDateUsed,
       team?.settings.carryoverSettings
     );
 
@@ -536,17 +542,17 @@ export default function LeaderLeaveBalancePage() {
     setUpdating(memberId);
     try {
       const token = localStorage.getItem('token');
+      const currentYear = new Date().getFullYear();
       const maxLeave = team?.settings.maxLeavePerYear || 20;
-      
-      // Get days used - use manualYearToDateUsed if set, otherwise calculate from approved requests
+      const effectiveManualYearToDateUsed = getEffectiveManualYearToDateUsed(member, currentYear);
+
+      // Get days used - use manualYearToDateUsed if set for the current year, otherwise calculate from approved requests
       let daysUsed: number;
-      if (member.manualYearToDateUsed !== undefined) {
-        daysUsed = member.manualYearToDateUsed;
+      if (effectiveManualYearToDateUsed !== undefined) {
+        daysUsed = effectiveManualYearToDateUsed;
       } else {
         const memberRequests = allRequests.filter(req => req.userId === memberId);
         const approvedRequests = memberRequests.filter(req => req.status === 'approved');
-        
-        const currentYear = new Date().getFullYear();
         const yearStart = new Date(currentYear, 0, 1);
         yearStart.setHours(0, 0, 0, 0);
         const yearEnd = new Date(currentYear, 11, 31);
@@ -677,6 +683,7 @@ export default function LeaderLeaveBalancePage() {
     setUpdating(memberId);
     try {
       const token = localStorage.getItem('token');
+      const currentYear = new Date().getFullYear();
       
       const response = await fetch(`/api/users/${memberId}`, {
         method: 'PATCH',
@@ -684,14 +691,14 @@ export default function LeaderLeaveBalancePage() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ manualYearToDateUsed: daysTakenValue }),
+        body: JSON.stringify({ manualYearToDateUsed: daysTakenValue, manualYearToDateUsedYear: currentYear }),
       });
 
       if (response.ok) {
         // Update member in state
         setMembers(members.map(m => 
           m._id === memberId 
-            ? { ...m, manualYearToDateUsed: daysTakenValue }
+            ? { ...m, manualYearToDateUsed: daysTakenValue, manualYearToDateUsedYear: currentYear }
             : m
         ));
         setEditingDaysTaken(null);
@@ -912,6 +919,64 @@ export default function LeaderLeaveBalancePage() {
     setTempMaternityDaysTaken('');
   };
 
+  const handleEditCarryover = (member: User) => {
+    setEditingCarryover(member._id || null);
+    setTempCarryover(Math.round(member.carryoverFromPreviousYear ?? 0).toString());
+  };
+
+  const handleSaveCarryover = async (memberId: string) => {
+    const member = members.find(m => m._id === memberId);
+    if (!member) return;
+
+    const carryoverValue = Math.floor(parseFloat(tempCarryover));
+    if (isNaN(carryoverValue) || carryoverValue < 0) {
+      showInfo('Please enter a valid non-negative whole number');
+      return;
+    }
+
+    setUpdating(memberId);
+    try {
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch(`/api/users/${memberId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ carryoverFromPreviousYear: carryoverValue }),
+      });
+
+      if (response.ok) {
+        // Update member in state immediately for instant UI feedback
+        setMembers(members.map(m => 
+          m._id === memberId 
+            ? { ...m, carryoverFromPreviousYear: carryoverValue }
+            : m
+        ));
+        setEditingCarryover(null);
+        setTempCarryover('');
+        // Add a small delay to ensure database write is committed before refreshing
+        setTimeout(async () => {
+          await fetchData(); // Refresh data including analytics
+        }, 300);
+      } else {
+        const error = await response.json();
+        showError(error.error || 'Failed to update carryover balance');
+      }
+    } catch (error) {
+      console.error('Error updating carryover balance:', error);
+      showError('Network error. Please try again.');
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const handleCancelEditCarryover = () => {
+    setEditingCarryover(null);
+    setTempCarryover('');
+  };
+
   const handleResetDaysTaken = async (memberId: string) => {
     if (!confirm('Reset days taken to auto-calculated? This will remove the manual override.')) {
       return;
@@ -927,7 +992,7 @@ export default function LeaderLeaveBalancePage() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ manualYearToDateUsed: null }),
+        body: JSON.stringify({ manualYearToDateUsed: null, manualYearToDateUsedYear: null }),
       });
 
       if (response.ok) {
@@ -936,6 +1001,7 @@ export default function LeaderLeaveBalancePage() {
           if (m._id === memberId) {
             const updated = { ...m };
             delete updated.manualYearToDateUsed;
+            delete updated.manualYearToDateUsedYear;
             return updated;
           }
           return m;
@@ -1327,7 +1393,7 @@ export default function LeaderLeaveBalancePage() {
                               <div className="group">
                                 <div className="flex flex-col space-y-1">
                                   <div className="flex items-center space-x-2">
-                                    <div 
+                                    <span
                                       className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400"
                                       onClick={() => handleEditBalance(member)}
                                       title="Click to edit balance"
@@ -1350,14 +1416,84 @@ export default function LeaderLeaveBalancePage() {
                                         );
                                       })()}
                                       <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">(remaining)</span>
-                                      {(() => {
+                                    </span>
+                                  </div>
+                                  {(() => {
+                                        // Show carryover section if team allows carryover
+                                        if (!team?.settings.allowCarryover) {
+                                          return null;
+                                        }
+                                        
                                         const memberAnalytics = getMemberAnalyticsData(member);
-                                        return memberAnalytics && memberAnalytics.carryoverBalance > 0 ? (
-                                          <div className="mt-1 text-xs text-blue-600 dark:text-blue-400">
-                                            Carryover: {Math.round(memberAnalytics.carryoverBalance)} days
+                                        const remainingCarryover = memberAnalytics?.carryoverBalance ?? 0;
+                                        
+                                        // Use member.carryoverFromPreviousYear as the source of truth for total carryover
+                                        // This is what leaders set when editing
+                                        const totalCarryover = member.carryoverFromPreviousYear ?? 0;
+                                        
+                                        // If totalCarryover is 0 but we have remaining carryover, it means carryover was used
+                                        // In this case, we need to infer the original total from remaining + used
+                                        // But we can't know the exact total without tracking usage separately
+                                        // So we'll use the member's carryoverFromPreviousYear as the authoritative source
+                                        
+                                        // Keep remaining carryover separate for display
+                                        const displayRemainingCarryover = Math.max(0, remainingCarryover);
+                                        
+                                        if (editingCarryover === member._id) {
+                                          return (
+                                            <div className="mt-1 space-y-1">
+                                              <div className="flex items-center space-x-2">
+                                                <span className="text-xs text-blue-600 dark:text-blue-400">Carryover:</span>
+                                                <input
+                                                  type="number"
+                                                  min="0"
+                                                  step="1"
+                                                  value={tempCarryover}
+                                                  onChange={(e) => setTempCarryover(e.target.value)}
+                                                  className="w-20 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                                                  autoFocus
+                                                />
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">days</span>
+                                              </div>
+                                              <div className="flex items-center space-x-2">
+                                                <button
+                                                  onClick={() => handleSaveCarryover(member._id!)}
+                                                  disabled={updating === member._id}
+                                                  className="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded disabled:opacity-50"
+                                                >
+                                                  {updating === member._id ? 'Saving...' : 'Save'}
+                                                </button>
+                                                <button
+                                                  onClick={handleCancelEditCarryover}
+                                                  disabled={updating === member._id}
+                                                  className="px-2 py-1 text-xs bg-gray-500 hover:bg-gray-600 text-white rounded disabled:opacity-50"
+                                                >
+                                                  Cancel
+                                                </button>
+                                              </div>
+                                            </div>
+                                          );
+                                        }
+                                        
+                                        // Only show if there's actual carryover data to display
+                                        // Show even if 0/0 to allow leaders to set it
+                                        return (
+                                          <div className="text-xs text-blue-600 dark:text-blue-400">
+                                            <span
+                                              className="cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400"
+                                              onClick={(event) => {
+                                                event.stopPropagation();
+                                                handleEditCarryover(member);
+                                              }}
+                                              title="Click to edit carryover balance"
+                                            >
+                                              Carryover: {Math.round(displayRemainingCarryover)} / {Math.round(totalCarryover)} days
+                                            </span>
                                           </div>
-                                        ) : null;
+                                        );
                                       })()}
+                                  <div className="flex items-center space-x-2">
+                                    <div>
                                       {leaveData.remainingBalance < 0 && (() => {
                                         // Check if member has taken compassionate leave (maternity, sick, bereavement, medical, etc.)
                                         const memberCompassionateRequests = allRequests.filter(req => 
@@ -1530,11 +1666,11 @@ export default function LeaderLeaveBalancePage() {
                                     title="Click to edit days taken"
                                   >
                                     {leaveData.baseBalance > 0 ? Math.round(leaveData.yearToDateUsed) : '-'}
-                                    {member.manualYearToDateUsed !== undefined && leaveData.baseBalance > 0 && (
+                                    {getEffectiveManualYearToDateUsed(member) !== undefined && leaveData.baseBalance > 0 && (
                                       <span className="ml-1 text-xs text-blue-600 dark:text-blue-400" title="Manual override">✏️</span>
                                     )}
                                   </div>
-                                  {member.manualYearToDateUsed !== undefined && (
+                                  {getEffectiveManualYearToDateUsed(member) !== undefined && (
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();

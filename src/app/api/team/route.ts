@@ -57,8 +57,11 @@ export async function GET(request: NextRequest) {
         // Include manualLeaveBalance for current user (they can see their own)
         manualLeaveBalance: currentUser.manualLeaveBalance,
         manualYearToDateUsed: currentUser.manualYearToDateUsed,
+        manualYearToDateUsedYear: currentUser.manualYearToDateUsedYear,
         manualMaternityLeaveBalance: currentUser.manualMaternityLeaveBalance,
         manualMaternityYearToDateUsed: currentUser.manualMaternityYearToDateUsed,
+        carryoverFromPreviousYear: currentUser.carryoverFromPreviousYear,
+        carryoverExpiryDate: currentUser.carryoverExpiryDate,
       } : null,
       members: allMembers.map(member => {
         const baseMember = {
@@ -81,8 +84,11 @@ export async function GET(request: NextRequest) {
             ...baseMember,
             manualLeaveBalance: member.manualLeaveBalance,
             manualYearToDateUsed: member.manualYearToDateUsed,
+            manualYearToDateUsedYear: member.manualYearToDateUsedYear,
             manualMaternityLeaveBalance: member.manualMaternityLeaveBalance,
             manualMaternityYearToDateUsed: member.manualMaternityYearToDateUsed,
+            carryoverFromPreviousYear: member.carryoverFromPreviousYear,
+            carryoverExpiryDate: member.carryoverExpiryDate,
           };
         }
         

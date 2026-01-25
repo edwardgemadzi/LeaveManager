@@ -1,5 +1,6 @@
 import { ShiftSchedule, User, Team, LeaveRequest } from '@/types';
 import { countWorkingDays, calculateLeaveBalance, isWorkingDay, getWorkingDays, calculateSurplusBalance, calculateMaternityLeaveBalance, calculateMaternitySurplusBalance, isMaternityLeave, countMaternityLeaveDays, calculateCarryoverBalance } from './leaveCalculations';
+import { getEffectiveManualYearToDateUsed } from './yearOverrides';
 import { parseDateSafe } from './dateUtils';
 import { debug } from './logger';
 
@@ -1072,13 +1073,15 @@ export const getMemberAnalytics = (
   // - If manualLeaveBalance is not set, use maxLeavePerYear
   const baseLeaveBalance = user.manualLeaveBalance !== undefined ? user.manualLeaveBalance : team.settings.maxLeavePerYear;
   
+  const effectiveManualYearToDateUsed = getEffectiveManualYearToDateUsed(user, currentYear);
+
   // Use User object to support historical schedules for past dates
   const remainingLeaveBalance = calculateLeaveBalance(
     team.settings.maxLeavePerYear,
     approvedRequestsForCalculation,
     user,
     user.manualLeaveBalance,
-    user.manualYearToDateUsed,
+    effectiveManualYearToDateUsed,
     team.settings.carryoverSettings
   );
   
@@ -1091,7 +1094,7 @@ export const getMemberAnalytics = (
       allApprovedRequests.filter(req => req.userId === member._id),
       member,
       member.manualLeaveBalance,
-      member.manualYearToDateUsed,
+      getEffectiveManualYearToDateUsed(member, currentYear),
       team.settings.carryoverSettings
     );
     return memberRemainingBalance > 0;
@@ -1144,8 +1147,8 @@ export const getMemberAnalytics = (
   }, 0);
   
   // Use manualYearToDateUsed if set, otherwise use calculated value
-  const workingDaysUsed = user.manualYearToDateUsed !== undefined 
-    ? user.manualYearToDateUsed 
+  const workingDaysUsed = effectiveManualYearToDateUsed !== undefined 
+    ? effectiveManualYearToDateUsed 
     : yearToDateWorkingDays;
   
   // Calculate carryover balance separately

@@ -6,6 +6,7 @@ import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { LeaveRequest, Team, User } from '@/types';
 import { calculateLeaveBalance, countWorkingDays, calculateSurplusBalance, calculateMaternityLeaveBalance, calculateMaternitySurplusBalance, isMaternityLeave, countMaternityLeaveDays } from '@/lib/leaveCalculations';
+import { getEffectiveManualYearToDateUsed } from '@/lib/yearOverrides';
 import { MemberAnalytics } from '@/lib/analyticsCalculations';
 import { useBrowserNotification } from '@/hooks/useBrowserNotification';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
@@ -429,7 +430,7 @@ export default function MemberDashboard() {
       approvedRequests,
       user,
       user.manualLeaveBalance,
-      user.manualYearToDateUsed,
+      getEffectiveManualYearToDateUsed(user),
       team.settings.carryoverSettings
     );
     
@@ -874,7 +875,7 @@ export default function MemberDashboard() {
                       {analytics?.workingDaysUsed !== undefined ? Math.round(analytics.workingDaysUsed) : getTotalWorkingDaysTaken()}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">This year</p>
-                    {user?.manualYearToDateUsed !== undefined && (
+                    {user && getEffectiveManualYearToDateUsed(user) !== undefined && (
                       <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Manual override</p>
                     )}
                   </div>
@@ -1114,7 +1115,7 @@ export default function MemberDashboard() {
             } else if (analytics) {
               // Use time-based scoring that accounts for time of year and usage patterns
               // Check if manual leave balance is set
-              const hasManualBalance = user?.manualLeaveBalance !== undefined || user?.manualYearToDateUsed !== undefined;
+              const hasManualBalance = user?.manualLeaveBalance !== undefined || (user ? getEffectiveManualYearToDateUsed(user) !== undefined : false);
               const timeBasedScore = calculateTimeBasedLeaveScore(
                 baseBalance,
                 used,

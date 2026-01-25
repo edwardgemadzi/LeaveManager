@@ -10,8 +10,9 @@ export interface User {
   shiftTag?: 'day' | 'night' | 'mixed'; // New field for shift categorization
   workingDaysTag?: string; // Automatic tag grouping members who work on exactly the same days
   subgroupTag?: string; // Custom subgroup name assigned by leader (only when enableSubgrouping is true)
-  manualLeaveBalance?: number; // Manual leave balance override set by leader (for members joining mid-year)
-  manualYearToDateUsed?: number; // Manual year-to-date used days override set by leader
+  manualLeaveBalance?: number; // Manual leave balance override set by leader (year-specific, cleared at year-end migration)
+  manualYearToDateUsed?: number; // Manual year-to-date used days override set by leader (year-specific, cleared at year-end migration)
+  manualYearToDateUsedYear?: number; // Year the manual year-to-date override applies to
   manualMaternityLeaveBalance?: number; // Manual maternity leave balance override
   manualMaternityYearToDateUsed?: number; // Manual maternity year-to-date used days override
   maternityPaternityType?: 'maternity' | 'paternity' | null; // Type of parental leave assigned by leader

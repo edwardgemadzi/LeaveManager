@@ -61,9 +61,9 @@ export async function PATCH(
     }
     
     const body = await request.json();
-    const { fullName, shiftTag, subgroupTag, manualLeaveBalance, manualYearToDateUsed, manualMaternityLeaveBalance, manualMaternityYearToDateUsed, newPassword, maternityPaternityType, carryoverFromPreviousYear, carryoverExpiryDate } = body;
+    const { fullName, shiftTag, subgroupTag, manualLeaveBalance, manualYearToDateUsed, manualYearToDateUsedYear, manualMaternityLeaveBalance, manualMaternityYearToDateUsed, newPassword, maternityPaternityType, carryoverFromPreviousYear, carryoverExpiryDate } = body;
 
-    if (!fullName && shiftTag === undefined && subgroupTag === undefined && manualLeaveBalance === undefined && manualYearToDateUsed === undefined && manualMaternityLeaveBalance === undefined && manualMaternityYearToDateUsed === undefined && !newPassword && maternityPaternityType === undefined && carryoverFromPreviousYear === undefined && carryoverExpiryDate === undefined) {
+    if (!fullName && shiftTag === undefined && subgroupTag === undefined && manualLeaveBalance === undefined && manualYearToDateUsed === undefined && manualYearToDateUsedYear === undefined && manualMaternityLeaveBalance === undefined && manualMaternityYearToDateUsed === undefined && !newPassword && maternityPaternityType === undefined && carryoverFromPreviousYear === undefined && carryoverExpiryDate === undefined) {
       return badRequestError('At least one field is required');
     }
 
@@ -166,8 +166,8 @@ export async function PATCH(
     }
 
     // Build update object
-    const updateData: { fullName?: string; shiftTag?: string; subgroupTag?: string; manualLeaveBalance?: number; manualYearToDateUsed?: number; manualMaternityLeaveBalance?: number; manualMaternityYearToDateUsed?: number; password?: string; maternityPaternityType?: 'maternity' | 'paternity' | null; carryoverFromPreviousYear?: number; carryoverExpiryDate?: Date } = {};
-    const unsetData: { manualLeaveBalance?: string; manualYearToDateUsed?: string; manualMaternityLeaveBalance?: string; manualMaternityYearToDateUsed?: string; carryoverFromPreviousYear?: string; carryoverExpiryDate?: string } = {};
+    const updateData: { fullName?: string; shiftTag?: string; subgroupTag?: string; manualLeaveBalance?: number; manualYearToDateUsed?: number; manualYearToDateUsedYear?: number; manualMaternityLeaveBalance?: number; manualMaternityYearToDateUsed?: number; password?: string; maternityPaternityType?: 'maternity' | 'paternity' | null; carryoverFromPreviousYear?: number; carryoverExpiryDate?: Date } = {};
+    const unsetData: { manualLeaveBalance?: string; manualYearToDateUsed?: string; manualYearToDateUsedYear?: string; manualMaternityLeaveBalance?: string; manualMaternityYearToDateUsed?: string; carryoverFromPreviousYear?: string; carryoverExpiryDate?: string } = {};
     let shouldUnset = false;
     
     if (fullName) updateData.fullName = fullName;
@@ -181,6 +181,7 @@ export async function PATCH(
     }
     if (manualLeaveBalance !== undefined) {
       // If manualLeaveBalance is null, remove it (use calculated balance)
+      // Note: manualLeaveBalance is year-specific and will be cleared at year-end migration
       if (manualLeaveBalance === null) {
         unsetData.manualLeaveBalance = '';
         shouldUnset = true;
@@ -199,10 +200,15 @@ export async function PATCH(
         updateData.manualLeaveBalance = manualLeaveBalance;
       }
     }
+    if (manualYearToDateUsedYear !== undefined && manualYearToDateUsed === undefined) {
+      return badRequestError('manualYearToDateUsedYear requires manualYearToDateUsed');
+    }
     if (manualYearToDateUsed !== undefined) {
       // If manualYearToDateUsed is null, remove it (use calculated value)
+      // Note: manualYearToDateUsed is year-specific and will be cleared at year-end migration
       if (manualYearToDateUsed === null) {
         unsetData.manualYearToDateUsed = '';
+        unsetData.manualYearToDateUsedYear = '';
         shouldUnset = true;
       } else {
         // Validate manualYearToDateUsed is a number and not negative
@@ -217,6 +223,13 @@ export async function PATCH(
         }
         
         updateData.manualYearToDateUsed = manualYearToDateUsed;
+
+        const currentYear = new Date().getFullYear();
+        const manualYear = manualYearToDateUsedYear ?? currentYear;
+        if (!Number.isInteger(manualYear) || manualYear < 2000 || manualYear > 2100) {
+          return badRequestError('manualYearToDateUsedYear must be a valid year');
+        }
+        updateData.manualYearToDateUsedYear = manualYear;
       }
     }
     if (manualMaternityLeaveBalance !== undefined) {

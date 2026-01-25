@@ -4,12 +4,13 @@
  */
 
 const isDevelopment = process.env.NODE_ENV === 'development';
+const isDebugEnabled = process.env.DEBUG_LOGS === 'true';
 
 /**
  * Log debug messages (only in development)
  */
 export function debug(message: string, data?: unknown): void {
-  if (isDevelopment) {
+  if (isDevelopment && isDebugEnabled) {
     console.log(`[DEBUG] ${message}`, data || '');
   }
 }

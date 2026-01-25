@@ -50,9 +50,9 @@ This comprehensive guide will help you deploy the Leave Manager application to V
    - Navigate to "Environment Variables"
    - Add the following variables:
 
-   | Variable | Value | Description |
-   |----------|-------|-------------|
-   | `MONGODB_URI` | `mongodb+srv://username:password@cluster.mongodb.net/leave-manager` | Your MongoDB Atlas connection string |
+| Variable | Value | Description |
+|----------|-------|-------------|
+| `MONGODB_URI` | `mongodb+srv://username:password@cluster.mongodb.net/leave-manager` | Your MongoDB Atlas connection string |
    | `JWT_SECRET` | `your-super-secret-jwt-key-at-least-32-characters-long` | A secure random string for JWT signing (generate with: `openssl rand -base64 32`) |
    | `NEXTAUTH_URL` | `https://your-app-name.vercel.app` | Your Vercel deployment URL (auto-set by Vercel) |
    | `ADMIN_ENABLED` | `false` | Set to false for production (admin panel is localhost only) |

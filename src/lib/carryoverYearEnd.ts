@@ -160,52 +160,63 @@ export async function updateTeamCarryover(
         allApprovedRequests
       );
       
-      // Only update if carryover changed
+      if (!member._id) {
+        errors.push({
+          username: member.username || 'unknown',
+          error: 'User ID is missing'
+        });
+        continue;
+      }
+      
+      const userId = member._id;
+      const filter: Filter<User> = { _id: userId };
+      
+      // Build update data for carryover
+      const updateData: Partial<User> = {
+        carryoverFromPreviousYear: expectedCarryover
+      };
+      
+      if (expiryDate) {
+        updateData.carryoverExpiryDate = expiryDate;
+      }
+      
+      // Clear year-specific manual overrides so next year uses default maxLeavePerYear
+      // manualLeaveBalance and manualYearToDateUsed are year-specific and should be cleared at year-end
+      const unsetData: Record<string, ''> = {
+        manualLeaveBalance: '',
+        manualYearToDateUsed: '',
+        manualYearToDateUsedYear: ''
+      };
+      
+      // Only update if carryover changed or if manual overrides need to be cleared
       const currentCarryover = member.carryoverFromPreviousYear ?? 0;
-      if (currentCarryover !== expectedCarryover) {
-        if (!member._id) {
-          errors.push({
-            username: member.username || 'unknown',
-            error: 'User ID is missing'
-          });
-          continue;
-        }
-        
-        if (!member._id) {
-          errors.push({
-            username: member.username || 'unknown',
-            error: 'User ID is missing'
-          });
-          continue;
-        }
-        const userId = member._id;
-        const updateData: Partial<User> = {
-          carryoverFromPreviousYear: expectedCarryover
-        };
-        
-        if (expiryDate) {
-          updateData.carryoverExpiryDate = expiryDate;
-        }
-        
-        const filter: Filter<User> = { _id: userId };
-        
+      const hasManualOverrides = member.manualLeaveBalance !== undefined || member.manualYearToDateUsed !== undefined;
+      const needsUpdate = currentCarryover !== expectedCarryover || hasManualOverrides;
+      
+      if (needsUpdate) {
         if (expectedCarryover === 0 && !expiryDate) {
           // Clear expiry date if no carryover
+          unsetData.carryoverExpiryDate = '';
           await usersCollection.updateOne(
             filter,
             { 
               $set: updateData,
-              $unset: { carryoverExpiryDate: '' }
+              $unset: unsetData
             }
           );
         } else {
           await usersCollection.updateOne(
             filter,
-            { $set: updateData }
+            { 
+              $set: updateData,
+              $unset: unsetData
+            }
           );
         }
         
-        membersUpdated++;
+        if (currentCarryover !== expectedCarryover) {
+          membersUpdated++;
+        }
       }
       
       if (expectedCarryover > 0) {

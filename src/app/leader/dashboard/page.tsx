@@ -6,6 +6,7 @@ import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { LeaveRequest, Team, User } from '@/types';
 import { calculateLeaveBalance, calculateSurplusBalance, calculateMaternityLeaveBalance, isMaternityLeave, countMaternityLeaveDays } from '@/lib/leaveCalculations';
+import { getEffectiveManualYearToDateUsed } from '@/lib/yearOverrides';
 import { GroupedTeamAnalytics } from '@/lib/analyticsCalculations';
 import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
 import { useBrowserNotification } from '@/hooks/useBrowserNotification';
@@ -359,7 +360,7 @@ export default function LeaderDashboard() {
             approvedRequests,
             member,
             member.manualLeaveBalance,
-            member.manualYearToDateUsed,
+            getEffectiveManualYearToDateUsed(member),
             team.settings.carryoverSettings
           );
 
