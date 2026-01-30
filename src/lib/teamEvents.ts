@@ -7,7 +7,7 @@
  * Events are scoped to teamId for privacy and security.
  */
 
-type EventType = 'leaveRequestCreated' | 'leaveRequestUpdated' | 'leaveRequestDeleted' | 'settingsUpdated';
+type EventType = 'leaveRequestCreated' | 'leaveRequestUpdated' | 'leaveRequestDeleted' | 'leaveRequestRestored' | 'settingsUpdated';
 
 type EventData = {
   type: EventType;

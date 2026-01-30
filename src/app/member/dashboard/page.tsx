@@ -292,6 +292,13 @@ export default function MemberDashboard() {
           refetchData();
         }
       }
+
+      if (event.type === 'leaveRequestRestored') {
+        const data = event.data as { requestId: string; userId: string };
+        if (user && String(data.userId).trim() === String(user._id).trim()) {
+          refetchData();
+        }
+      }
       
       // Handle settingsUpdated
       if (event.type === 'settingsUpdated') {

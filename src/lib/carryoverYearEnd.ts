@@ -142,7 +142,10 @@ export async function updateTeamCarryover(
   // Get all leave requests for the team
   const requestsCollection = db.collection<LeaveRequest>('leaveRequests');
   const teamIdStr = String(teamId);
-  const allRequests = await requestsCollection.find({ teamId: teamIdStr }).toArray();
+  const allRequests = await requestsCollection.find({
+    teamId: teamIdStr,
+    $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }]
+  } as unknown as Filter<LeaveRequest>).toArray();
   const allApprovedRequests = allRequests.filter(req => req.status === 'approved');
   
   const errors: Array<{ username: string; error: string }> = [];

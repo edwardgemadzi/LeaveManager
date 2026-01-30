@@ -15,7 +15,7 @@ export default function LeaderRequestsPage() {
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [members, setMembers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'deleted'>('all');
   
   // Emergency request state
   const [showEmergencyForm, setShowEmergencyForm] = useState(false);
@@ -73,7 +73,7 @@ export default function LeaderRequestsPage() {
               'Authorization': `Bearer ${token}`,
             },
           }),
-          fetch(`/api/leave-requests?teamId=${user.teamId}`, {
+          fetch(`/api/leave-requests?teamId=${user.teamId}&includeDeleted=true`, {
             headers: {
               'Authorization': `Bearer ${token}`,
             },
@@ -106,7 +106,7 @@ export default function LeaderRequestsPage() {
     enabled: !loading && !!teamId,
     onEvent: (event) => {
       // Refresh requests list when events received
-      if (event.type === 'leaveRequestCreated' || event.type === 'leaveRequestUpdated' || event.type === 'leaveRequestDeleted') {
+      if (event.type === 'leaveRequestCreated' || event.type === 'leaveRequestUpdated' || event.type === 'leaveRequestDeleted' || event.type === 'leaveRequestRestored') {
         // Debounce refresh to avoid excessive API calls
         if (refreshTimeoutRef.current) {
           clearTimeout(refreshTimeoutRef.current);
@@ -163,7 +163,7 @@ export default function LeaderRequestsPage() {
   };
 
   const handleDelete = async (requestId: string) => {
-    if (!confirm('Are you sure you want to delete this approved request? This action cannot be undone and will affect the member\'s leave balance.')) {
+    if (!confirm('Are you sure you want to delete this approved request? It will move to the Deleted tab and can be restored.')) {
       return;
     }
 
@@ -178,7 +178,7 @@ export default function LeaderRequestsPage() {
       });
 
       if (response.ok) {
-        setRequests(requests.filter(req => req._id !== requestId));
+        await fetchData();
         // Dispatch custom event to trigger refresh on other pages
         window.dispatchEvent(new CustomEvent('leaveRequestDeleted'));
         showSuccess('Request deleted successfully');
@@ -188,6 +188,33 @@ export default function LeaderRequestsPage() {
       }
     } catch (error) {
       console.error('Error deleting request:', error);
+      showError('Network error. Please try again.');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const handleRestore = async (requestId: string) => {
+    setDeleting(requestId);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/leave-requests/${requestId}/restore`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        await fetchData();
+        window.dispatchEvent(new CustomEvent('leaveRequestRestored'));
+        showSuccess('Request restored successfully');
+      } else {
+        const error = await response.json();
+        showError(error.error || 'Failed to restore request');
+      }
+    } catch (error) {
+      console.error('Error restoring request:', error);
       showError('Network error. Please try again.');
     } finally {
       setDeleting(null);
@@ -368,8 +395,26 @@ export default function LeaderRequestsPage() {
   };
 
   const filteredRequests = requests.filter(request => {
+    if (filter === 'deleted') {
+      return !!request.deletedAt;
+    }
+    if (request.deletedAt) return false;
     if (filter === 'all') return true;
     return request.status === filter;
+  });
+
+  const sortedRequests = [...filteredRequests].sort((a, b) => {
+    if (filter === 'deleted') {
+      const aDeleted = a.deletedAt ? new Date(a.deletedAt).getTime() : 0;
+      const bDeleted = b.deletedAt ? new Date(b.deletedAt).getTime() : 0;
+      return bDeleted - aDeleted;
+    }
+
+    const statusOrder: Record<string, number> = { pending: 0, approved: 1, rejected: 2 };
+    const statusDiff = (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3);
+    if (statusDiff !== 0) return statusDiff;
+
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
   const getStatusColor = (status: string) => {
@@ -683,10 +728,11 @@ export default function LeaderRequestsPage() {
                   { key: 'pending', label: 'Pending' },
                   { key: 'approved', label: 'Approved' },
                   { key: 'rejected', label: 'Rejected' },
+                  { key: 'deleted', label: 'Deleted' },
                 ].map((tab) => (
                   <button
                     key={tab.key}
-                    onClick={() => setFilter(tab.key as 'all' | 'pending' | 'approved' | 'rejected')}
+                    onClick={() => setFilter(tab.key as 'all' | 'pending' | 'approved' | 'rejected' | 'deleted')}
                     className={`py-2 px-1 border-b-2 font-semibold text-sm transition-colors ${
                       filter === tab.key
                         ? 'tab-active'
@@ -704,7 +750,7 @@ export default function LeaderRequestsPage() {
         {/* Requests List - Enhanced */}
         <div className="card">
           <div className="p-5 sm:p-6">
-            {filteredRequests.length === 0 ? (
+            {sortedRequests.length === 0 ? (
               <div className="text-center py-12">
                 <div className="flex flex-col items-center justify-center">
                   <svg className="h-16 w-16 text-gray-400 dark:text-gray-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -715,7 +761,7 @@ export default function LeaderRequestsPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {filteredRequests.map((request) => {
+                {sortedRequests.map((request) => {
                   const member = members.find(m => m._id === request.userId);
                   return (
                     <div key={request._id} className="bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-900 dark:to-gray-800/50 rounded-xl p-5 sm:p-6 border border-gray-200 dark:border-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all duration-200 stagger-item">
@@ -728,6 +774,11 @@ export default function LeaderRequestsPage() {
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${getStatusColor(request.status)}`}>
                               {request.status}
                             </span>
+                            {request.deletedAt && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                                deleted
+                              </span>
+                            )}
                           </div>
                           <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
                             {parseDateSafe(request.startDate).toLocaleDateString()} - {parseDateSafe(request.endDate).toLocaleDateString()}
@@ -780,7 +831,7 @@ export default function LeaderRequestsPage() {
                               </button>
                             </>
                           )}
-                          {request.status === 'approved' && (
+                          {request.status === 'approved' && !request.deletedAt && (
                             <button
                               onClick={() => handleDelete(request._id!)}
                               disabled={deleting === request._id}
@@ -788,6 +839,16 @@ export default function LeaderRequestsPage() {
                               title="Delete approved request"
                             >
                               {deleting === request._id ? 'Deleting...' : 'Delete'}
+                            </button>
+                          )}
+                          {request.deletedAt && (
+                            <button
+                              onClick={() => handleRestore(request._id!)}
+                              disabled={deleting === request._id}
+                              className="btn-primary px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Restore request"
+                            >
+                              {deleting === request._id ? 'Restoring...' : 'Restore'}
                             </button>
                           )}
                         </div>

@@ -64,7 +64,7 @@ export default function LeaderCalendarPage() {
     enabled: !loading && !!team,
     onEvent: (event) => {
       // Refresh calendar when leave requests are created, updated, or deleted
-      if (event.type === 'leaveRequestCreated' || event.type === 'leaveRequestUpdated' || event.type === 'leaveRequestDeleted') {
+      if (event.type === 'leaveRequestCreated' || event.type === 'leaveRequestUpdated' || event.type === 'leaveRequestDeleted' || event.type === 'leaveRequestRestored') {
         // Debounce refresh to avoid excessive API calls
         if (refreshTimeoutRef.current) {
           clearTimeout(refreshTimeoutRef.current);

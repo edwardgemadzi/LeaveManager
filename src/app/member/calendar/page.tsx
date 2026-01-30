@@ -96,7 +96,7 @@ export default function MemberCalendarPage() {
     enabled: !loading && !!team,
     onEvent: (event) => {
       // Refresh calendar when leave requests are created, updated, or deleted
-      if (event.type === 'leaveRequestCreated' || event.type === 'leaveRequestUpdated' || event.type === 'leaveRequestDeleted') {
+      if (event.type === 'leaveRequestCreated' || event.type === 'leaveRequestUpdated' || event.type === 'leaveRequestDeleted' || event.type === 'leaveRequestRestored') {
         // Debounce refresh to avoid excessive API calls
         if (refreshTimeoutRef.current) {
           clearTimeout(refreshTimeoutRef.current);
@@ -223,6 +223,7 @@ export default function MemberCalendarPage() {
                 currentUser={user || undefined}
                 teamSettings={team?.settings ? { 
                   minimumNoticePeriod: team.settings.minimumNoticePeriod || 1,
+                  bypassNoticePeriod: team.settings.bypassNoticePeriod,
                   maternityLeave: team.settings.maternityLeave,
                   paternityLeave: team.settings.paternityLeave
                 } : undefined}

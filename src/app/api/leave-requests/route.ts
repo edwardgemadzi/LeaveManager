@@ -4,13 +4,14 @@ import { LeaveRequestModel } from '@/models/LeaveRequest';
 import { TeamModel } from '@/models/Team';
 import { UserModel } from '@/models/User';
 import { CreateLeaveRequest, LeaveRequest } from '@/types';
-import { isBypassNoticePeriodActive } from '@/lib/analyticsCalculations';
+import { isBypassNoticePeriodActive } from '@/lib/noticePeriod';
 import { validateRequest, schemas } from '@/lib/validation';
 import { getClient } from '@/lib/mongodb';
 import { broadcastTeamUpdate } from '@/lib/teamEvents';
 import { error as logError, info } from '@/lib/logger';
 import { internalServerError } from '@/lib/errors';
 import { parseDateSafe } from '@/lib/dateUtils';
+import { isWorkingDay } from '@/lib/leaveCalculations';
 import { teamIdsMatch } from '@/lib/helpers';
 
 export async function GET(request: NextRequest) {
@@ -36,7 +37,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch all leave requests for the team
-    let requests = await LeaveRequestModel.findByTeamId(user.teamId);
+    const includeDeleted =
+      request.nextUrl.searchParams.get('includeDeleted') === 'true' && user.role === 'leader';
+    let requests = await LeaveRequestModel.findByTeamId(user.teamId, includeDeleted);
 
     // If user is a member and subgrouping is enabled, filter by subgroup
     if (user.role === 'member' && team.settings.enableSubgrouping) {
@@ -207,17 +210,22 @@ export async function POST(request: NextRequest) {
     // Create maps for O(1) lookups
     const userSubgroupMap = new Map<string, string>();
     const userShiftTagMap = new Map<string, string | undefined>();
+    const userMap = new Map<string, typeof teamMembers[number]>();
     teamMembers.forEach(member => {
       if (member._id) {
-        userSubgroupMap.set(member._id, member.subgroupTag || 'Ungrouped');
-        userShiftTagMap.set(member._id, member.shiftTag);
+        const memberId = String(member._id);
+        userSubgroupMap.set(memberId, member.subgroupTag || 'Ungrouped');
+        userShiftTagMap.set(memberId, member.shiftTag);
+        userMap.set(memberId, member);
       }
     });
     
     // Ensure requesting user is in the maps (in case they're not a member)
     if (requestUser?._id) {
-      userSubgroupMap.set(requestUser._id, requestingUserSubgroupTag || 'Ungrouped');
-      userShiftTagMap.set(requestUser._id, requestingUserShiftTag);
+      const requestUserId = String(requestUser._id);
+      userSubgroupMap.set(requestUserId, requestingUserSubgroupTag || 'Ungrouped');
+      userShiftTagMap.set(requestUserId, requestingUserShiftTag);
+      userMap.set(requestUserId, requestUser);
     }
 
     // Check concurrent leave limit and create request atomically using MongoDB transaction
@@ -231,6 +239,18 @@ export async function POST(request: NextRequest) {
 
       try {
         await session.withTransaction(async () => {
+          // Prevent duplicate pending requests for the same user and date range
+          const pendingOverlaps = await LeaveRequestModel.findPendingOverlappingRequestsForUser(
+            requestUserId,
+            start,
+            end,
+            undefined,
+            session
+          );
+          if (pendingOverlaps.length > 0) {
+            throw new Error('DUPLICATE_PENDING_REQUEST: You already have a pending leave request for one or more of the selected dates.');
+          }
+
           // Check availability (read-locked query with session)
           const overlappingRequests = await LeaveRequestModel.findOverlappingRequests(
             user.teamId!,
@@ -240,48 +260,66 @@ export async function POST(request: NextRequest) {
             session
           );
 
-          // Count relevant overlapping requests (respecting shift/subgroup filters)
-          let relevantOverlappingCount = 0;
-          
-          if (team.settings.enableSubgrouping) {
-            // Filter overlapping requests to only count those from the same subgroup
-            const requestingSubgroup = requestingUserSubgroupTag || 'Ungrouped';
-            
+          const requestStartDate = new Date(start);
+          requestStartDate.setHours(0, 0, 0, 0);
+          const requestEndDate = new Date(end);
+          requestEndDate.setHours(0, 0, 0, 0);
+
+          let exceedsConcurrentLimit = false;
+          for (let checkDate = new Date(requestStartDate); checkDate <= requestEndDate; checkDate.setDate(checkDate.getDate() + 1)) {
+            // Skip non-working days for the requesting user
+            if (!isWorkingDay(checkDate, requestUser)) {
+              continue;
+            }
+
+            // Count relevant overlapping requests for this date (respecting shift/subgroup filters)
+            let relevantOverlappingCount = 0;
             for (const req of overlappingRequests) {
-              const reqUserSubgroup = userSubgroupMap.get(req.userId) || 'Ungrouped';
-              const reqUserShiftTag = userShiftTagMap.get(req.userId);
+              const reqStart = parseDateSafe(req.startDate);
+              const reqEnd = parseDateSafe(req.endDate);
+              reqStart.setHours(0, 0, 0, 0);
+              reqEnd.setHours(23, 59, 59, 999);
+
+              if (checkDate < reqStart || checkDate > reqEnd) {
+                continue;
+              }
+
+              const reqUserId = String(req.userId);
+              const reqUser = userMap.get(reqUserId);
+              if (!reqUser) {
+                continue;
+              }
+
+              // Only count if the other user works on this date
+              if (!isWorkingDay(checkDate, reqUser)) {
+                continue;
+              }
+
+              if (team.settings.enableSubgrouping) {
+                const requestingSubgroup = requestingUserSubgroupTag || 'Ungrouped';
+                const reqUserSubgroup = userSubgroupMap.get(reqUserId) || 'Ungrouped';
+                if (requestingSubgroup !== reqUserSubgroup) continue;
+              }
               
-              // Only count if they're in the same subgroup
-              if (requestingSubgroup !== reqUserSubgroup) continue;
-              
-              // Also check shift tag if applicable (existing logic)
               if (requestingUserShiftTag !== undefined) {
+                const reqUserShiftTag = userShiftTagMap.get(reqUserId);
                 if (reqUserShiftTag !== requestingUserShiftTag) continue;
               } else {
-                // Requesting user has no shift tag - only count members with no shift tag
+                const reqUserShiftTag = userShiftTagMap.get(reqUserId);
                 if (reqUserShiftTag !== undefined) continue;
               }
               
               relevantOverlappingCount++;
             }
-          } else {
-            // Subgrouping disabled - use existing shift tag logic
-            if (requestingUserShiftTag !== undefined) {
-              // Count overlapping requests from users with the same shift tag
-              for (const req of overlappingRequests) {
-                const reqUserShiftTag = userShiftTagMap.get(req.userId);
-                if (reqUserShiftTag === requestingUserShiftTag) {
-                  relevantOverlappingCount++;
-                }
-              }
-            } else {
-              // User has no shift tag - count all overlapping requests
-              relevantOverlappingCount = overlappingRequests.length;
+
+            if (relevantOverlappingCount >= team.settings.concurrentLeave) {
+              exceedsConcurrentLimit = true;
+              break;
             }
           }
 
           // If not available, throw error (409 Conflict)
-          if (relevantOverlappingCount >= team.settings.concurrentLeave) {
+          if (exceedsConcurrentLimit) {
             let context = '';
             if (team.settings.enableSubgrouping && requestingUserSubgroupTag) {
               context = ` (${requestingUserSubgroupTag} subgroup)`;
@@ -307,6 +345,13 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         await session.endSession();
         
+        if (error instanceof Error && error.message.startsWith('DUPLICATE_PENDING_REQUEST:')) {
+          return NextResponse.json(
+            { error: error.message.replace('DUPLICATE_PENDING_REQUEST: ', '') },
+            { status: 409 }
+          );
+        }
+
         // Handle slot unavailable error (409 Conflict)
         if (error instanceof Error && error.message.startsWith('SLOT_UNAVAILABLE:')) {
           return NextResponse.json(

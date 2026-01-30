@@ -1,5 +1,5 @@
 import { getDatabase } from '@/lib/mongodb';
-import { ObjectId, ClientSession } from 'mongodb';
+import { ObjectId, ClientSession, Filter } from 'mongodb';
 import { LeaveRequest } from '@/types';
 
 export class LeaveRequestModel {
@@ -17,6 +17,15 @@ export class LeaveRequestModel {
     }
 
     return { [field]: idStr };
+  }
+
+  private static buildNotDeletedQuery(): Record<string, unknown> {
+    return {
+      $or: [
+        { deletedAt: { $exists: false } },
+        { deletedAt: null }
+      ]
+    };
   }
 
   static async create(
@@ -37,40 +46,50 @@ export class LeaveRequestModel {
     return { ...newRequest, _id: result.insertedId.toString() };
   }
 
-  static async findByUserId(userId: string): Promise<LeaveRequest[]> {
+  static async findByUserId(userId: string, includeDeleted = false): Promise<LeaveRequest[]> {
     const db = await getDatabase();
     const requests = db.collection<LeaveRequest>('leaveRequests');
-    const query = LeaveRequestModel.buildIdQuery('userId', userId);
+    const userQuery = LeaveRequestModel.buildIdQuery('userId', userId);
+    const query = includeDeleted
+      ? userQuery
+      : { $and: [userQuery, LeaveRequestModel.buildNotDeletedQuery()] };
     return await requests.find(query).sort({ createdAt: -1 }).toArray();
   }
 
-  static async findByTeamId(teamId: string): Promise<LeaveRequest[]> {
+  static async findByTeamId(teamId: string, includeDeleted = false): Promise<LeaveRequest[]> {
     const db = await getDatabase();
     const requests = db.collection<LeaveRequest>('leaveRequests');
-    const query = LeaveRequestModel.buildIdQuery('teamId', teamId);
+    const teamQuery = LeaveRequestModel.buildIdQuery('teamId', teamId);
+    const query = includeDeleted
+      ? teamQuery
+      : { $and: [teamQuery, LeaveRequestModel.buildNotDeletedQuery()] };
     return await requests.find(query).sort({ createdAt: -1 }).toArray();
   }
 
-  static async findPendingByTeamId(teamId: string): Promise<LeaveRequest[]> {
+  static async findPendingByTeamId(teamId: string, includeDeleted = false): Promise<LeaveRequest[]> {
     const db = await getDatabase();
     const requests = db.collection<LeaveRequest>('leaveRequests');
     const teamQuery = LeaveRequestModel.buildIdQuery('teamId', teamId);
     const query = {
       $and: [
         teamQuery,
-        { status: 'pending' }
+        { status: 'pending' },
+        ...(includeDeleted ? [] : [LeaveRequestModel.buildNotDeletedQuery()])
       ]
     };
     return await requests.find(query).sort({ createdAt: -1 }).toArray();
   }
 
-  static async findById(id: string): Promise<LeaveRequest | null> {
+  static async findById(id: string, includeDeleted = false): Promise<LeaveRequest | null> {
     const db = await getDatabase();
     const requests = db.collection<LeaveRequest>('leaveRequests');
     try {
       const objectId = new ObjectId(id);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return await requests.findOne({ _id: objectId } as any);
+      const baseQuery = { _id: objectId } as unknown as Filter<LeaveRequest>;
+      const query = includeDeleted
+        ? baseQuery
+        : ({ $and: [baseQuery, LeaveRequestModel.buildNotDeletedQuery()] } as unknown as Filter<LeaveRequest>);
+      return await requests.findOne(query);
     } catch (error) {
       console.error('LeaveRequestModel.findById error:', error);
       return null;
@@ -103,6 +122,7 @@ export class LeaveRequestModel {
       $and: [
         teamQuery,
         { status: 'approved' },
+        LeaveRequestModel.buildNotDeletedQuery(),
         {
           $or: [
             {
@@ -132,18 +152,90 @@ export class LeaveRequestModel {
     return await requests.find(query, options).toArray();
   }
 
-  static async delete(id: string): Promise<boolean> {
+  static async findPendingOverlappingRequestsForUser(
+    userId: string,
+    startDate: Date,
+    endDate: Date,
+    excludeId?: string,
+    session?: ClientSession
+  ): Promise<LeaveRequest[]> {
+    const db = await getDatabase();
+    const requests = db.collection<LeaveRequest>('leaveRequests');
+
+    const userQuery = LeaveRequestModel.buildIdQuery('userId', userId);
+    const query: Record<string, unknown> = {
+      $and: [
+        userQuery,
+        { status: 'pending' },
+        LeaveRequestModel.buildNotDeletedQuery(),
+        {
+          $or: [
+            {
+              startDate: { $lte: endDate },
+              endDate: { $gte: startDate }
+            }
+          ]
+        }
+      ]
+    };
+
+    if (excludeId) {
+      if (ObjectId.isValid(excludeId)) {
+        query.$and = [
+          ...(query.$and as Record<string, unknown>[]),
+          { _id: { $ne: new ObjectId(excludeId) } }
+        ];
+      } else {
+        query.$and = [
+          ...(query.$and as Record<string, unknown>[]),
+          { _id: { $ne: excludeId } }
+        ];
+      }
+    }
+
+    const options = session ? { session } : {};
+    return await requests.find(query, options).toArray();
+  }
+
+  static async softDelete(id: string, deletedBy: string, session?: ClientSession): Promise<boolean> {
     const db = await getDatabase();
     const requests = db.collection<LeaveRequest>('leaveRequests');
     try {
       const objectId = new ObjectId(id);
-      const result = await requests.deleteOne(
+      const options = session ? { session } : {};
+      const result = await requests.updateOne(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { _id: objectId } as any
+        { _id: objectId } as any,
+        { $set: { deletedAt: new Date(), deletedBy, updatedAt: new Date() } },
+        options
       );
-      return result.deletedCount > 0;
+      return result.modifiedCount > 0;
     } catch (error) {
-      console.error('LeaveRequestModel.delete error:', error);
+      console.error('LeaveRequestModel.softDelete error:', error);
+      return false;
+    }
+  }
+
+  // Backward-compatible alias (soft delete)
+  static async delete(id: string, deletedBy: string, session?: ClientSession): Promise<boolean> {
+    return LeaveRequestModel.softDelete(id, deletedBy, session);
+  }
+
+  static async restore(id: string, session?: ClientSession): Promise<boolean> {
+    const db = await getDatabase();
+    const requests = db.collection<LeaveRequest>('leaveRequests');
+    try {
+      const objectId = new ObjectId(id);
+      const options = session ? { session } : {};
+      const result = await requests.updateOne(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { _id: objectId } as any,
+        { $unset: { deletedAt: '', deletedBy: '' }, $set: { updatedAt: new Date() } },
+        options
+      );
+      return result.modifiedCount > 0;
+    } catch (error) {
+      console.error('LeaveRequestModel.restore error:', error);
       return false;
     }
   }

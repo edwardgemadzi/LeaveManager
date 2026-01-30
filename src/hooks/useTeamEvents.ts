@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { usePolling } from './usePolling';
 
-type EventType = 'leaveRequestCreated' | 'leaveRequestUpdated' | 'leaveRequestDeleted' | 'settingsUpdated' | 'connected' | 'keepalive' | 'error';
+type EventType = 'leaveRequestCreated' | 'leaveRequestUpdated' | 'leaveRequestDeleted' | 'leaveRequestRestored' | 'settingsUpdated' | 'connected' | 'keepalive' | 'error';
 
 type EventData = {
   type: EventType;

@@ -3,31 +3,7 @@ import { countWorkingDays, calculateLeaveBalance, isWorkingDay, getWorkingDays, 
 import { getEffectiveManualYearToDateUsed } from './yearOverrides';
 import { parseDateSafe } from './dateUtils';
 import { debug } from './logger';
-
-// Check if bypass notice period is active for a given team and date
-export const isBypassNoticePeriodActive = (team: Team, date: Date = new Date()): boolean => {
-  if (!team.settings.bypassNoticePeriod?.enabled) {
-    return false;
-  }
-  
-  const bypass = team.settings.bypassNoticePeriod;
-  
-  // Use parseDateSafe to handle both Date objects and strings safely
-  if (!bypass.startDate || !bypass.endDate) {
-    return false;
-  }
-  
-  const checkDate = parseDateSafe(date);
-  const startDate = parseDateSafe(bypass.startDate);
-  const endDate = parseDateSafe(bypass.endDate);
-  
-  // Normalize all dates to midnight for consistent comparison
-  checkDate.setHours(0, 0, 0, 0);
-  startDate.setHours(0, 0, 0, 0);
-  endDate.setHours(23, 59, 59, 999);
-  
-  return checkDate >= startDate && checkDate <= endDate;
-};
+import { isBypassNoticePeriodActive } from './noticePeriod';
 
 // Generate a unique tag for working days pattern
 // Members with the same tag work on exactly the same days (100% overlap)

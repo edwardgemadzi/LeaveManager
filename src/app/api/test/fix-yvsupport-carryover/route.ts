@@ -3,6 +3,7 @@ import { updateTeamCarryover } from '@/lib/carryoverYearEnd';
 import { TeamModel } from '@/models/Team';
 import { UserModel } from '@/models/User';
 import { getDatabase } from '@/lib/mongodb';
+import { Filter } from 'mongodb';
 import { LeaveRequest } from '@/types';
 import { parseDateSafe } from '@/lib/dateUtils';
 import { isMaternityLeave, countWorkingDays } from '@/lib/leaveCalculations';
@@ -47,7 +48,10 @@ export async function POST(request: NextRequest) {
     const db = await getDatabase();
     const requestsCollection = db.collection<LeaveRequest>('leaveRequests');
     const teamIdStr = String(team._id);
-    const allRequests = await requestsCollection.find({ teamId: teamIdStr }).toArray();
+    const allRequests = await requestsCollection.find({
+      teamId: teamIdStr,
+      $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }]
+    } as unknown as Filter<LeaveRequest>).toArray();
     const allApprovedRequests = allRequests.filter(req => req.status === 'approved');
     
     const lastYearStart = new Date(previousYear, 0, 1);

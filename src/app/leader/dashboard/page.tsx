@@ -256,6 +256,10 @@ export default function LeaderDashboard() {
       if (event.type === 'leaveRequestDeleted') {
         refetchData();
       }
+
+      if (event.type === 'leaveRequestRestored') {
+        refetchData();
+      }
       
       // Handle settingsUpdated
       if (event.type === 'settingsUpdated') {

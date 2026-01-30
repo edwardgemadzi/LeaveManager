@@ -161,8 +161,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Delete the request
-    const deleted = await LeaveRequestModel.delete(id);
+    // Soft delete the request
+    const deleted = await LeaveRequestModel.delete(id, user.id);
     if (!deleted) {
       return NextResponse.json(
         { error: 'Failed to delete request' },

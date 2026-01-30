@@ -11,6 +11,7 @@ import { CheckCircleIcon, ClockIcon, XCircleIcon, ExclamationTriangleIcon } from
 import { useNotification } from '@/hooks/useNotification';
 import { useBrowserNotification } from '@/hooks/useBrowserNotification';
 import { parseDateSafe, formatDateSafe } from '@/lib/dateUtils';
+import { isBypassNoticePeriodActive } from '@/lib/noticePeriod';
 
 const localizer = momentLocalizer(moment);
 
@@ -35,6 +36,7 @@ interface CalendarProps {
   currentUser?: User; // Current logged-in user (for highlighting working days)
   teamSettings?: { 
     minimumNoticePeriod: number;
+    bypassNoticePeriod?: { enabled: boolean; startDate?: Date | string; endDate?: Date | string };
     maternityLeave?: { countingMethod?: 'calendar' | 'working' };
     paternityLeave?: { countingMethod?: 'calendar' | 'working' };
   }; // Optional: team settings (if provided, skip fetching)
@@ -54,7 +56,10 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [showRequestModal, setShowRequestModal] = useState(false);
-  const [teamSettings, setTeamSettings] = useState<{ minimumNoticePeriod: number } | null>(null);
+  const [teamSettings, setTeamSettings] = useState<{
+    minimumNoticePeriod: number;
+    bypassNoticePeriod?: { enabled: boolean; startDate?: Date | string; endDate?: Date | string };
+  } | null>(null);
   
   // Leave request form state
   const [selectedReasonType, setSelectedReasonType] = useState('');
@@ -88,6 +93,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
         if (data.team?.settings) {
           setTeamSettings({
             minimumNoticePeriod: data.team.settings.minimumNoticePeriod || 1,
+            bypassNoticePeriod: data.team.settings.bypassNoticePeriod,
           });
         }
       } catch (error) {
@@ -562,8 +568,10 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
       }
     }
 
+    const bypassActive = teamSettings ? isBypassNoticePeriodActive(teamSettings) : false;
+
     // Check minimum notice period for earliest date
-    if (teamSettings?.minimumNoticePeriod && teamSettings.minimumNoticePeriod > 0) {
+    if (!bypassActive && teamSettings?.minimumNoticePeriod && teamSettings.minimumNoticePeriod > 0) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const earliestDate = sortedDates[0];
@@ -1033,7 +1041,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
                   </div>
                 )}
 
-                {teamSettings?.minimumNoticePeriod && teamSettings.minimumNoticePeriod > 0 && (
+                {teamSettings?.minimumNoticePeriod && teamSettings.minimumNoticePeriod > 0 && !isBypassNoticePeriodActive(teamSettings) && (
                   <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
                     <ExclamationTriangleIcon className="h-4 w-4 text-orange-600 dark:text-orange-400" />
                     Leave requests must be submitted at least {teamSettings.minimumNoticePeriod} day(s) in advance

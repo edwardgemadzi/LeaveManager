@@ -150,7 +150,7 @@ export default function LeaderAnalyticsPage() {
     enabled: !loading && !!team,
     onEvent: (event) => {
       // Refresh analytics when leave requests are updated or settings change
-      if (event.type === 'leaveRequestUpdated' || event.type === 'leaveRequestDeleted' || event.type === 'settingsUpdated') {
+      if (event.type === 'leaveRequestUpdated' || event.type === 'leaveRequestDeleted' || event.type === 'leaveRequestRestored' || event.type === 'settingsUpdated') {
         // Debounce refresh to avoid excessive API calls
         if (refreshTimeoutRef.current) {
           clearTimeout(refreshTimeoutRef.current);

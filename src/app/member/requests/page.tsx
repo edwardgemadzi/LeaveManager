@@ -8,6 +8,7 @@ import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useNotification } from '@/hooks/useNotification';
 import { useBrowserNotification } from '@/hooks/useBrowserNotification';
 import { parseDateSafe } from '@/lib/dateUtils';
+import { isBypassNoticePeriodActive } from '@/lib/noticePeriod';
 
 export default function MemberRequestsPage() {
   const { showSuccess, showError, showInfo } = useNotification();
@@ -21,7 +22,10 @@ export default function MemberRequestsPage() {
     reason: '',
     customReason: '',
   });
-  const [teamSettings, setTeamSettings] = useState({
+  const [teamSettings, setTeamSettings] = useState<{
+    minimumNoticePeriod: number;
+    bypassNoticePeriod?: { enabled: boolean; startDate?: Date | string; endDate?: Date | string };
+  }>({
     minimumNoticePeriod: 1,
   });
   const [selectedReasonType, setSelectedReasonType] = useState('');
@@ -29,6 +33,7 @@ export default function MemberRequestsPage() {
   const leaveReasons = LEAVE_REASONS;
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const bypassActive = isBypassNoticePeriodActive(teamSettings);
 
   const handleReasonChange = (reasonType: string) => {
     setSelectedReasonType(reasonType);
@@ -100,7 +105,7 @@ export default function MemberRequestsPage() {
     }
     
     // Check minimum notice period
-    if (teamSettings.minimumNoticePeriod > 0) {
+    if (!bypassActive && teamSettings.minimumNoticePeriod > 0) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const startDate = new Date(formData.startDate);
@@ -263,7 +268,7 @@ export default function MemberRequestsPage() {
                     />
                     <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                       For single-day leave, use the same date for both start and end
-                      {teamSettings.minimumNoticePeriod > 0 && (
+                      {teamSettings.minimumNoticePeriod > 0 && !bypassActive && (
                         <span className="flex items-center gap-2 mt-2 text-orange-600 dark:text-orange-400 font-medium">
                           <ExclamationTriangleIcon className="h-4 w-4" />
                           Leave requests must be submitted at least {teamSettings.minimumNoticePeriod} day(s) in advance

@@ -130,7 +130,7 @@ export default function LeaderLeaveBalancePage() {
     enabled: !loading && !!team,
     onEvent: (event) => {
       // Refresh data when leave requests are updated or deleted
-      if (event.type === 'leaveRequestUpdated' || event.type === 'leaveRequestDeleted' || event.type === 'settingsUpdated') {
+      if (event.type === 'leaveRequestUpdated' || event.type === 'leaveRequestDeleted' || event.type === 'leaveRequestRestored' || event.type === 'settingsUpdated') {
         // Debounce refresh to avoid excessive API calls
         if (refreshTimeoutRef.current) {
           clearTimeout(refreshTimeoutRef.current);
@@ -153,6 +153,10 @@ export default function LeaderLeaveBalancePage() {
       // Refetch data immediately when a request is deleted
       fetchData();
     };
+
+    const handleRequestRestored = () => {
+      fetchData();
+    };
     
     const handleSettingsUpdated = () => {
       // Refetch data when settings are updated
@@ -164,10 +168,12 @@ export default function LeaderLeaveBalancePage() {
 
     window.addEventListener('focus', handleFocus);
     window.addEventListener('leaveRequestDeleted', handleRequestDeleted);
+    window.addEventListener('leaveRequestRestored', handleRequestRestored);
     window.addEventListener('teamSettingsUpdated', handleSettingsUpdated);
     return () => {
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('leaveRequestDeleted', handleRequestDeleted);
+      window.removeEventListener('leaveRequestRestored', handleRequestRestored);
       window.removeEventListener('teamSettingsUpdated', handleSettingsUpdated);
     };
   }, []);
