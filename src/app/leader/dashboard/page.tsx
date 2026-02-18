@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
@@ -11,6 +11,7 @@ import { GroupedTeamAnalytics } from '@/lib/analyticsCalculations';
 import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
 import { useBrowserNotification } from '@/hooks/useBrowserNotification';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
+import { useDashboardData } from '@/hooks/useDashboardData';
 import { calculateTimeBasedTeamHealthScore } from '@/lib/helpers';
 import { parseDateSafe } from '@/lib/dateUtils';
 import { 
@@ -39,6 +40,11 @@ export default function LeaderDashboard() {
   // Refs to track notification state and prevent duplicates
   const previousPendingRequestsRef = useRef<LeaveRequest[]>([]);
   const membersAtRiskNotifiedRef = useRef(false);
+
+  const { data: dashboardData, mutate: mutateDashboard, isLoading: dashboardLoading } = useDashboardData({
+    include: ['team', 'members', 'requests', 'analytics', 'currentUser'],
+    requestFields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'createdAt', 'requestedBy'],
+  });
 
   const handleApprove = async (requestId: string) => {
     setProcessingRequest(requestId);
@@ -88,69 +94,26 @@ export default function LeaderDashboard() {
     }
   };
 
-  const refetchData = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const refetchData = useCallback(async () => {
+    await mutateDashboard();
+  }, [mutateDashboard]);
 
-      if (!user.teamId) {
-        console.error('No team ID found');
-        return;
-      }
-
-      // Fetch all dashboard data in a single API call
-      const response = await fetch('/api/dashboard', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        // Handle 401 (Unauthorized) - token expired or invalid
-        if (response.status === 401) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          window.location.href = '/login';
-          return;
-        }
-        
-        console.error('Failed to fetch dashboard data:', response.status);
-        return;
-      }
-
-      const data = await response.json();
-      
-      // Set all state from single response
-      setTeam(data.team);
-      setMembers(data.members || []);
-      setAllRequests(data.requests || []);
-      const pending = (data.requests || []).filter((req: LeaveRequest) => req.status === 'pending');
+  useEffect(() => {
+    if (!dashboardLoading && dashboardData) {
+      setTeam(dashboardData.team || null);
+      setMembers(dashboardData.members || []);
+      setAllRequests(dashboardData.requests || []);
+      const pending = (dashboardData.requests || []).filter((req: LeaveRequest) => req.status === 'pending');
       setPendingRequests(pending);
-      // Initialize previous pending requests ref for polling comparison
       if (previousPendingRequestsRef.current.length === 0) {
         previousPendingRequestsRef.current = pending;
       }
-      
-      // Analytics structure for leaders: { analytics: GroupedTeamAnalytics }
-      if (data.analytics) {
-        setAnalytics(data.analytics);
+      if (dashboardData.analytics) {
+        setAnalytics(dashboardData.analytics as GroupedTeamAnalytics);
       }
-    } catch (error) {
-      console.error('Error fetching data:', error);
+      setLoading(false);
     }
-  };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        await refetchData();
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-    
     // Listen for settings updates to refresh analytics
     const handleSettingsUpdated = () => {
       // Add a small delay to ensure database write is fully committed before fetching
@@ -158,12 +121,12 @@ export default function LeaderDashboard() {
         refetchData();
       }, 200);
     };
-    
+
     window.addEventListener('teamSettingsUpdated', handleSettingsUpdated);
     return () => {
       window.removeEventListener('teamSettingsUpdated', handleSettingsUpdated);
     };
-  }, []);
+  }, [dashboardData, dashboardLoading, refetchData]);
 
   // Real-time updates using SSE with fallback to polling
   useTeamEvents(team?._id || null, {
@@ -171,60 +134,39 @@ export default function LeaderDashboard() {
     fallbackToPolling: true,
     pollingCallback: async () => {
       if (!team) return;
-      
       try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('/api/dashboard', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
+        const data = await mutateDashboard();
+        const currentData = data || dashboardData;
+        if (!currentData) return;
 
-        if (response.ok) {
-          const data = await response.json();
-          const currentPending = (data.requests || []).filter((req: LeaveRequest) => req.status === 'pending');
-          
-          // Check for new requests
-          const previousIds = new Set(previousPendingRequestsRef.current.map(r => r._id));
-          const newRequests = currentPending.filter((req: LeaveRequest) => !previousIds.has(req._id));
-          
-          if (newRequests.length > 0) {
-            // Update state with new data
-            setAllRequests(data.requests || []);
-            setPendingRequests(currentPending);
-            setMembers(data.members || []);
-            if (data.analytics) {
-              setAnalytics(data.analytics);
-            }
-            
-            // Find member names for new requests
-            const currentMembers = data.members || members;
-            newRequests.forEach((req: LeaveRequest) => {
-              const member = currentMembers.find((m: User) => m._id === req.userId);
-              const memberName = member?.fullName || member?.username || 'A team member';
-              const startDate = parseDateSafe(req.startDate).toLocaleDateString();
-              const endDate = parseDateSafe(req.endDate).toLocaleDateString();
-              
-              showNotification(
-                'New Leave Request',
-                `${memberName} has submitted a leave request for ${startDate} to ${endDate}`
-              );
-            });
-          }
-          
-          previousPendingRequestsRef.current = currentPending;
+        const currentPending = (currentData.requests || []).filter((req: LeaveRequest) => req.status === 'pending');
+        const previousIds = new Set(previousPendingRequestsRef.current.map(r => r._id));
+        const newRequests = currentPending.filter((req: LeaveRequest) => !previousIds.has(req._id));
+
+        if (newRequests.length > 0) {
+          const currentMembers = currentData.members || members;
+          newRequests.forEach((req: LeaveRequest) => {
+            const member = currentMembers.find((m: User) => m._id === req.userId);
+            const memberName = member?.fullName || member?.username || 'A team member';
+            const startDate = parseDateSafe(req.startDate).toLocaleDateString();
+            const endDate = parseDateSafe(req.endDate).toLocaleDateString();
+
+            showNotification(
+              'New Leave Request',
+              `${memberName} has submitted a leave request for ${startDate} to ${endDate}`
+            );
+          });
         }
+
+        previousPendingRequestsRef.current = currentPending;
       } catch (error) {
         console.error('Error polling for new requests:', error);
       }
     },
     pollingInterval: 30000,
     onEvent: (event) => {
-      console.log('[LeaderDashboard] Received event:', event.type, event.data);
-      // Handle leaveRequestCreated
       if (event.type === 'leaveRequestCreated') {
         const data = event.data as { requestId: string; userId: string; startDate: string; endDate: string; reason: string; status: string };
-        console.log('[LeaderDashboard] leaveRequestCreated event data:', data);
         // Always refresh data when a new request is created, regardless of status
         refetchData();
         
@@ -256,7 +198,7 @@ export default function LeaderDashboard() {
       if (event.type === 'leaveRequestDeleted') {
         refetchData();
       }
-
+      
       if (event.type === 'leaveRequestRestored') {
         refetchData();
       }

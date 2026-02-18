@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { Team, User } from '@/types';
@@ -8,6 +8,7 @@ import { MemberAnalytics, MaternityMemberAnalytics, getMaternityMemberAnalytics,
 import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
 import { parseDateSafe } from '@/lib/dateUtils';
+import { useDashboardData } from '@/hooks/useDashboardData';
 import { 
   ChartBarIcon, 
   CheckCircleIcon, 
@@ -33,97 +34,18 @@ export default function MemberAnalyticsPage() {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const fetchData = async (year?: number) => {
-    const targetYear = year ?? selectedYear;
+  const { data: dashboardData, mutate: mutateDashboard, isLoading: dashboardLoading } = useDashboardData({
+    include: ['team', 'requests', 'analytics', 'currentUser'],
+    requestFields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'createdAt'],
+  });
+
+  const fetchData = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
-      const userData = JSON.parse(localStorage.getItem('user') || '{}');
-      setUser(userData);
-
-      // Fetch dashboard data (which includes requests)
-      // Add cache-busting query parameter to prevent Vercel caching issues
-      const dashboardResponse = await fetch(`/api/dashboard?t=${Date.now()}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        cache: 'no-store',
-      });
-
-      if (!dashboardResponse.ok) {
-        // Handle 401 (Unauthorized) - token expired or invalid
-        if (dashboardResponse.status === 401) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          window.location.href = '/login';
-          return;
-        }
-        
-        console.error('Failed to fetch dashboard data:', dashboardResponse.status, dashboardResponse.statusText);
-        return;
-      }
-
-      const data = await dashboardResponse.json();
-      
-      setTeam(data.team);
-      if (data.currentUser) {
-        setUser(data.currentUser);
-      }
-      
-      // Set analytics (structure for members: { analytics: MemberAnalytics })
-      if (data.analytics && data.analytics.analytics) {
-        setAnalytics(data.analytics.analytics);
-      }
-
-      // Set leave requests (filter to current user's requests from dashboard response)
-      // The dashboard API already returns allRequests, so we filter to current user
-      const currentUserId = data.currentUser?._id || userData.id;
-      const allRequests = data.requests || [];
-      const userRequests = allRequests.filter((req: LeaveRequest) => {
-        const reqUserId = String(req.userId || '').trim();
-        const userId = String(currentUserId || '').trim();
-        return reqUserId === userId;
-      });
-      
-      // Filter leave requests to selected year
-      const yearStart = new Date(targetYear, 0, 1);
-      yearStart.setHours(0, 0, 0, 0);
-      const yearEnd = new Date(targetYear, 11, 31);
-      yearEnd.setHours(23, 59, 59, 999);
-      
-      const yearRequests = userRequests.filter((req: LeaveRequest) => {
-        const reqStart = parseDateSafe(req.startDate);
-        const reqEnd = parseDateSafe(req.endDate);
-        return reqStart <= yearEnd && reqEnd >= yearStart;
-      });
-      setLeaveRequests(yearRequests);
-
-      // Calculate maternity analytics if user has maternity/paternity type assigned and it's enabled
-      if (data.currentUser?.maternityPaternityType && data.team) {
-        const userType = data.currentUser.maternityPaternityType;
-        const isTypeEnabled = userType === 'paternity' 
-          ? data.team.settings.paternityLeave?.enabled 
-          : data.team.settings.maternityLeave?.enabled;
-        
-        if (isTypeEnabled) {
-          const approvedRequests = yearRequests.filter((req: LeaveRequest) => req.status === 'approved');
-          const maternityAnalyticsData = getMaternityMemberAnalytics(
-            data.currentUser,
-            data.team,
-            approvedRequests
-          );
-          setMaternityAnalytics(maternityAnalyticsData);
-        } else {
-          setMaternityAnalytics(null);
-        }
-      } else {
-        setMaternityAnalytics(null);
-      }
+      await mutateDashboard();
     } catch (error) {
       console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [mutateDashboard]);
 
   const toggleSection = (section: string) => {
     const newExpanded = new Set(expandedSections);
@@ -136,21 +58,83 @@ export default function MemberAnalyticsPage() {
   };
 
   useEffect(() => {
-    fetchData(selectedYear);
-    
-    // Listen for settings updates to refresh analytics
+    const userData = JSON.parse(localStorage.getItem('user') || '{}');
+    setUser(userData);
+  }, []);
+
+  useEffect(() => {
+    if (!dashboardData) return;
+
+    if (dashboardData.team) {
+      setTeam(dashboardData.team);
+    }
+    if (dashboardData.currentUser) {
+      setUser(dashboardData.currentUser);
+    }
+
+    const analyticsPayload = dashboardData.analytics as { analytics?: MemberAnalytics } | undefined;
+    if (analyticsPayload?.analytics) {
+      setAnalytics(analyticsPayload.analytics);
+    }
+
+    const currentUserId = dashboardData.currentUser?._id || user?._id;
+    const allRequests = dashboardData.requests || [];
+    const userRequests = allRequests.filter((req: LeaveRequest) => {
+      const reqUserId = String(req.userId || '').trim();
+      const userId = String(currentUserId || '').trim();
+      return reqUserId === userId;
+    });
+
+    const yearStart = new Date(selectedYear, 0, 1);
+    yearStart.setHours(0, 0, 0, 0);
+    const yearEnd = new Date(selectedYear, 11, 31);
+    yearEnd.setHours(23, 59, 59, 999);
+
+    const yearRequests = userRequests.filter((req: LeaveRequest) => {
+      const reqStart = parseDateSafe(req.startDate);
+      const reqEnd = parseDateSafe(req.endDate);
+      return reqStart <= yearEnd && reqEnd >= yearStart;
+    });
+    setLeaveRequests(yearRequests);
+
+    if (dashboardData.currentUser?.maternityPaternityType && dashboardData.team) {
+      const userType = dashboardData.currentUser.maternityPaternityType;
+      const isTypeEnabled = userType === 'paternity'
+        ? dashboardData.team.settings.paternityLeave?.enabled
+        : dashboardData.team.settings.maternityLeave?.enabled;
+
+      if (isTypeEnabled) {
+        const approvedRequests = yearRequests.filter((req: LeaveRequest) => req.status === 'approved');
+        const maternityAnalyticsData = getMaternityMemberAnalytics(
+          dashboardData.currentUser,
+          dashboardData.team,
+          approvedRequests
+        );
+        setMaternityAnalytics(maternityAnalyticsData);
+      } else {
+        setMaternityAnalytics(null);
+      }
+    } else {
+      setMaternityAnalytics(null);
+    }
+  }, [dashboardData, selectedYear, user]);
+
+  useEffect(() => {
+    setLoading(dashboardLoading);
+  }, [dashboardLoading]);
+
+  useEffect(() => {
     const handleSettingsUpdated = () => {
       setTimeout(() => {
-        fetchData(selectedYear);
+        fetchData();
       }, 200);
     };
-    
+
     window.addEventListener('teamSettingsUpdated', handleSettingsUpdated);
     return () => {
       window.removeEventListener('teamSettingsUpdated', handleSettingsUpdated);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedYear]);
+  }, [fetchData]);
 
   // Real-time updates using SSE
   useTeamEvents(team?._id || null, {
@@ -163,7 +147,7 @@ export default function MemberAnalyticsPage() {
           clearTimeout(refreshTimeoutRef.current);
         }
         refreshTimeoutRef.current = setTimeout(() => {
-          fetchData(selectedYear);
+          fetchData();
         }, 300);
       }
     },
@@ -559,7 +543,6 @@ export default function MemberAnalyticsPage() {
                   onChange={(e) => {
                     const year = parseInt(e.target.value);
                     setSelectedYear(year);
-                    fetchData(year);
                   }}
                   className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 >
@@ -837,16 +820,37 @@ export default function MemberAnalyticsPage() {
               
               {analytics.allowCarryover ? (
                 <div>
+                  {/* No carryover on file hint when team allows carryover but user has none */}
+                  {!(analytics.carryoverBalance > 0) && (user?.carryoverFromPreviousYear ?? 0) <= 0 && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                      No carryover on file. If you had days from last year, your leader can set them in Leave balance.
+                    </p>
+                  )}
+                  {/* Carryover history: carried over / used / remaining */}
+                  {(user?.carryoverFromPreviousYear ?? 0) > 0 && (
+                    <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Carryover history (this year)</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        Carried over: <strong>{Math.round(user?.carryoverFromPreviousYear ?? 0)}</strong> days · Used: <strong>{Math.round(analytics.carryoverDaysUsed ?? 0)}</strong> · Remaining: <strong>{Math.round(analytics.carryoverExpired ? (analytics.carryoverRemainingDisplay ?? 0) : (analytics.carryoverBalance ?? 0))}</strong>
+                        {(analytics.carryoverExpired ?? false) && <span className="ml-1 text-red-600 dark:text-red-400 font-medium">Expired</span>}
+                      </p>
+                    </div>
+                  )}
                   {/* Current Carryover from Last Year */}
-                  {analytics.carryoverBalance > 0 && (
+                  {((user?.carryoverFromPreviousYear ?? 0) > 0 && (analytics.carryoverBalance > 0 || (analytics.carryoverExpired && (analytics.carryoverRemainingDisplay ?? 0) > 0))) && (
                     <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
                       <div className="flex items-center space-x-3 mb-2">
-                        <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
-                          <CalendarIcon className="h-6 w-6 text-blue-700 dark:text-blue-400" />
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${analytics.carryoverExpired ? 'bg-red-100 dark:bg-red-900/30' : 'bg-blue-100 dark:bg-blue-900/30'}`}>
+                          <CalendarIcon className={`h-6 w-6 ${analytics.carryoverExpired ? 'text-red-700 dark:text-red-400' : 'text-blue-700 dark:text-blue-400'}`} />
                         </div>
                         <div>
-                          <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">{Math.round(analytics.carryoverBalance)} days</p>
-                          <p className="text-sm text-blue-600 dark:text-blue-400">available from last year</p>
+                          <p className={`text-2xl font-bold ${analytics.carryoverExpired ? 'text-red-700 dark:text-red-400' : 'text-blue-700 dark:text-blue-400'}`}>
+                            {Math.round(analytics.carryoverExpired ? (analytics.carryoverRemainingDisplay ?? 0) : analytics.carryoverBalance)} days
+                            {(analytics.carryoverExpired ?? false) && <span className="ml-2 text-sm font-semibold uppercase">Expired</span>}
+                          </p>
+                          <p className={`text-sm ${analytics.carryoverExpired ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}>
+                            {analytics.carryoverExpired ? 'expired (no longer usable)' : 'available from last year'}
+                          </p>
                         </div>
                       </div>
                       {analytics.carryoverExpiryDate && (
@@ -1073,15 +1077,19 @@ export default function MemberAnalyticsPage() {
                   <p className="text-3xl font-bold text-gray-900 dark:text-white">
                     {Math.round(analytics.remainingLeaveBalance ?? 0)}
                   </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">out of {team?.settings.maxLeavePerYear || 20} days</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">total (carryover used first)</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    {Math.round((analytics.remainingLeaveBalance ?? 0) - (analytics.carryoverBalance ?? 0))} of {team?.settings.maxLeavePerYear || 20} days annual allocation remaining
+                  </p>
                 </div>
-                {analytics.carryoverBalance > 0 && (
-                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                {((user?.carryoverFromPreviousYear ?? 0) > 0 && ((analytics.carryoverBalance ?? 0) > 0 || (analytics.carryoverExpired && (analytics.carryoverRemainingDisplay ?? 0) > 0))) && (
+                  <div className={`p-4 rounded-lg ${analytics.carryoverExpired ? 'bg-red-50 dark:bg-red-900/20' : 'bg-blue-50 dark:bg-blue-900/20'}`}>
                     <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Carryover Balance</p>
-                    <p className="text-3xl font-bold text-blue-900 dark:text-blue-300">
-                      {Math.round(analytics.carryoverBalance)}
+                    <p className={`text-3xl font-bold ${analytics.carryoverExpired ? 'text-red-900 dark:text-red-300' : 'text-blue-900 dark:text-blue-300'}`}>
+                      {Math.round(analytics.carryoverExpired ? (analytics.carryoverRemainingDisplay ?? 0) : (analytics.carryoverBalance ?? 0))}
+                      {(analytics.carryoverExpired ?? false) && <span className="ml-2 text-sm font-semibold uppercase">Expired</span>}
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">from previous year</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{analytics.carryoverExpired ? 'expired (no longer usable)' : 'from previous year'}</p>
                   </div>
                 )}
                 <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">

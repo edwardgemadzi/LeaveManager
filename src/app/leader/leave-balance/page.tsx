@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { Team, User, LeaveRequest } from '@/types';
@@ -9,6 +9,9 @@ import { calculateUsableDays, calculateMembersSharingSameShift, GroupedTeamAnaly
 import { UsersIcon, CalendarIcon, ChartBarIcon, ArrowTrendingUpIcon } from '@heroicons/react/24/outline';
 import { useNotification } from '@/hooks/useNotification';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
+import { useTeamData } from '@/hooks/useTeamData';
+import { useRequests } from '@/hooks/useRequests';
+import { useAnalytics } from '@/hooks/useAnalytics';
 import { parseDateSafe } from '@/lib/dateUtils';
 import { getEffectiveManualYearToDateUsed } from '@/lib/yearOverrides';
 
@@ -32,98 +35,54 @@ export default function LeaderLeaveBalancePage() {
   const [editingCarryover, setEditingCarryover] = useState<string | null>(null);
   const [tempCarryover, setTempCarryover] = useState<string>('');
   const [updating, setUpdating] = useState<string | null>(null);
+  const [carryoverReportOpen, setCarryoverReportOpen] = useState(false);
+  const [carryoverReportData, setCarryoverReportData] = useState<{
+    members: Array<{
+      userId: string;
+      fullName?: string;
+      username: string;
+      carryoverFromPreviousYear: number;
+      carryoverExpiryDate: string | null;
+      carryoverBalance: number;
+      usedFromCarryover: number;
+    }>;
+  } | null>(null);
+  const [carryoverReportLoading, setCarryoverReportLoading] = useState(false);
+
+  const { data: teamData, mutate: mutateTeam, isLoading: teamLoading } = useTeamData({ members: 'full' });
+  const { data: requestsData, mutate: mutateRequests, isLoading: requestsLoading } = useRequests();
+  const { data: analyticsData, mutate: mutateAnalytics, isLoading: analyticsLoading } = useAnalytics();
 
   // Extract fetchData function to be reusable
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-
-      if (!user.teamId) {
-        console.error('No team ID found');
-        return;
-      }
-
-      // Fetch all data in parallel
-      const [teamResponse, requestsResponse, analyticsResponse] = await Promise.all([
-        fetch('/api/team', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        }),
-        fetch('/api/leave-requests', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        }),
-        fetch(`/api/analytics?t=${Date.now()}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          cache: 'no-store',
-        }),
-      ]);
-      
-      // Process team response
-      if (!teamResponse.ok) {
-        // Handle 401 (Unauthorized) - token expired or invalid
-        if (teamResponse.status === 401) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          window.location.href = '/login';
-          return;
-        }
-        console.error('Failed to fetch team data:', teamResponse.status);
-      } else {
-        const teamData = await teamResponse.json();
-        setTeam(teamData.team);
-        setMembers(teamData.members || []);
-      }
-
-      // Process requests response
-      if (!requestsResponse.ok) {
-        // Handle 401 (Unauthorized) - token expired or invalid
-        if (requestsResponse.status === 401) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          window.location.href = '/login';
-          return;
-        }
-      } else {
-        const requests = await requestsResponse.json();
-        setAllRequests(requests || []);
-      }
-
-      // Process analytics response
-      if (!analyticsResponse.ok) {
-        // Handle 401 (Unauthorized) - token expired or invalid
-        if (analyticsResponse.status === 401) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          window.location.href = '/login';
-          return;
-        }
-        const errorText = await analyticsResponse.text();
-        console.error('[Leave Balance] Analytics API error:', analyticsResponse.status, errorText);
-      } else {
-        const analyticsData = await analyticsResponse.json();
-        const groupedData = analyticsData.analytics || analyticsData.grouped || null;
-        if (groupedData) {
-          setAnalytics(groupedData);
-        }
-      }
+      await Promise.all([mutateTeam(), mutateRequests(), mutateAnalytics()]);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [mutateTeam, mutateRequests, mutateAnalytics]);
 
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (teamData?.team) setTeam(teamData.team);
+    if (teamData?.members) setMembers(teamData.members);
+  }, [teamData]);
+
+  useEffect(() => {
+    if (requestsData) setAllRequests(requestsData);
+  }, [requestsData]);
+
+  useEffect(() => {
+    const groupedData = (analyticsData?.analytics || analyticsData?.grouped || null) as GroupedTeamAnalytics | null;
+    if (groupedData) setAnalytics(groupedData);
+  }, [analyticsData]);
+
+  useEffect(() => {
+    setLoading(teamLoading || requestsLoading || analyticsLoading);
+  }, [teamLoading, requestsLoading, analyticsLoading]);
 
   // Real-time updates using SSE
   useTeamEvents(team?._id || null, {
@@ -176,7 +135,7 @@ export default function LeaderLeaveBalancePage() {
       window.removeEventListener('leaveRequestRestored', handleRequestRestored);
       window.removeEventListener('teamSettingsUpdated', handleSettingsUpdated);
     };
-  }, []);
+  }, [fetchData]);
 
   // Helper function to find member analytics data from grouped analytics
   const getMemberAnalyticsData = (member: User): MemberAnalytics | null => {
@@ -983,6 +942,24 @@ export default function LeaderLeaveBalancePage() {
     setTempCarryover('');
   };
 
+  const fetchCarryoverReport = async () => {
+    setCarryoverReportLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/team/carryover-report', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error(res.status === 403 ? 'Leaders only' : 'Failed to load report');
+      const data = await res.json();
+      setCarryoverReportData(data);
+      setCarryoverReportOpen(true);
+    } catch (e) {
+      showError(e instanceof Error ? e.message : 'Failed to load carryover report');
+    } finally {
+      setCarryoverReportLoading(false);
+    }
+  };
+
   const handleResetDaysTaken = async (memberId: string) => {
     if (!confirm('Reset days taken to auto-calculated? This will remove the manual override.')) {
       return;
@@ -1213,9 +1190,72 @@ export default function LeaderLeaveBalancePage() {
                     <option value="used">Days Used</option>
                   </select>
                 </div>
+
+                {team?.settings.allowCarryover && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={fetchCarryoverReport}
+                      disabled={carryoverReportLoading}
+                      className="px-3 py-2 text-sm font-medium rounded-md bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-800/50 disabled:opacity-50"
+                    >
+                      {carryoverReportLoading ? 'Loading…' : 'Carryover report'}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
+
+          {/* Carryover report modal */}
+          {carryoverReportOpen && carryoverReportData && (
+            <div className="fixed inset-0 z-50 overflow-y-auto" aria-modal="true">
+              <div className="flex min-h-full items-center justify-center p-4">
+                <div className="fixed inset-0 bg-black/50" onClick={() => setCarryoverReportOpen(false)} />
+                <div className="relative bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+                  <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Carryover report (database + calculated)</h3>
+                    <button
+                      type="button"
+                      onClick={() => setCarryoverReportOpen(false)}
+                      className="p-1 rounded text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className="p-4 overflow-auto max-h-[calc(90vh-8rem)]">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                      Carried over = value in database. Used = carried − remaining. Use this to verify figures (e.g. Edward: 5 carried, 4 used, 1 remaining).
+                    </p>
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200 dark:border-gray-700">
+                          <th className="text-left py-2 pr-4 font-semibold text-gray-700 dark:text-gray-300">Member</th>
+                          <th className="text-right py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">Carried</th>
+                          <th className="text-right py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">Used</th>
+                          <th className="text-right py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">Remaining</th>
+                          <th className="text-left py-2 pl-2 font-semibold text-gray-700 dark:text-gray-300">Expiry</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {carryoverReportData.members.map((m) => (
+                          <tr key={m.userId} className="border-b border-gray-100 dark:border-gray-800">
+                            <td className="py-2 pr-4 text-gray-900 dark:text-white">{m.fullName || m.username}</td>
+                            <td className="text-right py-2 px-2">{m.carryoverFromPreviousYear}</td>
+                            <td className="text-right py-2 px-2">{m.usedFromCarryover}</td>
+                            <td className="text-right py-2 px-2">{m.carryoverBalance}</td>
+                            <td className="py-2 pl-2 text-gray-500 dark:text-gray-400 text-xs">
+                              {m.carryoverExpiryDate ? new Date(m.carryoverExpiryDate).toLocaleDateString() : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Remainder Days Notice - Enhanced */}
           {(() => {

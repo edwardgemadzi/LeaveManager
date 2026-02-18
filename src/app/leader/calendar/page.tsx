@@ -7,6 +7,8 @@ import { Team, User, LeaveRequest } from '@/types';
 import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
 import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
+import { useTeamData } from '@/hooks/useTeamData';
+import { useRequests } from '@/hooks/useRequests';
 
 export default function LeaderCalendarPage() {
   const [team, setTeam] = useState<Team | null>(null);
@@ -21,43 +23,23 @@ export default function LeaderCalendarPage() {
   const [selectedSubgroups, setSelectedSubgroups] = useState<string[]>([]);
   const [selectedWorkingDaysTags, setSelectedWorkingDaysTags] = useState<string[]>([]);
 
-  const fetchData = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-        
-        // Fetch team and requests in parallel
-        const [teamResponse, requestsResponse] = await Promise.all([
-          fetch('/api/team', {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          }),
-          fetch(`/api/leave-requests?teamId=${user.teamId}`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          }),
-        ]);
-
-        // Process team response
-        const teamData = await teamResponse.json();
-        setTeam(teamData.team);
-        setMembers(teamData.members);
-
-        // Process requests response
-        const requestsData = await requestsResponse.json();
-        setAllRequests(requestsData);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const { data: teamData, mutate: mutateTeam, isLoading: teamLoading } = useTeamData({ members: 'full' });
+  const { data: requestsData, mutate: mutateRequests, isLoading: requestsLoading } = useRequests({
+    fields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'createdAt'],
+  });
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (teamData?.team) setTeam(teamData.team);
+    if (teamData?.members) setMembers(teamData.members);
+  }, [teamData]);
+
+  useEffect(() => {
+    if (requestsData) setAllRequests(requestsData);
+  }, [requestsData]);
+
+  useEffect(() => {
+    setLoading(teamLoading || requestsLoading);
+  }, [teamLoading, requestsLoading]);
 
   // Real-time updates using SSE
   useTeamEvents(team?._id || null, {
@@ -70,7 +52,8 @@ export default function LeaderCalendarPage() {
           clearTimeout(refreshTimeoutRef.current);
         }
         refreshTimeoutRef.current = setTimeout(() => {
-          fetchData();
+          mutateRequests();
+          mutateTeam();
         }, 300);
       }
     },

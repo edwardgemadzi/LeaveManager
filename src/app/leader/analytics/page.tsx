@@ -8,6 +8,9 @@ import { GroupedTeamAnalytics, calculateLeaveFrequencyByPeriod, generateWorkingD
 import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
 import { isMaternityLeave } from '@/lib/leaveCalculations';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
+import { useTeamData } from '@/hooks/useTeamData';
+import { useRequests } from '@/hooks/useRequests';
+import { useAnalytics } from '@/hooks/useAnalytics';
 import { UsersIcon, CalendarIcon, ChartBarIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { parseDateSafe } from '@/lib/dateUtils';
 
@@ -26,116 +29,52 @@ export default function LeaderAnalyticsPage() {
   const [selectedSubgroup, setSelectedSubgroup] = useState<string>('all');
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const fetchData = useCallback(async (year?: number) => {
-    const targetYear = year ?? selectedYear;
-      try {
-        const token = localStorage.getItem('token');
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const { data: teamData, mutate: mutateTeam, isLoading: teamLoading } = useTeamData({ members: 'full' });
+  const { data: requestsData, mutate: mutateRequests, isLoading: requestsLoading } = useRequests();
+  const { data: analyticsData, mutate: mutateAnalytics, isLoading: analyticsLoading } = useAnalytics({ year: selectedYear });
 
-        if (!user.teamId) {
-          console.error('No team ID found');
-          return;
-        }
-
-        // Fetch all data in parallel
-        const [teamResponse, requestsResponse, analyticsResponse] = await Promise.all([
-          fetch('/api/team', {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          }),
-          fetch('/api/leave-requests', {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          }),
-          fetch(`/api/analytics?year=${targetYear}&t=${Date.now()}`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-            cache: 'no-store',
-          }),
-        ]);
-
-        // Process team response
-        if (!teamResponse.ok) {
-          // Handle 401 (Unauthorized) - token expired or invalid
-          if (teamResponse.status === 401) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = '/login';
-            return;
-          }
-          console.error('Failed to fetch team data:', teamResponse.status);
-        } else {
-          const teamData = await teamResponse.json();
-          setTeam(teamData.team);
-          setMembers(teamData.members || []);
-        }
-
-        // Process requests response
-        if (!requestsResponse.ok) {
-          // Handle 401 (Unauthorized) - token expired or invalid
-          if (requestsResponse.status === 401) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = '/login';
-            return;
-          }
-        } else {
-          const requestsData = await requestsResponse.json();
-          // API returns array directly, not wrapped in { requests: [...] }
-          const requests = Array.isArray(requestsData) ? requestsData : (requestsData.requests || []);
-          setAllRequests(requests);
-        }
-
-        // Process analytics response
-        if (!analyticsResponse.ok) {
-          // Handle 401 (Unauthorized) - token expired or invalid
-          if (analyticsResponse.status === 401) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = '/login';
-            return;
-          }
-          const errorText = await analyticsResponse.text();
-          console.error('Analytics API error:', analyticsResponse.status, errorText);
-          setAnalytics(null);
-        } else {
-          const analyticsData = await analyticsResponse.json();
-          
-          // The API returns { analytics: groupedAnalytics }
-          const groupedData = analyticsData.analytics || analyticsData.grouped || null;
-          
-          if (groupedData) {
-            setAnalytics(groupedData);
-          } else {
-            console.error('Analytics page - No analytics data found in response');
-            setAnalytics(null);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      } finally {
-        setLoading(false);
-      }
-  }, [selectedYear]);
+  const fetchData = useCallback(async () => {
+    try {
+      await Promise.all([mutateTeam(), mutateRequests(), mutateAnalytics()]);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    }
+  }, [mutateTeam, mutateRequests, mutateAnalytics]);
 
   useEffect(() => {
-    fetchData(selectedYear);
-    
+    if (teamData?.team) setTeam(teamData.team);
+    if (teamData?.members) setMembers(teamData.members);
+  }, [teamData]);
+
+  useEffect(() => {
+    if (requestsData) setAllRequests(requestsData);
+  }, [requestsData]);
+
+  useEffect(() => {
+    const groupedData = (analyticsData?.analytics || analyticsData?.grouped || null) as GroupedTeamAnalytics | null;
+    if (groupedData) {
+      setAnalytics(groupedData);
+    } else if (analyticsData) {
+      setAnalytics(null);
+    }
+  }, [analyticsData]);
+
+  useEffect(() => {
+    setLoading(teamLoading || requestsLoading || analyticsLoading);
+  }, [teamLoading, requestsLoading, analyticsLoading]);
+
+  useEffect(() => {
     // Listen for settings updates to refresh analytics
     let settingsTimeout: NodeJS.Timeout | null = null;
     const handleSettingsUpdated = () => {
-      // Add a small delay to ensure database write is fully committed before fetching
       if (settingsTimeout) {
         clearTimeout(settingsTimeout);
       }
       settingsTimeout = setTimeout(() => {
-        fetchData(selectedYear);
+        fetchData();
       }, 200);
     };
-    
+
     window.addEventListener('teamSettingsUpdated', handleSettingsUpdated);
     return () => {
       window.removeEventListener('teamSettingsUpdated', handleSettingsUpdated);
@@ -143,7 +82,7 @@ export default function LeaderAnalyticsPage() {
         clearTimeout(settingsTimeout);
       }
     };
-  }, [fetchData, selectedYear]);
+  }, [fetchData]);
 
   // Real-time updates using SSE
   useTeamEvents(team?._id || null, {
@@ -156,7 +95,7 @@ export default function LeaderAnalyticsPage() {
           clearTimeout(refreshTimeoutRef.current);
         }
         refreshTimeoutRef.current = setTimeout(() => {
-          fetchData(selectedYear);
+        fetchData();
         }, 500);
       }
     },
@@ -401,7 +340,6 @@ export default function LeaderAnalyticsPage() {
                   onChange={(e) => {
                     const year = parseInt(e.target.value);
                     setSelectedYear(year);
-                    fetchData(year);
                   }}
                   className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 >
@@ -723,17 +661,6 @@ export default function LeaderAnalyticsPage() {
                   );
                 }
 
-                // Only log in development to prevent data leakage in production
-                if (process.env.NODE_ENV === 'development') {
-                  console.log('[Leave Frequency] Members:', filteredMembersForFrequency.length);
-                  console.log('[Leave Frequency] Approved requests:', approvedRequestsForFrequency.length);
-                  console.log('[Leave Frequency] Period type:', periodType);
-                  console.log('[Leave Frequency] Subgroup filter:', frequencySubgroup);
-                  console.log('[Leave Frequency] Working days filter:', frequencyWorkingDays);
-                  console.log('[Leave Frequency] Year filter:', frequencyYear);
-                  console.log('[Leave Frequency] Calculated data:', leaveFrequencyData);
-                }
-                
                 if (leaveFrequencyData.length === 0) {
                   return (
                     <div className="text-center py-12">

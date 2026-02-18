@@ -5,6 +5,7 @@ import { AuditLogModel } from '@/models/AuditLog';
 import { emailService } from '@/lib/email';
 import { UserModel } from '@/models/User';
 import { teamIdsMatch } from '@/lib/helpers';
+import { invalidateAnalyticsCache } from '@/lib/analyticsCache';
 import { error as logError } from '@/lib/logger';
 import { internalServerError, unauthorizedError, forbiddenError, badRequestError } from '@/lib/errors';
 
@@ -118,6 +119,10 @@ export async function PATCH(request: NextRequest) {
           error: error instanceof Error ? error.message : 'Unknown error' 
         });
       }
+    }
+
+    if (results.successful.length > 0) {
+      invalidateAnalyticsCache(user.teamId!);
     }
 
     return NextResponse.json({

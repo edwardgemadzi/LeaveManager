@@ -3,6 +3,7 @@ import { getTokenFromRequest, verifyToken } from '@/lib/auth';
 import { TeamModel } from '@/models/Team';
 import { UserModel } from '@/models/User';
 import { LeaveRequestModel } from '@/models/LeaveRequest';
+import { LeaveRequest } from '@/types';
 import { getMemberAnalytics, getGroupedTeamAnalytics } from '@/lib/analyticsCalculations';
 import { error as logError } from '@/lib/logger';
 import { internalServerError } from '@/lib/errors';
@@ -13,6 +14,7 @@ export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = request.nextUrl;
     const token = getTokenFromRequest(request);
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -27,11 +29,53 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No team assigned' }, { status: 400 });
     }
 
+    const include = new Set(
+      (searchParams.get('include') || 'team,currentUser,members,requests,analytics')
+        .split(',')
+        .map(item => item.trim())
+        .filter(Boolean)
+    );
+    const membersMode = searchParams.get('members') || 'full';
+    const requestFieldsParam = searchParams.get('requestFields');
+    const allowedRequestFields = new Set([
+      '_id',
+      'userId',
+      'teamId',
+      'startDate',
+      'endDate',
+      'reason',
+      'status',
+      'requestedBy',
+      'createdAt',
+      'updatedAt',
+      'deletedAt',
+      'deletedBy',
+    ]);
+    const requestFields = requestFieldsParam
+      ? requestFieldsParam.split(',').map(field => field.trim()).filter(field => allowedRequestFields.has(field))
+      : null;
+    const pickRequestFields = (req: LeaveRequest) => {
+      if (!requestFields || requestFields.length === 0) return req;
+      const picked: Partial<LeaveRequest> = {};
+      requestFields.forEach(field => {
+        if (field in req) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (picked as any)[field] = (req as any)[field];
+        }
+      });
+      return picked;
+    };
+
+    const includeAnalytics = include.has('analytics');
+    const includeMembers = include.has('members') || includeAnalytics;
+    const includeRequests = include.has('requests') || includeAnalytics;
+    const includeCurrentUser = include.has('currentUser') || includeAnalytics;
+
     // Fetch all data in parallel (single database round trip)
     const [team, members, allRequests] = await Promise.all([
       TeamModel.findById(user.teamId),
-      UserModel.findByTeamId(user.teamId),
-      LeaveRequestModel.findByTeamId(user.teamId),
+      includeMembers ? UserModel.findByTeamId(user.teamId) : Promise.resolve([]),
+      includeRequests ? LeaveRequestModel.findByTeamId(user.teamId) : Promise.resolve([]),
     ]);
 
     if (!team) {
@@ -39,14 +83,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Get current user data
-    const currentUser = await UserModel.findById(user.id);
-    if (!currentUser) {
+    const currentUser = includeCurrentUser ? await UserModel.findById(user.id) : null;
+    if (includeCurrentUser && !currentUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     // Calculate analytics based on role
     let analytics;
-    if (user.role === 'member') {
+    if (includeAnalytics && user.role === 'member' && currentUser) {
       // IMPORTANT: Use grouped analytics to ensure members see the same normalized values as leaders
       // This ensures consistency between member and leader views
       const memberList = members.filter(m => m.role === 'member');
@@ -81,10 +125,10 @@ export async function GET(request: NextRequest) {
       }
       
       analytics = memberAnalytics;
-    } else if (user.role === 'leader') {
+    } else if (includeAnalytics && user.role === 'leader') {
       // Return grouped team analytics for leaders
       analytics = getGroupedTeamAnalytics(members, team, allRequests);
-    } else {
+    } else if (includeAnalytics) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
     }
 
@@ -92,8 +136,9 @@ export async function GET(request: NextRequest) {
     const isLeader = user.role === 'leader';
     
     const response = {
-      team,
-      currentUser: currentUser ? {
+      ...(include.has('team') ? { team } : {}),
+      ...(includeCurrentUser ? {
+        currentUser: currentUser ? {
         _id: currentUser._id,
         username: currentUser.username,
         fullName: currentUser.fullName,
@@ -112,14 +157,16 @@ export async function GET(request: NextRequest) {
         carryoverFromPreviousYear: currentUser.carryoverFromPreviousYear,
         carryoverExpiryDate: currentUser.carryoverExpiryDate,
       } : null,
-      members: members.map(member => {
+      } : {}),
+      ...(includeMembers ? {
+        members: members.map(member => {
         const baseMember = {
           _id: member._id,
           username: member.username,
           fullName: member.fullName,
           role: member.role,
           shiftSchedule: member.shiftSchedule,
-          shiftHistory: member.shiftHistory, // Include shift history for historical schedule support
+          shiftHistory: membersMode === 'full' ? member.shiftHistory : undefined,
           shiftTag: member.shiftTag,
           workingDaysTag: member.workingDaysTag,
           subgroupTag: member.subgroupTag,
@@ -127,7 +174,7 @@ export async function GET(request: NextRequest) {
         };
         
         // Include manualLeaveBalance and manualYearToDateUsed for leaders (to edit balances) or if it's the current user's own data
-        if (isLeader || member._id === user.id) {
+        if (membersMode === 'full' && (isLeader || member._id === user.id)) {
           return {
             ...baseMember,
             manualLeaveBalance: member.manualLeaveBalance,
@@ -141,8 +188,9 @@ export async function GET(request: NextRequest) {
         
         return baseMember;
       }),
-      requests: allRequests,
-      analytics: user.role === 'leader' ? analytics : { analytics },
+      } : {}),
+      ...(includeRequests ? { requests: requestFields ? allRequests.map(req => pickRequestFields(req)) : allRequests } : {}),
+      ...(includeAnalytics ? { analytics: user.role === 'leader' ? analytics : { analytics } } : {}),
     };
     
     return NextResponse.json(response, {

@@ -7,6 +7,7 @@ import { UserModel } from '@/models/User';
 import { teamIdsMatch } from '@/lib/helpers';
 import { ObjectId } from 'mongodb';
 import { broadcastTeamUpdate } from '@/lib/teamEvents';
+import { invalidateAnalyticsCache } from '@/lib/analyticsCache';
 import { error as logError } from '@/lib/logger';
 import { internalServerError } from '@/lib/errors';
 
@@ -88,6 +89,7 @@ export async function PATCH(
     }
 
     // Broadcast event after status change
+    invalidateAnalyticsCache(user.teamId!);
     broadcastTeamUpdate(user.teamId!, 'leaveRequestUpdated', {
       requestId: id,
       userId: leaveRequest.userId,
@@ -195,6 +197,7 @@ export async function DELETE(
     }
 
     // Broadcast event after deletion
+    invalidateAnalyticsCache(user.teamId!);
     broadcastTeamUpdate(user.teamId!, 'leaveRequestDeleted', {
       requestId: id,
       userId: leaveRequest.userId,

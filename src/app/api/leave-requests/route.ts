@@ -8,6 +8,7 @@ import { isBypassNoticePeriodActive } from '@/lib/noticePeriod';
 import { validateRequest, schemas } from '@/lib/validation';
 import { getClient } from '@/lib/mongodb';
 import { broadcastTeamUpdate } from '@/lib/teamEvents';
+import { invalidateAnalyticsCache } from '@/lib/analyticsCache';
 import { error as logError, info } from '@/lib/logger';
 import { internalServerError } from '@/lib/errors';
 import { parseDateSafe } from '@/lib/dateUtils';
@@ -36,9 +37,47 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Team not found' }, { status: 404 });
     }
 
+    const { searchParams } = request.nextUrl;
+    const statusParam = searchParams.get('status');
+    const userIdParam = searchParams.get('userId');
+    const fieldsParam = searchParams.get('fields');
+    const allowedFields = new Set([
+      '_id',
+      'userId',
+      'teamId',
+      'startDate',
+      'endDate',
+      'reason',
+      'status',
+      'requestedBy',
+      'createdAt',
+      'updatedAt',
+      'deletedAt',
+      'deletedBy',
+    ]);
+    const fields = fieldsParam
+      ? fieldsParam.split(',').map(field => field.trim()).filter(field => allowedFields.has(field))
+      : null;
+
+    const pickFields = (req: LeaveRequest) => {
+      if (!fields || fields.length === 0) return req;
+      const picked: Partial<LeaveRequest> = {};
+      fields.forEach(field => {
+        if (field in req) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (picked as any)[field] = (req as any)[field];
+        }
+      });
+      return picked;
+    };
+
+    const statusFilter = statusParam
+      ? new Set(statusParam.split(',').map(s => s.trim()).filter(Boolean))
+      : null;
+
     // Fetch all leave requests for the team
     const includeDeleted =
-      request.nextUrl.searchParams.get('includeDeleted') === 'true' && user.role === 'leader';
+      searchParams.get('includeDeleted') === 'true' && user.role === 'leader';
     let requests = await LeaveRequestModel.findByTeamId(user.teamId, includeDeleted);
 
     // If user is a member and subgrouping is enabled, filter by subgroup
@@ -69,8 +108,18 @@ export async function GET(request: NextRequest) {
       requests = filteredRequests;
     }
     // Leaders see all requests (no filtering needed)
+    if (statusFilter) {
+      requests = requests.filter(req => statusFilter.has(req.status));
+    }
 
-    return NextResponse.json(requests);
+    if (userIdParam) {
+      const normalizedUserId = userIdParam.trim();
+      requests = requests.filter(req => String(req.userId).trim() === normalizedUserId);
+    }
+
+    const response = fields ? requests.map(req => pickFields(req)) : requests;
+
+    return NextResponse.json(response);
   } catch (error) {
     logError('Get leave requests error:', error);
     return internalServerError();
@@ -298,7 +347,7 @@ export async function POST(request: NextRequest) {
               if (team.settings.enableSubgrouping) {
                 const requestingSubgroup = requestingUserSubgroupTag || 'Ungrouped';
                 const reqUserSubgroup = userSubgroupMap.get(reqUserId) || 'Ungrouped';
-                if (requestingSubgroup !== reqUserSubgroup) continue;
+              if (requestingSubgroup !== reqUserSubgroup) continue;
               }
               
               if (requestingUserShiftTag !== undefined) {
@@ -351,7 +400,7 @@ export async function POST(request: NextRequest) {
             { status: 409 }
           );
         }
-
+        
         // Handle slot unavailable error (409 Conflict)
         if (error instanceof Error && error.message.startsWith('SLOT_UNAVAILABLE:')) {
           return NextResponse.json(
@@ -403,6 +452,7 @@ export async function POST(request: NextRequest) {
     };
     
     info(`[LeaveRequest] Broadcasting leaveRequestCreated event for team ${user.teamId}:`, eventData);
+    invalidateAnalyticsCache(user.teamId!);
     broadcastTeamUpdate(user.teamId!, 'leaveRequestCreated', eventData);
 
     return NextResponse.json(createdRequest);

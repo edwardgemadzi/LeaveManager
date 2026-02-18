@@ -4,11 +4,13 @@ import { TeamModel } from '@/models/Team';
 import { UserModel } from '@/models/User';
 import { apiRateLimit } from '@/lib/rateLimit';
 import { broadcastTeamUpdate } from '@/lib/teamEvents';
+import { invalidateAnalyticsCache } from '@/lib/analyticsCache';
 import { error as logError, info } from '@/lib/logger';
 import { internalServerError, unauthorizedError, forbiddenError, badRequestError, notFoundError } from '@/lib/errors';
 
 export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = request.nextUrl;
     const token = getTokenFromRequest(request);
     
     if (!token) {
@@ -24,11 +26,15 @@ export async function GET(request: NextRequest) {
       return badRequestError('No team assigned');
     }
     
-    // Fetch team, members, and currentUser in parallel
+    const membersMode = searchParams.get('members') || 'full'; // full | summary | none
+    const includeMembers = membersMode !== 'none';
+    const includeCurrentUser = searchParams.get('currentUser') !== 'none';
+
+    // Fetch team, members, and currentUser in parallel (skip when not needed)
     const [team, members, currentUser] = await Promise.all([
       TeamModel.findById(user.teamId),
-      UserModel.findByTeamId(user.teamId),
-      UserModel.findById(user.id),
+      includeMembers ? UserModel.findByTeamId(user.teamId) : Promise.resolve([]),
+      includeCurrentUser ? UserModel.findById(user.id) : Promise.resolve(null),
     ]);
 
     if (!team) {
@@ -43,57 +49,61 @@ export async function GET(request: NextRequest) {
     
     const response = {
       team,
-      currentUser: currentUser ? {
-        _id: currentUser._id,
-        username: currentUser.username,
-        fullName: currentUser.fullName,
-        role: currentUser.role,
-        shiftSchedule: currentUser.shiftSchedule,
-        shiftHistory: currentUser.shiftHistory, // Include shift history for historical schedule support
-        shiftTag: currentUser.shiftTag,
-        workingDaysTag: currentUser.workingDaysTag,
-        subgroupTag: currentUser.subgroupTag,
-        maternityPaternityType: currentUser.maternityPaternityType,
-        // Include manualLeaveBalance for current user (they can see their own)
-        manualLeaveBalance: currentUser.manualLeaveBalance,
-        manualYearToDateUsed: currentUser.manualYearToDateUsed,
-        manualYearToDateUsedYear: currentUser.manualYearToDateUsedYear,
-        manualMaternityLeaveBalance: currentUser.manualMaternityLeaveBalance,
-        manualMaternityYearToDateUsed: currentUser.manualMaternityYearToDateUsed,
-        carryoverFromPreviousYear: currentUser.carryoverFromPreviousYear,
-        carryoverExpiryDate: currentUser.carryoverExpiryDate,
-      } : null,
-      members: allMembers.map(member => {
-        const baseMember = {
-          _id: member._id,
-          username: member.username,
-          fullName: member.fullName,
-          role: member.role,
-          shiftSchedule: member.shiftSchedule,
-          shiftHistory: member.shiftHistory, // Include shift history for historical schedule support
-          shiftTag: member.shiftTag,
-          workingDaysTag: member.workingDaysTag,
-          subgroupTag: member.subgroupTag,
-          maternityPaternityType: member.maternityPaternityType,
-          createdAt: member.createdAt,
-        };
-        
-        // Include manualLeaveBalance and manualYearToDateUsed for leaders (to edit balances) or if it's the current user's own data
-        if (isLeader || member._id === user.id) {
-          return {
-            ...baseMember,
-            manualLeaveBalance: member.manualLeaveBalance,
-            manualYearToDateUsed: member.manualYearToDateUsed,
-            manualYearToDateUsedYear: member.manualYearToDateUsedYear,
-            manualMaternityLeaveBalance: member.manualMaternityLeaveBalance,
-            manualMaternityYearToDateUsed: member.manualMaternityYearToDateUsed,
-            carryoverFromPreviousYear: member.carryoverFromPreviousYear,
-            carryoverExpiryDate: member.carryoverExpiryDate,
+      ...(includeCurrentUser ? {
+        currentUser: currentUser ? {
+          _id: currentUser._id,
+          username: currentUser.username,
+          fullName: currentUser.fullName,
+          role: currentUser.role,
+          shiftSchedule: currentUser.shiftSchedule,
+          shiftHistory: currentUser.shiftHistory, // Include shift history for historical schedule support
+          shiftTag: currentUser.shiftTag,
+          workingDaysTag: currentUser.workingDaysTag,
+          subgroupTag: currentUser.subgroupTag,
+          maternityPaternityType: currentUser.maternityPaternityType,
+          // Include manualLeaveBalance for current user (they can see their own)
+          manualLeaveBalance: currentUser.manualLeaveBalance,
+          manualYearToDateUsed: currentUser.manualYearToDateUsed,
+          manualYearToDateUsedYear: currentUser.manualYearToDateUsedYear,
+          manualMaternityLeaveBalance: currentUser.manualMaternityLeaveBalance,
+          manualMaternityYearToDateUsed: currentUser.manualMaternityYearToDateUsed,
+          carryoverFromPreviousYear: currentUser.carryoverFromPreviousYear,
+          carryoverExpiryDate: currentUser.carryoverExpiryDate,
+        } : null,
+      } : {}),
+      ...(includeMembers ? {
+        members: allMembers.map(member => {
+          const baseMember = {
+            _id: member._id,
+            username: member.username,
+            fullName: member.fullName,
+            role: member.role,
+            shiftSchedule: member.shiftSchedule,
+            shiftHistory: membersMode === 'full' ? member.shiftHistory : undefined,
+            shiftTag: member.shiftTag,
+            workingDaysTag: member.workingDaysTag,
+            subgroupTag: member.subgroupTag,
+            maternityPaternityType: member.maternityPaternityType,
+            createdAt: member.createdAt,
           };
-        }
-        
-        return baseMember;
-      }),
+          
+          // Include manualLeaveBalance and manualYearToDateUsed for leaders (to edit balances) or if it's the current user's own data
+          if (membersMode === 'full' && (isLeader || member._id === user.id)) {
+            return {
+              ...baseMember,
+              manualLeaveBalance: member.manualLeaveBalance,
+              manualYearToDateUsed: member.manualYearToDateUsed,
+              manualYearToDateUsedYear: member.manualYearToDateUsedYear,
+              manualMaternityLeaveBalance: member.manualMaternityLeaveBalance,
+              manualMaternityYearToDateUsed: member.manualMaternityYearToDateUsed,
+              carryoverFromPreviousYear: member.carryoverFromPreviousYear,
+              carryoverExpiryDate: member.carryoverExpiryDate,
+            };
+          }
+          
+          return baseMember;
+        }),
+      } : {}),
     };
     
     return NextResponse.json(response);
@@ -363,6 +373,7 @@ export async function PATCH(request: NextRequest) {
     });
 
     // Broadcast event after settings change
+    invalidateAnalyticsCache(user.teamId!);
     broadcastTeamUpdate(user.teamId!, 'settingsUpdated', {
       teamId: user.teamId,
       updatedSettings: updatedTeam.settings,

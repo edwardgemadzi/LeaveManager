@@ -7,6 +7,7 @@ import { User, ShiftSchedule, Team } from '@/types';
 import { getWorkingDaysGroupDisplayName, getWorkingDaysGroupDisplayNameWithTag } from '@/lib/helpers';
 import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
 import { useNotification } from '@/hooks/useNotification';
+import { useTeamData } from '@/hooks/useTeamData';
 
 export default function LeaderMembersPage() {
   const { showSuccess, showError } = useNotification();
@@ -31,42 +32,22 @@ export default function LeaderMembersPage() {
   const [filterWorkingDaysTag, setFilterWorkingDaysTag] = useState<string>('');
   const [filterSubgroup, setFilterSubgroup] = useState<string>('');
   const [sortBy, setSortBy] = useState<'name' | 'joinDate'>('name');
+  const [visibleCount, setVisibleCount] = useState(50);
+
+  const { data: teamData, mutate: mutateTeam, isLoading: teamLoading } = useTeamData({ members: 'full' });
 
   useEffect(() => {
-    const fetchMembers = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('/api/team', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        
-        if (!response.ok) {
-          // Handle 401 (Unauthorized) - token expired or invalid
-          if (response.status === 401) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = '/login';
-            return;
-          }
-          
-          console.error('Failed to fetch team data:', response.status, response.statusText);
-          return;
-        }
-        
-        const data = await response.json();
-        setMembers(data.members || []);
-        setTeam(data.team || null);
-      } catch (error) {
-        console.error('Error fetching members:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    if (teamData?.members) setMembers(teamData.members);
+    if (teamData?.team) setTeam(teamData.team);
+  }, [teamData]);
 
-    fetchMembers();
-  }, []);
+  useEffect(() => {
+    setLoading(teamLoading);
+  }, [teamLoading]);
+
+  useEffect(() => {
+    setVisibleCount(50);
+  }, [searchQuery, filterShiftTag, filterWorkingDaysTag, filterSubgroup, sortBy]);
 
   const handleDeleteMember = async (memberId: string, memberName: string) => {
     if (!confirm(`Are you sure you want to remove ${memberName} from the team? This action cannot be undone.`)) {
@@ -221,16 +202,7 @@ export default function LeaderMembersPage() {
 
       if (response.ok) {
         // Refetch team data to get updated workingDaysTag
-        const teamResponse = await fetch('/api/team', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        
-        if (teamResponse.ok) {
-          const data = await teamResponse.json();
-          setMembers(data.members || []);
-        }
+        await mutateTeam();
         
         setEditingSchedule(null);
         setTempSchedule(null);
@@ -391,6 +363,8 @@ export default function LeaderMembersPage() {
       }
     });
 
+  const pagedMembers = filteredAndSortedMembers.slice(0, visibleCount);
+
   const hasActiveFilters = searchQuery || filterShiftTag || filterWorkingDaysTag || filterSubgroup;
 
   const clearFilters = () => {
@@ -436,19 +410,7 @@ export default function LeaderMembersPage() {
         return;
       }
       
-      // Fetch current team settings first to merge properly
-      const currentResponse = await fetch('/api/team', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      
-      if (!currentResponse.ok) {
-        throw new Error('Failed to fetch current settings');
-      }
-      
-      const currentData = await currentResponse.json();
-      const currentSettings = currentData.team?.settings || {};
+      const currentSettings = team?.settings || {};
       
       // Update settings with new group names
       const response = await fetch('/api/team', {
@@ -467,18 +429,9 @@ export default function LeaderMembersPage() {
       
       if (response.ok) {
         // Refresh team data
-        const teamResponse = await fetch('/api/team', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        
-        if (teamResponse.ok) {
-          const data = await teamResponse.json();
-          setTeam(data.team);
-          setEditingGroupNames({});
-          showSuccess('Group names saved successfully!');
-        }
+        await mutateTeam();
+        setEditingGroupNames({});
+        showSuccess('Group names saved successfully!');
       } else {
         const error = await response.json();
         showError(error.error || 'Failed to save group names');
@@ -738,7 +691,7 @@ export default function LeaderMembersPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {filteredAndSortedMembers.map((member) => (
+                {pagedMembers.map((member) => (
                   <div key={member._id} className="border border-gray-200 dark:border-gray-800 rounded-lg p-4 sm:p-6 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors bg-white dark:bg-gray-900">
                     <div className="space-y-4">
                       {/* Header Section */}
@@ -964,6 +917,17 @@ export default function LeaderMembersPage() {
                     </div>
                   </div>
                 ))}
+                {filteredAndSortedMembers.length > pagedMembers.length && (
+                  <div className="pt-4 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => setVisibleCount(prev => prev + 50)}
+                      className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-900"
+                    >
+                      Load more
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

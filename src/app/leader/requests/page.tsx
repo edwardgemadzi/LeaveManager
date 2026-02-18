@@ -8,6 +8,8 @@ import { LEAVE_REASONS, EMERGENCY_REASONS, isEmergencyReason } from '@/lib/leave
 import { ExclamationTriangleIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import { useNotification } from '@/hooks/useNotification';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
+import { useTeamData } from '@/hooks/useTeamData';
+import { useRequests } from '@/hooks/useRequests';
 import { parseDateSafe, formatDateSafe } from '@/lib/dateUtils';
 
 export default function LeaderRequestsPage() {
@@ -60,46 +62,37 @@ export default function LeaderRequestsPage() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [teamId, setTeamId] = useState<string | null>(null);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [visibleCount, setVisibleCount] = useState(50);
 
-  const fetchData = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-
-        // Fetch team and requests in parallel
-        const [teamResponse, requestsResponse] = await Promise.all([
-          fetch('/api/team', {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          }),
-          fetch(`/api/leave-requests?teamId=${user.teamId}&includeDeleted=true`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          }),
-        ]);
-
-        // Process team response
-        const teamData = await teamResponse.json();
-        setMembers(teamData.members);
-        if (teamData.team?._id) {
-          setTeamId(teamData.team._id);
-        }
-
-        // Process requests response
-        const allRequests = await requestsResponse.json();
-        setRequests(allRequests);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const { data: teamData, mutate: mutateTeam, isLoading: teamLoading } = useTeamData({ members: 'full' });
+  const { data: requestsData, mutate: mutateRequests, isLoading: requestsLoading } = useRequests({
+    teamId,
+    includeDeleted: true,
+    fields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'createdAt', 'updatedAt', 'deletedAt', 'deletedBy', 'requestedBy'],
+  });
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (teamData?.members) {
+      setMembers(teamData.members);
+    }
+    if (teamData?.team?._id) {
+      setTeamId(teamData.team._id);
+    }
+  }, [teamData]);
+
+  useEffect(() => {
+    if (requestsData) {
+      setRequests(requestsData);
+    }
+  }, [requestsData]);
+
+  useEffect(() => {
+    setLoading(teamLoading || requestsLoading);
+  }, [teamLoading, requestsLoading]);
+
+  useEffect(() => {
+    setVisibleCount(50);
+  }, [filter]);
 
   // Real-time updates using SSE
   useTeamEvents(teamId, {
@@ -112,7 +105,8 @@ export default function LeaderRequestsPage() {
           clearTimeout(refreshTimeoutRef.current);
         }
         refreshTimeoutRef.current = setTimeout(() => {
-          fetchData();
+          mutateRequests();
+          mutateTeam();
         }, 300);
       }
     },
@@ -131,9 +125,7 @@ export default function LeaderRequestsPage() {
       });
 
       if (response.ok) {
-        setRequests(requests.map(req => 
-          req._id === requestId ? { ...req, status: 'approved' } : req
-        ));
+        await mutateRequests();
       }
     } catch (err) {
       console.error('Error approving request:', err);
@@ -153,9 +145,7 @@ export default function LeaderRequestsPage() {
       });
 
       if (response.ok) {
-        setRequests(requests.map(req => 
-          req._id === requestId ? { ...req, status: 'rejected' } : req
-        ));
+        await mutateRequests();
       }
     } catch (err) {
       console.error('Error rejecting request:', err);
@@ -178,7 +168,7 @@ export default function LeaderRequestsPage() {
       });
 
       if (response.ok) {
-        await fetchData();
+        await mutateRequests();
         // Dispatch custom event to trigger refresh on other pages
         window.dispatchEvent(new CustomEvent('leaveRequestDeleted'));
         showSuccess('Request deleted successfully');
@@ -206,7 +196,7 @@ export default function LeaderRequestsPage() {
       });
 
       if (response.ok) {
-        await fetchData();
+        await mutateRequests();
         window.dispatchEvent(new CustomEvent('leaveRequestRestored'));
         showSuccess('Request restored successfully');
       } else {
@@ -243,7 +233,7 @@ export default function LeaderRequestsPage() {
 
       if (response.ok) {
         // Add the new request to the list
-        setRequests([data, ...requests]);
+        await mutateRequests();
         setEmergencyForm({
           memberId: '',
           startDate: '',
@@ -357,17 +347,7 @@ export default function LeaderRequestsPage() {
       });
 
       if (successCount > 0) {
-        // Refresh requests list
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-        const requestsResponse = await fetch(`/api/leave-requests?teamId=${user.teamId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        if (requestsResponse.ok) {
-          const allRequests = await requestsResponse.json();
-          setRequests(allRequests);
-        }
+        await mutateRequests();
 
         if (errorCount === 0) {
           showSuccess(`Successfully created ${successCount} historical leave ${successCount === 1 ? 'entry' : 'entries'}!`);
@@ -416,6 +396,8 @@ export default function LeaderRequestsPage() {
 
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
+
+  const pagedRequests = sortedRequests.slice(0, visibleCount);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -761,7 +743,7 @@ export default function LeaderRequestsPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {sortedRequests.map((request) => {
+                {pagedRequests.map((request) => {
                   const member = members.find(m => m._id === request.userId);
                   return (
                     <div key={request._id} className="bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-900 dark:to-gray-800/50 rounded-xl p-5 sm:p-6 border border-gray-200 dark:border-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all duration-200 stagger-item">
@@ -856,6 +838,17 @@ export default function LeaderRequestsPage() {
                     </div>
                   );
                 })}
+                {sortedRequests.length > pagedRequests.length && (
+                  <div className="pt-4 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => setVisibleCount(prev => prev + 50)}
+                      className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-900"
+                    >
+                      Load more
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

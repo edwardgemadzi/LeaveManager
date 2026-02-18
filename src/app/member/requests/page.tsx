@@ -9,12 +9,15 @@ import { useNotification } from '@/hooks/useNotification';
 import { useBrowserNotification } from '@/hooks/useBrowserNotification';
 import { parseDateSafe } from '@/lib/dateUtils';
 import { isBypassNoticePeriodActive } from '@/lib/noticePeriod';
+import { useTeamData } from '@/hooks/useTeamData';
+import { useRequests } from '@/hooks/useRequests';
 
 export default function MemberRequestsPage() {
   const { showSuccess, showError, showInfo } = useNotification();
   const { showNotification: showBrowserNotification } = useBrowserNotification();
   const [myRequests, setMyRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     startDate: '',
@@ -52,43 +55,30 @@ export default function MemberRequestsPage() {
     return formData.reason;
   };
 
+  const { data: teamData, isLoading: teamLoading } = useTeamData({ members: 'none' });
+  const { data: allRequests, mutate: mutateRequests, isLoading: requestsLoading } = useRequests({
+    fields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'createdAt'],
+  });
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-
-        // Fetch team and requests in parallel
-        const [teamResponse, requestsResponse] = await Promise.all([
-          fetch('/api/team', {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          }),
-          fetch(`/api/leave-requests?teamId=${user.teamId}`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          }),
-        ]);
-
-        // Process team response
-        const teamData = await teamResponse.json();
-        setTeamSettings(teamData.team?.settings || { minimumNoticePeriod: 1 });
-
-        // Process requests response
-        const allRequests = await requestsResponse.json();
-        const myRequests = allRequests.filter((req: LeaveRequest) => req.userId === user.id);
-        setMyRequests(myRequests);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    setUserId(user.id || null);
   }, []);
+
+  useEffect(() => {
+    if (teamData?.team?.settings) {
+      setTeamSettings(teamData.team.settings);
+    }
+  }, [teamData]);
+
+  useEffect(() => {
+    if (!allRequests || !userId) return;
+    setMyRequests(allRequests.filter((req: LeaveRequest) => req.userId === userId));
+  }, [allRequests, userId]);
+
+  useEffect(() => {
+    setLoading(teamLoading || requestsLoading);
+  }, [teamLoading, requestsLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,8 +126,8 @@ export default function MemberRequestsPage() {
       });
 
       if (response.ok) {
-        const newRequest = await response.json();
-        setMyRequests([newRequest, ...myRequests]);
+        await response.json();
+        await mutateRequests();
         setFormData({ startDate: '', endDate: '', reason: '', customReason: '' });
         setSelectedReasonType('');
         setShowForm(false);
@@ -176,7 +166,7 @@ export default function MemberRequestsPage() {
       });
 
       if (response.ok) {
-        setMyRequests(myRequests.filter(req => req._id !== requestId));
+        await mutateRequests();
         showSuccess('Request cancelled successfully');
       } else {
         const error = await response.json();

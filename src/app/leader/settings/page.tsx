@@ -69,7 +69,6 @@ export default function TeamSettingsPage() {
         }
         
         const data = await response.json();
-        console.log('Settings - Team data received:', data);
         setTeam(data.team);
         const defaultSettings = {
           concurrentLeave: 2,
@@ -172,19 +171,7 @@ export default function TeamSettingsPage() {
       });
 
       if (response.ok) {
-        const responseData = await response.json();
-        console.log('[Settings] Save response:', responseData);
-        
-        // Verify the settings were saved correctly from the response
-        const savedSettings = responseData.settings;
-        if (savedSettings) {
-          console.log('[Settings] Settings saved to database:', {
-            concurrentLeave: savedSettings.concurrentLeave,
-            maxLeavePerYear: savedSettings.maxLeavePerYear,
-            minimumNoticePeriod: savedSettings.minimumNoticePeriod
-          });
-        }
-        
+        await response.json();
         showSuccess('Settings saved successfully!');
         
         // Wait a moment to ensure database write completes and is committed
@@ -200,7 +187,6 @@ export default function TeamSettingsPage() {
         });
         if (teamResponse.ok) {
           const teamData = await teamResponse.json();
-          console.log('[Settings] Team data fetched after save. Concurrent leave:', teamData.team?.settings?.concurrentLeave);
           setTeam(teamData.team);
           const defaultSettings = {
             concurrentLeave: 2,
@@ -233,10 +219,7 @@ export default function TeamSettingsPage() {
           }
           setSettings(teamSettings);
           
-          // Dispatch event to notify other pages that settings have been updated
-          // Include the actual concurrent leave value in the event for debugging
           const eventDetail = { concurrentLeave: teamSettings.concurrentLeave };
-          console.log('[Settings] Dispatching teamSettingsUpdated event with concurrentLeave:', teamSettings.concurrentLeave);
           window.dispatchEvent(new CustomEvent('teamSettingsUpdated', { detail: eventDetail }));
         }
       } else {

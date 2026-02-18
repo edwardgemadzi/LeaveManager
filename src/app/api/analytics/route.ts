@@ -4,6 +4,7 @@ import { TeamModel } from '@/models/Team';
 import { UserModel } from '@/models/User';
 import { LeaveRequestModel } from '@/models/LeaveRequest';
 import { getMemberAnalytics, getTeamAnalytics, getGroupedTeamAnalytics } from '@/lib/analyticsCalculations';
+import { buildAnalyticsCacheKey, getAnalyticsCache, setAnalyticsCache } from '@/lib/analyticsCache';
 import { error as logError, debug } from '@/lib/logger';
 import { internalServerError } from '@/lib/errors';
 
@@ -87,6 +88,16 @@ export async function GET(request: NextRequest) {
     }
     
 
+    const cacheKey = buildAnalyticsCacheKey(String(user.teamId), targetYear, user.role, team.settings);
+    const cached = getAnalyticsCache<Record<string, unknown>>(cacheKey);
+    if (cached) {
+      return NextResponse.json(cached, {
+        headers: {
+          'Cache-Control': 'private, max-age=30',
+        }
+      });
+    }
+
     // Fetch user data
     const currentUser = await UserModel.findById(user.id);
     if (!currentUser) {
@@ -154,11 +165,13 @@ export async function GET(request: NextRequest) {
         );
       }
       
-      return NextResponse.json({ 
+      const responseBody = { 
         analytics: memberAnalytics,
         year: targetYear,
         isHistorical: targetYear < new Date().getFullYear()
-      }, {
+      };
+      setAnalyticsCache(cacheKey, responseBody);
+      return NextResponse.json(responseBody, {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
           'Pragma': 'no-cache',
@@ -220,6 +233,7 @@ export async function GET(request: NextRequest) {
         
         debug('[Analytics API] Returning analytics with concurrentLeave:', team.settings.concurrentLeave);
         
+        setAnalyticsCache(cacheKey, analyticsResponse);
         return NextResponse.json(analyticsResponse, {
           headers: {
             'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',

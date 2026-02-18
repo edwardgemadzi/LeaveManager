@@ -5,6 +5,8 @@ import Navbar from '@/components/shared/Navbar';
 import TeamCalendar from '@/components/shared/Calendar';
 import { Team, User, LeaveRequest } from '@/types';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
+import { useTeamData } from '@/hooks/useTeamData';
+import { useRequests } from '@/hooks/useRequests';
 import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
 import { FunnelIcon } from '@heroicons/react/24/outline';
 
@@ -17,79 +19,56 @@ export default function MemberCalendarPage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<CalendarFilter>('all');
+  const [localUser, setLocalUser] = useState<User | null>(null);
 
   const [allRequests, setAllRequests] = useState<LeaveRequest[]>([]);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const fetchData = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const userData = JSON.parse(localStorage.getItem('user') || '{}');
-        
-        // Fetch team and requests in parallel
-        const [teamResponse, requestsResponse] = await Promise.all([
-          fetch('/api/team', {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          }),
-          fetch(`/api/leave-requests?teamId=${userData.teamId}`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          }),
-        ]);
-
-        // Process team response
-        const data = await teamResponse.json();
-        setTeam(data.team);
-        
-        // Update user with fresh data from server
-        if (data.currentUser) {
-          setUser(data.currentUser);
-        } else {
-          setUser(userData);
-        }
-        
-        // Process requests response first
-        const requestsData = await requestsResponse.json();
-        setAllRequests(requestsData);
-        setAllMembers(data.members);
-
-        // If subgrouping is enabled, filter members by subgroup
-        // IMPORTANT: Include ALL members from the same subgroup, not just those with requests
-        // This ensures that when requests are processed, all necessary member data is available
-        if (data.team?.settings?.enableSubgrouping && data.currentUser) {
-          const userSubgroup = data.currentUser.subgroupTag || 'Ungrouped';
-          
-          // Get all userIds from the requests to ensure we include all members whose requests are shown
-          const requestUserIds = new Set(requestsData.map((req: LeaveRequest) => req.userId));
-          
-          const filteredMembers = data.members.filter((member: User) => {
-            // Always include the current user
-            if (member._id === data.currentUser._id) return true;
-            // Include ALL members from the same subgroup (requests are already filtered by subgroup)
-            const memberSubgroup = member.subgroupTag || 'Ungrouped';
-            if (memberSubgroup === userSubgroup) return true;
-            // Also include members whose requests are in the filtered requests (catch-all for edge cases)
-            if (member._id && requestUserIds.has(member._id)) return true;
-            return false;
-          });
-          setMembers(filteredMembers);
-        } else {
-          // No subgrouping - show all members
-          setMembers(data.members);
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const { data: teamData, mutate: mutateTeam, isLoading: teamLoading } = useTeamData({ members: 'full' });
+  const { data: requestsData, mutate: mutateRequests, isLoading: requestsLoading } = useRequests({
+    fields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'createdAt'],
+  });
 
   useEffect(() => {
-    fetchData();
+    const userData = JSON.parse(localStorage.getItem('user') || '{}');
+    setLocalUser(userData);
   }, []);
+
+  useEffect(() => {
+    const dataTeam = teamData?.team;
+    if (dataTeam) {
+      setTeam(dataTeam);
+    }
+
+    const currentUser = teamData?.currentUser || localUser;
+    if (currentUser) {
+      setUser(currentUser);
+    }
+
+    const requestsList = requestsData || [];
+    const membersList = teamData?.members || [];
+    setAllRequests(requestsList);
+    setAllMembers(membersList);
+
+    if (dataTeam?.settings?.enableSubgrouping && currentUser) {
+      const userSubgroup = currentUser.subgroupTag || 'Ungrouped';
+      const requestUserIds = new Set(requestsList.map((req: LeaveRequest) => req.userId));
+      const filteredMembers = membersList.filter((member: User) => {
+        if (member._id === currentUser._id) return true;
+        const memberSubgroup = member.subgroupTag || 'Ungrouped';
+        if (memberSubgroup === userSubgroup) return true;
+        if (member._id && requestUserIds.has(member._id)) return true;
+        return false;
+      });
+      setMembers(filteredMembers);
+    } else {
+      setMembers(membersList);
+    }
+  }, [teamData, requestsData, localUser]);
+
+  useEffect(() => {
+    setLoading(teamLoading || requestsLoading);
+  }, [teamLoading, requestsLoading]);
 
   // Real-time updates using SSE
   useTeamEvents(team?._id || null, {
@@ -102,7 +81,8 @@ export default function MemberCalendarPage() {
           clearTimeout(refreshTimeoutRef.current);
         }
         refreshTimeoutRef.current = setTimeout(() => {
-          fetchData();
+          mutateRequests();
+          mutateTeam();
         }, 300);
       }
     },

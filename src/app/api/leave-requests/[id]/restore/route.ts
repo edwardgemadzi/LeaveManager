@@ -6,6 +6,7 @@ import { UserModel } from '@/models/User';
 import { teamIdsMatch } from '@/lib/helpers';
 import { ObjectId } from 'mongodb';
 import { broadcastTeamUpdate } from '@/lib/teamEvents';
+import { invalidateAnalyticsCache } from '@/lib/analyticsCache';
 import { error as logError } from '@/lib/logger';
 import { internalServerError } from '@/lib/errors';
 
@@ -76,6 +77,7 @@ export async function POST(
       });
     }
 
+    invalidateAnalyticsCache(user.teamId!);
     broadcastTeamUpdate(user.teamId!, 'leaveRequestRestored', {
       requestId: id,
       userId: leaveRequest.userId,

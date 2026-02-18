@@ -33,16 +33,11 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (response.ok) {
-        console.log('Login successful:', data);
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
-        
-        // Redirect based on role
         if (data.user.role === 'leader') {
-          console.log('Redirecting to leader dashboard');
           router.push('/leader/dashboard');
         } else {
-          console.log('Redirecting to member dashboard');
           router.push('/member/dashboard');
         }
       } else {

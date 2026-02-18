@@ -9,6 +9,7 @@ import { error as logError } from '@/lib/logger';
 import { internalServerError, badRequestError, notFoundError, unauthorizedError, forbiddenError } from '@/lib/errors';
 import { requireLeader } from '@/lib/api-helpers';
 import { parseDateSafe } from '@/lib/dateUtils';
+import { invalidateAnalyticsCache } from '@/lib/analyticsCache';
 
 export async function POST(request: NextRequest) {
   try {
@@ -75,6 +76,8 @@ export async function POST(request: NextRequest) {
       status: 'approved', // Emergency requests are auto-approved
       requestedBy: user.id, // Track that this was requested by the leader
     });
+
+    invalidateAnalyticsCache(user.teamId!);
 
     // Return the created request
     return NextResponse.json({

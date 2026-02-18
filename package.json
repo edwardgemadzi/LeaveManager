@@ -39,7 +39,8 @@
     "next": "^15.5.9",
     "react": "19.2.1",
     "react-big-calendar": "^1.8.5",
-    "react-dom": "19.2.1"
+    "react-dom": "19.2.1",
+    "swr": "^2.2.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

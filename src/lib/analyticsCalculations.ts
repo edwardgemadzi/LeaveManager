@@ -1,5 +1,5 @@
 import { ShiftSchedule, User, Team, LeaveRequest } from '@/types';
-import { countWorkingDays, calculateLeaveBalance, isWorkingDay, getWorkingDays, calculateSurplusBalance, calculateMaternityLeaveBalance, calculateMaternitySurplusBalance, isMaternityLeave, countMaternityLeaveDays, calculateCarryoverBalance } from './leaveCalculations';
+import { countWorkingDays, calculateLeaveBalance, isWorkingDay, getWorkingDays, calculateSurplusBalance, calculateMaternityLeaveBalance, calculateMaternitySurplusBalance, isMaternityLeave, countMaternityLeaveDays, calculateCarryoverBalance, getCarryoverDaysUsed } from './leaveCalculations';
 import { getEffectiveManualYearToDateUsed } from './yearOverrides';
 import { parseDateSafe } from './dateUtils';
 import { debug } from './logger';
@@ -864,7 +864,10 @@ export interface MemberAnalytics {
   realisticUsableDays: number; // Realistic days factoring in members sharing same schedule who also need to use remaining leave days (whole days per member)
   remainingLeaveBalance: number; // Remaining balance after subtracting approved requests
   baseLeaveBalance: number; // Base balance (manualLeaveBalance if set, otherwise maxLeavePerYear) - before subtracting approved requests
-  carryoverBalance: number; // Available carryover balance from previous year (separate stat)
+  carryoverBalance: number; // Usable carryover (0 when expired; used for balance math)
+  carryoverDaysUsed: number; // Days actually used from carryover this year (respects limitedToMonths)
+  carryoverExpired?: boolean; // True when carryover has passed its expiry date
+  carryoverRemainingDisplay?: number; // When expired: remaining days that expired (show with Expired tag); when not: same as carryoverBalance
   workingDaysUsed: number;
   workingDaysInYear: number;
   willCarryover: number;
@@ -1130,12 +1133,29 @@ export const getMemberAnalytics = (
   // Calculate carryover balance separately
   // Pass approvedRequests and carryoverSettings to account for month limitations
   const carryoverBalance = calculateCarryoverBalance(
-    user, 
+    user,
     workingDaysUsed,
     approvedRequestsForCalculation,
     team.settings.carryoverSettings
   );
-  
+
+  // Days actually used from carryover this year (respects limitedToMonths; correct when expired)
+  const carryoverDaysUsed = getCarryoverDaysUsed(
+    user,
+    workingDaysUsed,
+    approvedRequestsForCalculation,
+    team.settings.carryoverSettings
+  );
+
+  const originalCarryover = user.carryoverFromPreviousYear ?? 0;
+  const carryoverExpiryDate = user.carryoverExpiryDate ? new Date(user.carryoverExpiryDate) : null;
+  const nowMidnight = new Date();
+  nowMidnight.setHours(0, 0, 0, 0);
+  const carryoverExpired = !!(originalCarryover > 0 && carryoverExpiryDate && carryoverExpiryDate.setHours(0, 0, 0, 0) < nowMidnight.getTime());
+  const carryoverRemainingDisplay = carryoverExpired
+    ? Math.max(0, originalCarryover - carryoverDaysUsed)
+    : carryoverBalance;
+
   // Calculate surplus balance
   const surplusBalance = calculateSurplusBalance(user.manualLeaveBalance, team.settings.maxLeavePerYear);
   
@@ -1324,6 +1344,8 @@ export const getMemberAnalytics = (
     remainingLeaveBalance,
     baseLeaveBalance,
     carryoverBalance,
+    carryoverDaysUsed,
+    ...(originalCarryover > 0 && { carryoverExpired, carryoverRemainingDisplay }),
     workingDaysUsed,
     workingDaysInYear,
     willCarryover: carryoverResult.willCarryover,

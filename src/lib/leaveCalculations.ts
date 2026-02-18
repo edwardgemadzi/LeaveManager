@@ -182,7 +182,9 @@ export const countMaternityLeaveDays = (
   }
 };
 
-// Function to calculate leave balance for a user
+// Function to calculate leave balance for a user.
+// Source of truth: User from database (carryoverFromPreviousYear, carryoverExpiryDate) and approved leave requests.
+// Same logic for every user; if it's wrong for one, it's wrong for all.
 // Overload 1: Accepts User object (uses historical schedules for past dates)
 export function calculateLeaveBalance(
   maxLeavePerYear: number,
@@ -258,16 +260,18 @@ export function calculateLeaveBalance(
   // Get carryover from previous year if exists and not expired
   // Only check if userOrSchedule is a User object (has carryoverFromPreviousYear field)
   let carryoverAvailable = 0;
+  let originalCarryover = 0; // Used when expired: still attribute past usage to carryover so annual is not double-counted
+  let isCarryoverExpired = false;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
   if ('carryoverFromPreviousYear' in userOrSchedule && userOrSchedule.carryoverFromPreviousYear) {
-    const isExpired = userOrSchedule.carryoverExpiryDate && 
-      new Date(userOrSchedule.carryoverExpiryDate).setHours(0, 0, 0, 0) < today.getTime();
-    
-    // Only count carryover if it hasn't expired (as set by leader)
-    if (!isExpired && userOrSchedule.carryoverFromPreviousYear > 0) {
-      carryoverAvailable = userOrSchedule.carryoverFromPreviousYear;
+    isCarryoverExpired = !!(userOrSchedule.carryoverExpiryDate &&
+      new Date(userOrSchedule.carryoverExpiryDate).setHours(0, 0, 0, 0) < today.getTime());
+    originalCarryover = userOrSchedule.carryoverFromPreviousYear;
+    // Only count carryover as available (for remaining balance) if it hasn't expired
+    if (!isCarryoverExpired && originalCarryover > 0) {
+      carryoverAvailable = originalCarryover;
     }
   }
   
@@ -370,9 +374,13 @@ export function calculateLeaveBalance(
     daysUsedOutsideAllowedMonths = 0;
   }
 
-  // IMPORTANT: When carryover is limited to specific months:
-  // - Days in allowed months: use carryover FIRST, when carryover finishes annual balance is deducted
-  // - Days outside allowed months: ALWAYS consume annual balance directly
+  // When carryover has expired we still use originalCarryover to decide how much to deduct from annual,
+  // so that days already used from carryover (e.g. in January) do not also reduce annual.
+  const effectiveCarryoverForDeduction = isCarryoverExpired ? originalCarryover : carryoverAvailable;
+
+  // When carryover is limited to specific months (e.g. January only):
+  // - Days IN allowed months: use carryover first; only excess deducts from annual.
+  // - Days OUTSIDE allowed months: always deducted from regular annual leave (never from carryover).
   let remainingCarryover = 0;
   let remainingNewYearBalance = newYearBalance;
 
@@ -380,28 +388,28 @@ export function calculateLeaveBalance(
     // When month limits are set:
     // 1. Days in allowed months: consume carryover first, when carryover finishes annual balance is deducted
     // 2. Days outside allowed months: consume annual balance directly
-    if (daysUsedInAllowedMonths <= carryoverAvailable) {
+    if (daysUsedInAllowedMonths <= effectiveCarryoverForDeduction) {
       // All days in allowed months come from carryover
-      remainingCarryover = carryoverAvailable - daysUsedInAllowedMonths;
+      remainingCarryover = isCarryoverExpired ? 0 : (carryoverAvailable - daysUsedInAllowedMonths);
       // Only days outside allowed months consume annual balance
       remainingNewYearBalance = newYearBalance - daysUsedOutsideAllowedMonths;
     } else {
       // Carryover exhausted for allowed months - annual balance is deducted for excess
       remainingCarryover = 0;
-      const excessFromAllowedMonths = daysUsedInAllowedMonths - carryoverAvailable;
+      const excessFromAllowedMonths = daysUsedInAllowedMonths - effectiveCarryoverForDeduction;
       remainingNewYearBalance = newYearBalance - (daysUsedOutsideAllowedMonths + excessFromAllowedMonths);
     }
   } else {
     // No month limit: consume carryover first, then new year balance
-    if (daysUsedInAllowedMonths <= carryoverAvailable) {
+    if (daysUsedInAllowedMonths <= effectiveCarryoverForDeduction) {
       // All days in allowed months come from carryover
-      remainingCarryover = carryoverAvailable - daysUsedInAllowedMonths;
+      remainingCarryover = isCarryoverExpired ? 0 : (carryoverAvailable - daysUsedInAllowedMonths);
       // Days outside allowed months consume new year balance
       remainingNewYearBalance = newYearBalance - daysUsedOutsideAllowedMonths;
     } else {
       // Carryover exhausted for allowed months, remaining days come from new year balance
       remainingCarryover = 0;
-      const excessFromAllowedMonths = daysUsedInAllowedMonths - carryoverAvailable;
+      const excessFromAllowedMonths = daysUsedInAllowedMonths - effectiveCarryoverForDeduction;
       remainingNewYearBalance = newYearBalance - (daysUsedOutsideAllowedMonths + excessFromAllowedMonths);
     }
   }
@@ -410,17 +418,12 @@ export function calculateLeaveBalance(
   let remainingBalance = remainingNewYearBalance + remainingCarryover;
   
   // Final check: if carryover has expired (as set by leader), remove any unused carryover
-  if ('carryoverFromPreviousYear' in userOrSchedule && userOrSchedule.carryoverFromPreviousYear) {
-    const isExpired = userOrSchedule.carryoverExpiryDate && 
-      new Date(userOrSchedule.carryoverExpiryDate).setHours(0, 0, 0, 0) < today.getTime();
-    
-    if (isExpired) {
-      // If carryover expired and we still have remaining carryover, it's lost
-      remainingCarryover = 0;
-      // If remaining balance exceeds new year balance, it means unused carryover expired
-      if (remainingBalance > newYearBalance) {
-        remainingBalance = newYearBalance;
-      }
+  if (isCarryoverExpired) {
+    // If carryover expired and we still have remaining carryover, it's lost
+    remainingCarryover = 0;
+    // If remaining balance exceeds new year balance, it means unused carryover expired
+    if (remainingBalance > newYearBalance) {
+      remainingBalance = newYearBalance;
     }
   }
   
@@ -556,6 +559,92 @@ export function calculateCarryoverBalance(
     // Carryover exhausted
     return 0;
   }
+}
+
+/**
+ * Returns the number of days actually used from carryover this year.
+ * Respects limitedToMonths: only days in allowed months count as "used from carryover".
+ * Use this for display so that when carryover is expired we still show the correct used count (e.g. 4 not 6).
+ */
+export function getCarryoverDaysUsed(
+  userOrSchedule: User | ShiftSchedule,
+  daysUsed: number,
+  approvedRequests?: Array<{ startDate: Date; endDate: Date; reason?: string }>,
+  carryoverSettings?: { limitedToMonths?: number[] }
+): number {
+  if (!('carryoverFromPreviousYear' in userOrSchedule) || !userOrSchedule.carryoverFromPreviousYear) {
+    return 0;
+  }
+  const originalCarryover = userOrSchedule.carryoverFromPreviousYear;
+
+  if (carryoverSettings?.limitedToMonths && carryoverSettings.limitedToMonths.length > 0 && approvedRequests) {
+    const currentYear = new Date().getFullYear();
+    const yearStart = new Date(currentYear, 0, 1);
+    yearStart.setHours(0, 0, 0, 0);
+    const yearEnd = new Date(currentYear, 11, 31);
+    yearEnd.setHours(23, 59, 59, 999);
+    const nonMaternityRequests = approvedRequests.filter(req =>
+      !req.reason || !isMaternityLeave(req.reason)
+    );
+    const allowedMonths = carryoverSettings.limitedToMonths;
+    let daysUsedInAllowedMonths = 0;
+    const calculateWorkingDaysInAllowedMonths = (
+      startDate: Date,
+      endDate: Date,
+      allowedMonthsArr: number[],
+      schedule: User | ShiftSchedule
+    ): number => {
+      let totalDays = 0;
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      const currentMonthStart = new Date(start);
+      currentMonthStart.setDate(1);
+      currentMonthStart.setHours(0, 0, 0, 0);
+      const lastMonthStart = new Date(end);
+      lastMonthStart.setDate(1);
+      lastMonthStart.setHours(0, 0, 0, 0);
+      const currentMonth = new Date(currentMonthStart);
+      while (currentMonth <= lastMonthStart) {
+        const monthIndex = currentMonth.getMonth();
+        if (allowedMonthsArr.includes(monthIndex)) {
+          const monthStart = new Date(Math.max(start.getTime(), currentMonth.getTime()));
+          monthStart.setHours(0, 0, 0, 0);
+          const monthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+          monthEnd.setHours(23, 59, 59, 999);
+          const monthEndActual = new Date(Math.min(end.getTime(), monthEnd.getTime()));
+          if (monthStart <= monthEndActual) {
+            const workingDays = ('shiftSchedule' in schedule)
+              ? countWorkingDays(monthStart, monthEndActual, schedule as User)
+              : countWorkingDays(monthStart, monthEndActual, schedule as ShiftSchedule);
+            totalDays += workingDays;
+          }
+        }
+        currentMonth.setMonth(currentMonth.getMonth() + 1);
+      }
+      return totalDays;
+    };
+    nonMaternityRequests.forEach(req => {
+      const reqStart = new Date(req.startDate);
+      const reqEnd = new Date(req.endDate);
+      reqStart.setHours(0, 0, 0, 0);
+      reqEnd.setHours(23, 59, 59, 999);
+      if (reqStart <= yearEnd && reqEnd >= yearStart) {
+        const overlapStart = reqStart > yearStart ? reqStart : yearStart;
+        const overlapEnd = reqEnd < yearEnd ? reqEnd : yearEnd;
+        daysUsedInAllowedMonths += calculateWorkingDaysInAllowedMonths(
+          overlapStart,
+          overlapEnd,
+          allowedMonths,
+          userOrSchedule
+        );
+      }
+    });
+    return Math.min(originalCarryover, daysUsedInAllowedMonths);
+  }
+
+  return Math.min(originalCarryover, daysUsed);
 }
 
 // Function to calculate surplus balance (when manual balance exceeds team max)
