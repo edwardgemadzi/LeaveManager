@@ -19,6 +19,7 @@ export async function GET(
     if (authResult instanceof NextResponse) {
       return authResult;
     }
+    const user = authResult;
 
     const { id } = await params;
     
@@ -26,6 +27,10 @@ export async function GET(
     const userDataResult = await requireSafeUserData(id, 'User not found');
     if (userDataResult instanceof NextResponse) {
       return userDataResult;
+    }
+
+    if (!teamIdsMatch(user.teamId, userDataResult.teamId)) {
+      return forbiddenError('Access denied - users must be in the same team');
     }
 
     return NextResponse.json({ user: userDataResult });
@@ -122,11 +127,15 @@ export async function PATCH(
       if (typeof newPassword !== 'string' || newPassword.trim().length === 0) {
         return badRequestError('Password must be a non-empty string');
       }
-      if (newPassword.length < 6) {
-        return badRequestError('Password must be at least 6 characters long');
+      if (newPassword.length < 8) {
+        return badRequestError('Password must be at least 8 characters long');
       }
       if (newPassword.length > 100) {
         return badRequestError('Password must be no more than 100 characters long');
+      }
+      const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
+      if (!passwordPattern.test(newPassword)) {
+        return badRequestError('Password must contain uppercase, lowercase, number, and special character');
       }
     }
 

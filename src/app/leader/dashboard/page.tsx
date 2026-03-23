@@ -43,20 +43,20 @@ export default function LeaderDashboard() {
 
   const { data: dashboardData, mutate: mutateDashboard, isLoading: dashboardLoading } = useDashboardData({
     include: ['team', 'members', 'requests', 'analytics', 'currentUser'],
-    requestFields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'createdAt', 'requestedBy'],
+    requestFields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'decisionNote', 'decisionAt', 'decisionByUsername', 'createdAt', 'requestedBy'],
   });
 
   const handleApprove = async (requestId: string) => {
     setProcessingRequest(requestId);
+    const decisionNote = prompt('Optional approval note (leave blank to skip):') || '';
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`/api/leave-requests/${requestId}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status: 'approved' }),
+        credentials: 'include',
+        body: JSON.stringify({ status: 'approved', decisionNote }),
       });
 
       if (response.ok) {
@@ -71,16 +71,19 @@ export default function LeaderDashboard() {
   };
 
   const handleReject = async (requestId: string) => {
+    const decisionNote = prompt('Rejection reason (required):') || '';
+    if (!decisionNote.trim()) {
+      return;
+    }
     setProcessingRequest(requestId);
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`/api/leave-requests/${requestId}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status: 'rejected' }),
+        credentials: 'include',
+        body: JSON.stringify({ status: 'rejected', decisionNote: decisionNote.trim() }),
       });
 
       if (response.ok) {
@@ -140,24 +143,7 @@ export default function LeaderDashboard() {
         if (!currentData) return;
 
         const currentPending = (currentData.requests || []).filter((req: LeaveRequest) => req.status === 'pending');
-        const previousIds = new Set(previousPendingRequestsRef.current.map(r => r._id));
-        const newRequests = currentPending.filter((req: LeaveRequest) => !previousIds.has(req._id));
-
-        if (newRequests.length > 0) {
-          const currentMembers = currentData.members || members;
-          newRequests.forEach((req: LeaveRequest) => {
-            const member = currentMembers.find((m: User) => m._id === req.userId);
-            const memberName = member?.fullName || member?.username || 'A team member';
-            const startDate = parseDateSafe(req.startDate).toLocaleDateString();
-            const endDate = parseDateSafe(req.endDate).toLocaleDateString();
-
-            showNotification(
-              'New Leave Request',
-              `${memberName} has submitted a leave request for ${startDate} to ${endDate}`
-            );
-          });
-        }
-
+        // Polling fallback only refreshes state; notifications are emitted from SSE handlers.
         previousPendingRequestsRef.current = currentPending;
       } catch (error) {
         console.error('Error polling for new requests:', error);
@@ -180,7 +166,9 @@ export default function LeaderDashboard() {
           
           showNotification(
             'New Leave Request',
-            `${memberName} has submitted a leave request for ${startDate} to ${endDate}`
+            `${memberName} has submitted a leave request for ${startDate} to ${endDate}`,
+            undefined,
+            { dedupeKey: `leader-new-request-${data.requestId}`, cooldownMs: 60000 }
           );
         }
       }
@@ -258,7 +246,9 @@ export default function LeaderDashboard() {
       
       showNotification(
         'Members at Risk Alert',
-        notificationMessage
+        notificationMessage,
+        undefined,
+        { dedupeKey: 'leader-members-at-risk', cooldownMs: 86400000 }
       );
     }
   }, [analytics, members, team, showNotification]);
@@ -1016,6 +1006,9 @@ export default function LeaderDashboard() {
                                   {parseDateSafe(request.startDate).toLocaleDateString()} - {parseDateSafe(request.endDate).toLocaleDateString()}
                                 </span>
                               </div>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300">
+                                Pending {Math.max(1, Math.ceil((Date.now() - new Date(request.createdAt).getTime()) / (1000 * 60 * 60 * 24)))}d
+                              </span>
                             </div>
                             <p className="text-sm text-gray-700 dark:text-gray-300 font-medium bg-white/50 dark:bg-gray-800/50 px-3 py-1.5 rounded-lg inline-block">
                               {request.reason}

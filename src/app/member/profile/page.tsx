@@ -27,14 +27,9 @@ export default function MemberProfilePage() {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) return;
-
         // Fetch fresh user data from API
         const userResponse = await fetch('/api/users/profile', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
+          credentials: 'include',
         });
 
         if (userResponse.ok) {
@@ -47,9 +42,7 @@ export default function MemberProfilePage() {
 
         // Fetch team data
         const teamResponse = await fetch('/api/team', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
+          credentials: 'include',
         });
 
         if (teamResponse.ok) {
@@ -91,13 +84,12 @@ export default function MemberProfilePage() {
     setChangingPassword(true);
 
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch('/api/auth/change-password', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           currentPassword: passwordForm.currentPassword,
           newPassword: passwordForm.newPassword,
@@ -141,13 +133,12 @@ export default function MemberProfilePage() {
     setUpdatingProfile(true);
 
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch('/api/users/profile', {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           fullName: profileForm.fullName.trim(),
         }),

@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    env:
+      MONGODB_URI: mongodb://localhost:27017/leave-manager
+      JWT_SECRET: ci-jwt-secret-32-characters-minimum
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npm run type-check
+
+      - name: Build
+        run: npm run build
+
+  smoke:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      MONGODB_URI: mongodb://localhost:27017/leave-manager
+      JWT_SECRET: ci-jwt-secret-32-characters-minimum
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build app
+        run: npm run build
+
+      - name: Start app
+        run: npm run start &
+
+      - name: Wait for app
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:3000/api/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "App did not become ready in time"
+          exit 1
+
+      - name: Health check
+        run: curl -fsS http://127.0.0.1:3000/api/health
+
+      - name: Readiness check
+        run: curl -fsS http://127.0.0.1:3000/api/ready

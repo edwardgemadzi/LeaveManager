@@ -12,6 +12,12 @@ import { isBypassNoticePeriodActive } from '@/lib/noticePeriod';
 import { useTeamData } from '@/hooks/useTeamData';
 import { useRequests } from '@/hooks/useRequests';
 
+type LeaveDateConstraintDay = {
+  selectable: boolean;
+  codes: string[];
+  message: string;
+};
+
 export default function MemberRequestsPage() {
   const { showSuccess, showError, showInfo } = useNotification();
   const { showNotification: showBrowserNotification } = useBrowserNotification();
@@ -36,7 +42,19 @@ export default function MemberRequestsPage() {
   const leaveReasons = LEAVE_REASONS;
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [availabilityPreview, setAvailabilityPreview] = useState<{ available: boolean; message: string } | null>(null);
+  const [dateConstraints, setDateConstraints] = useState<Record<string, LeaveDateConstraintDay>>({});
   const bypassActive = isBypassNoticePeriodActive(teamSettings);
+  const todayIso = new Date().toISOString().split('T')[0];
+  const minStartDateIso = (() => {
+    if (bypassActive || teamSettings.minimumNoticePeriod <= 0) {
+      return todayIso;
+    }
+    const minDate = new Date();
+    minDate.setHours(0, 0, 0, 0);
+    minDate.setDate(minDate.getDate() + teamSettings.minimumNoticePeriod);
+    return minDate.toISOString().split('T')[0];
+  })();
 
   const handleReasonChange = (reasonType: string) => {
     setSelectedReasonType(reasonType);
@@ -57,7 +75,7 @@ export default function MemberRequestsPage() {
 
   const { data: teamData, isLoading: teamLoading } = useTeamData({ members: 'none' });
   const { data: allRequests, mutate: mutateRequests, isLoading: requestsLoading } = useRequests({
-    fields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'createdAt'],
+    fields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'decisionNote', 'decisionAt', 'decisionByUsername', 'createdAt'],
   });
 
   useEffect(() => {
@@ -79,6 +97,76 @@ export default function MemberRequestsPage() {
   useEffect(() => {
     setLoading(teamLoading || requestsLoading);
   }, [teamLoading, requestsLoading]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const runPreview = async () => {
+      if (!formData.startDate || !formData.endDate || !showForm) {
+        setAvailabilityPreview(null);
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `/api/leave-requests/availability?startDate=${encodeURIComponent(formData.startDate)}&endDate=${encodeURIComponent(formData.endDate)}`,
+          { credentials: 'include', signal: controller.signal }
+        );
+        if (!response.ok) {
+          setAvailabilityPreview(null);
+          return;
+        }
+        const data = await response.json();
+        setAvailabilityPreview({
+          available: Boolean(data.available),
+          message: String(data.message || ''),
+        });
+      } catch {
+        setAvailabilityPreview(null);
+      }
+    };
+
+    runPreview();
+
+    return () => {
+      controller.abort();
+    };
+  }, [formData.startDate, formData.endDate, showForm]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const fetchConstraints = async () => {
+      if (!showForm) return;
+      const from = minStartDateIso;
+      const toDate = new Date(from);
+      toDate.setDate(toDate.getDate() + 120);
+      const to = toDate.toISOString().split('T')[0];
+      try {
+        const response = await fetch(
+          `/api/leave-requests/constraints?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+          { credentials: 'include', signal: controller.signal }
+        );
+        if (!response.ok) return;
+        const data = await response.json();
+        setDateConstraints(data.days || {});
+      } catch {
+        // ignore transient constraint fetch failures
+      }
+    };
+    fetchConstraints();
+    return () => controller.abort();
+  }, [showForm, minStartDateIso]);
+
+  const isDateSelectable = (dateIso: string): { selectable: boolean; message?: string } => {
+    if (!dateIso || dateIso < todayIso) {
+      return { selectable: false, message: 'Past dates cannot be requested.' };
+    }
+    const constraint = dateConstraints[dateIso];
+    if (!constraint) {
+      return { selectable: false, message: 'Date constraints are still loading. Please try again in a moment.' };
+    }
+    return { selectable: constraint.selectable, message: constraint.message };
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,13 +200,12 @@ export default function MemberRequestsPage() {
     setSubmitting(true);
 
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch('/api/leave-requests', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           ...formData,
           reason: getFinalReason(),
@@ -151,18 +238,15 @@ export default function MemberRequestsPage() {
   };
 
   const handleDelete = async (requestId: string) => {
-    if (!confirm('Are you sure you want to cancel this request? This action cannot be undone.')) {
+    if (!confirm('Are you sure you want to cancel this request? It will be removed from active requests, and your leader can restore it if needed.')) {
       return;
     }
 
     setDeleting(requestId);
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`/api/leave-requests/${requestId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        credentials: 'include',
       });
 
       if (response.ok) {
@@ -177,6 +261,52 @@ export default function MemberRequestsPage() {
       showError('Network error. Please try again.');
     } finally {
       setDeleting(null);
+    }
+  };
+
+  const handleEditPending = async (request: LeaveRequest) => {
+    const startDate = prompt(
+      'New start date (YYYY-MM-DD)',
+      request.startDate ? new Date(request.startDate).toISOString().split('T')[0] : ''
+    );
+    if (!startDate) return;
+
+    const endDate = prompt(
+      'New end date (YYYY-MM-DD)',
+      request.endDate ? new Date(request.endDate).toISOString().split('T')[0] : ''
+    );
+    if (!endDate) return;
+
+    const reason = prompt('Updated reason', request.reason || '');
+    if (!reason || !reason.trim()) {
+      showInfo('A reason is required to update your request.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/leave-requests/${request._id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          startDate,
+          endDate,
+          reason: reason.trim(),
+        }),
+      });
+
+      if (response.ok) {
+        await mutateRequests();
+        showSuccess('Pending request updated successfully.');
+      } else {
+        const error = await response.json();
+        showError(error.error || 'Failed to update request');
+      }
+    } catch (error) {
+      console.error('Error editing request:', error);
+      showError('Network error. Please try again.');
     }
   };
 
@@ -239,8 +369,21 @@ export default function MemberRequestsPage() {
                       type="date"
                       id="startDate"
                       required
+                      min={minStartDateIso}
                       value={formData.startDate}
-                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                      onChange={(e) => {
+                        const nextStartDate = e.target.value;
+                        const selection = isDateSelectable(nextStartDate);
+                        if (!selection.selectable) {
+                          showInfo(selection.message || 'Selected start date is not available.');
+                          return;
+                        }
+                        setFormData(prev => ({
+                          ...prev,
+                          startDate: nextStartDate,
+                          endDate: prev.endDate && prev.endDate < nextStartDate ? nextStartDate : prev.endDate,
+                        }));
+                      }}
                       className="input-modern w-full"
                     />
                   </div>
@@ -252,8 +395,39 @@ export default function MemberRequestsPage() {
                       type="date"
                       id="endDate"
                       required
+                      min={formData.startDate || minStartDateIso}
                       value={formData.endDate}
-                      onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                      onChange={(e) => {
+                        const nextEndDate = e.target.value;
+                        const start = formData.startDate;
+                        if (!start) {
+                          setFormData({ ...formData, endDate: nextEndDate });
+                          return;
+                        }
+
+                        const startDate = new Date(start);
+                        const endDate = new Date(nextEndDate);
+                        if (endDate < startDate) {
+                          showInfo('End date cannot be before start date.');
+                          return;
+                        }
+
+                        const cursor = new Date(startDate);
+                        cursor.setHours(0, 0, 0, 0);
+                        const last = new Date(endDate);
+                        last.setHours(0, 0, 0, 0);
+                        while (cursor <= last) {
+                          const dayKey = cursor.toISOString().split('T')[0];
+                          const selection = isDateSelectable(dayKey);
+                          if (!selection.selectable) {
+                            showInfo(selection.message || `Date ${dayKey} is not available.`);
+                            return;
+                          }
+                          cursor.setDate(cursor.getDate() + 1);
+                        }
+
+                        setFormData({ ...formData, endDate: nextEndDate });
+                      }}
                       className="input-modern w-full"
                     />
                     <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
@@ -267,6 +441,15 @@ export default function MemberRequestsPage() {
                     </p>
                   </div>
                 </div>
+                {availabilityPreview && (
+                  <div className={`rounded-lg px-4 py-3 text-sm ${
+                    availabilityPreview.available
+                      ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
+                      : 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800'
+                  }`}>
+                    {availabilityPreview.message}
+                  </div>
+                )}
                 <div>
                   <label htmlFor="reason" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     Reason for Leave
@@ -352,12 +535,35 @@ export default function MemberRequestsPage() {
                           {parseDateSafe(request.startDate).toLocaleDateString()} - {parseDateSafe(request.endDate).toLocaleDateString()}
                         </p>
                         <p className="text-base text-gray-700 dark:text-gray-300 mb-3">{request.reason}</p>
+                        {request.decisionNote && (
+                          <p className="text-sm text-indigo-700 dark:text-indigo-300 mb-2">
+                            Decision note: {request.decisionNote}
+                          </p>
+                        )}
                         <p className="text-xs text-gray-500 dark:text-gray-400">
                           Requested on {new Date(request.createdAt).toLocaleDateString()}
                         </p>
+                        {request.status === 'pending' && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            Pending for {Math.max(1, Math.ceil((Date.now() - new Date(request.createdAt).getTime()) / (1000 * 60 * 60 * 24)))} day(s)
+                          </p>
+                        )}
+                        {request.decisionAt && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            Decided on {new Date(request.decisionAt).toLocaleDateString()}
+                            {request.decisionByUsername ? ` by ${request.decisionByUsername}` : ''}
+                          </p>
+                        )}
                       </div>
                       {request.status === 'pending' && (
-                        <div className="sm:ml-4 sm:flex-shrink-0">
+                        <div className="sm:ml-4 sm:flex-shrink-0 flex gap-2">
+                          <button
+                            onClick={() => handleEditPending(request)}
+                            className="btn-secondary px-3 py-2 text-sm"
+                            title="Edit pending request"
+                          >
+                            Edit
+                          </button>
                           <button
                             onClick={() => handleDelete(request._id!)}
                             disabled={deleting === request._id}

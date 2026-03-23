@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { isTokenExpired } from '@/lib/api-client';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -15,22 +14,11 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
   const router = useRouter();
 
   useEffect(() => {
-    const checkAuth = () => {
+    const checkAuth = async () => {
       try {
-        const token = localStorage.getItem('token');
         const user = localStorage.getItem('user');
 
-        if (!token || !user) {
-          router.push('/login');
-          setIsLoading(false);
-          return;
-        }
-
-        // Check if token is expired
-        if (isTokenExpired(token)) {
-          console.log('Token expired, redirecting to login');
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
+        if (!user) {
           router.push('/login');
           setIsLoading(false);
           return;
@@ -43,7 +31,6 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
           if (!userData || !userData.role || !userData.id) {
             // Invalid user data structure, clear it
             console.error('Invalid user data structure:', userData);
-            localStorage.removeItem('token');
             localStorage.removeItem('user');
             router.push('/login');
             setIsLoading(false);
@@ -65,10 +52,27 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
             return;
           }
 
+          // Validate active session with backend cookie auth.
+          const profileResponse = await fetch('/api/users/profile', { credentials: 'include' });
+          if (!profileResponse.ok) {
+            localStorage.removeItem('user');
+            router.push('/login');
+            setIsLoading(false);
+            return;
+          }
+
+          const profileData = await profileResponse.json();
+          if (!profileData?.user?.id || !profileData?.user?.role) {
+            localStorage.removeItem('user');
+            router.push('/login');
+            setIsLoading(false);
+            return;
+          }
+
+          localStorage.setItem('user', JSON.stringify(profileData.user));
           setIsAuthenticated(true);
         } catch (parseError) {
           console.error('Error parsing user data:', parseError);
-          localStorage.removeItem('token');
           localStorage.removeItem('user');
           router.push('/login');
         }

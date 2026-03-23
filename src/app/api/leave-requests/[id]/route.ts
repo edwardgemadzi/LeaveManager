@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTokenFromRequest, verifyToken } from '@/lib/auth';
+import { getTokenFromRequest, shouldRejectCsrf, verifyToken } from '@/lib/auth';
 import { LeaveRequestModel } from '@/models/LeaveRequest';
 import { AuditLogModel } from '@/models/AuditLog';
 import { emailService } from '@/lib/email';
@@ -10,31 +10,87 @@ import { broadcastTeamUpdate } from '@/lib/teamEvents';
 import { invalidateAnalyticsCache } from '@/lib/analyticsCache';
 import { error as logError } from '@/lib/logger';
 import { internalServerError } from '@/lib/errors';
+import { apiRateLimit } from '@/lib/rateLimit';
+import { updateMemberPendingLeaveRequest } from '@/services/leaveRequestsService';
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const rateLimitResponse = apiRateLimit(request);
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
+    if (shouldRejectCsrf(request)) {
+      return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 });
+    }
+
     const token = getTokenFromRequest(request);
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const user = verifyToken(token);
-    if (!user || user.role !== 'leader') {
+    if (!user) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const hasStatusField = Object.prototype.hasOwnProperty.call(body ?? {}, 'status');
+    const status = body?.status;
+    const decisionNote =
+      typeof body?.decisionNote === 'string' ? body.decisionNote.trim() : '';
+
+    const { id } = await params;
+
+    if (!hasStatusField) {
+      const updated = await updateMemberPendingLeaveRequest({
+        user,
+        requestId: id,
+        body: {
+          startDate: body?.startDate,
+          endDate: body?.endDate,
+          reason: body?.reason,
+        },
+      });
+      if ('error' in updated) {
+        return NextResponse.json(updated.error.body, { status: updated.error.status });
+      }
+
+      invalidateAnalyticsCache(user.teamId!);
+      broadcastTeamUpdate(user.teamId!, 'leaveRequestUpdated', {
+        requestId: id,
+        userId: user.id,
+        updatedBy: user.id,
+        updateType: 'member_edit',
+      });
+
+      return NextResponse.json({ success: true, request: updated.data });
+    }
+
+    if (!['approved', 'rejected'].includes(status)) {
+      return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
+    }
+
+    if (user.role !== 'leader') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const { status } = await request.json();
-    if (!status || !['approved', 'rejected'].includes(status)) {
+    if (decisionNote.length > 500) {
       return NextResponse.json(
-        { error: 'Invalid status' },
+        { error: 'Decision note must be 500 characters or fewer' },
         { status: 400 }
       );
     }
 
-    const { id } = await params;
+    if (status === 'rejected' && decisionNote.length === 0) {
+      return NextResponse.json(
+        { error: 'Rejection reason is required' },
+        { status: 400 }
+      );
+    }
     const leaveRequest = await LeaveRequestModel.findById(id);
     if (!leaveRequest) {
       return NextResponse.json({ error: 'Request not found' }, { status: 404 });
@@ -44,11 +100,19 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    await LeaveRequestModel.updateStatus(id, status);
+    const actorUser = await UserModel.findById(user.id);
+    if (!actorUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    await LeaveRequestModel.updateStatus(id, status, {
+      note: decisionNote || undefined,
+      byUserId: user.id,
+      byUsername: actorUser.username,
+    });
 
     // Get user details for audit and email
     const targetUser = await UserModel.findById(leaveRequest.userId);
-    const actorUser = await UserModel.findById(user.id);
 
     if (targetUser && actorUser) {
       // Log audit trail
@@ -65,6 +129,7 @@ export async function PATCH(
           startDate: leaveRequest.startDate.toISOString().split('T')[0],
           endDate: leaveRequest.endDate.toISOString().split('T')[0],
           reason: leaveRequest.reason,
+          decisionNote: decisionNote || undefined,
         }
       );
 
@@ -83,7 +148,8 @@ export async function PATCH(
           targetUser.username,
           leaveRequest.startDate.toISOString().split('T')[0],
           leaveRequest.endDate.toISOString().split('T')[0],
-          leaveRequest.reason
+          leaveRequest.reason,
+          decisionNote || undefined
         );
       }
     }
@@ -95,6 +161,9 @@ export async function PATCH(
       userId: leaveRequest.userId,
       newStatus: status,
       updatedBy: user.id,
+      decisionNote: decisionNote || undefined,
+      decisionAt: new Date().toISOString(),
+      decisionByUsername: actorUser.username,
     });
     
     return NextResponse.json({ success: true });
@@ -109,6 +178,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const rateLimitResponse = apiRateLimit(request);
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
+    if (shouldRejectCsrf(request)) {
+      return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 });
+    }
+
     const token = getTokenFromRequest(request);
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -139,7 +217,10 @@ export async function DELETE(
     // Members can only delete their own pending requests
     // Leaders can delete any approved request
     if (user.role === 'member') {
-      if (leaveRequest.userId !== user.id) {
+      const requestOwnerId = String(leaveRequest.userId).trim();
+      const currentUserId = String(user.id).trim();
+
+      if (requestOwnerId !== currentUserId) {
         return NextResponse.json(
           { error: 'You can only delete your own requests' },
           { status: 403 }

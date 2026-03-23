@@ -10,7 +10,7 @@ import { error as logError, info } from '@/lib/logger';
  * Clients connect via EventSource API and receive real-time updates
  * when leave requests are created, updated, deleted, or team settings change.
  * 
- * Authentication: JWT token via Authorization header or query parameter
+ * Authentication: JWT token via Authorization header only.
  * 
  * Events are scoped to teamId for privacy and security.
  */
@@ -63,12 +63,7 @@ export async function GET(request: NextRequest) {
           sendEvent('connected', { message: 'Connected to event stream' });
 
           // Authenticate user
-          let token = getTokenFromRequest(request);
-          if (!token) {
-            // Try query parameter as fallback
-            const url = new URL(request.url);
-            token = url.searchParams.get('token') || null;
-          }
+          const token = getTokenFromRequest(request);
 
           if (!token) {
             sendEvent('error', { message: 'Unauthorized: No token provided' });

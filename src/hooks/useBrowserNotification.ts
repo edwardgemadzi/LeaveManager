@@ -2,8 +2,21 @@
 
 import { useCallback } from 'react';
 
+type BrowserNotificationMeta = {
+  dedupeKey?: string;
+  cooldownMs?: number;
+  requestPermission?: boolean;
+};
+
+const recentNotificationByKey = new Map<string, number>();
+let permissionRequestedThisSession = false;
+
 export function useBrowserNotification() {
   const requestPermission = useCallback(async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      return false;
+    }
+
     if (!('Notification' in window)) {
       console.warn('This browser does not support notifications');
       return false;
@@ -24,21 +37,40 @@ export function useBrowserNotification() {
   const showNotification = useCallback(async (
     title: string,
     body: string,
-    options?: NotificationOptions
+    options?: NotificationOptions,
+    meta?: BrowserNotificationMeta
   ) => {
-    const hasPermission = await requestPermission();
-    
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      return;
+    }
+
+    const dedupeKey = meta?.dedupeKey || `${title}:${body}`;
+    const cooldownMs = meta?.cooldownMs ?? 15000;
+    const now = Date.now();
+    const lastShownAt = recentNotificationByKey.get(dedupeKey) ?? 0;
+    if (now - lastShownAt < cooldownMs) {
+      return;
+    }
+
+    const shouldRequestPermission = meta?.requestPermission ?? false;
+    let hasPermission = Notification.permission === 'granted';
+
+    if (!hasPermission && shouldRequestPermission && !permissionRequestedThisSession) {
+      permissionRequestedThisSession = true;
+      hasPermission = await requestPermission();
+    }
+
     if (!hasPermission) {
-      // Fallback to console if permission denied
       console.log(`[Notification] ${title}: ${body}`);
       return;
     }
 
+    recentNotificationByKey.set(dedupeKey, now);
     const notification = new Notification(title, {
       body,
       icon: '/favicon.ico',
       badge: '/favicon.ico',
-      tag: `notification-${Date.now()}`, // Unique tag to prevent duplicates
+      tag: dedupeKey,
       requireInteraction: false,
       silent: false,
       ...options,

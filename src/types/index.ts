@@ -69,6 +69,10 @@ export interface LeaveRequest {
   reason: string;
   status: 'pending' | 'approved' | 'rejected';
   requestedBy?: string; // For leader requests on behalf of members
+  decisionNote?: string;
+  decisionAt?: Date;
+  decisionBy?: string;
+  decisionByUsername?: string;
   deletedAt?: Date;
   deletedBy?: string;
   createdAt: Date;

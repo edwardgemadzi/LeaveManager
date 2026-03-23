@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+import { verifyTokenEdge } from '@/lib/auth-edge';
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Public routes that don't require authentication
@@ -29,7 +29,7 @@ export function middleware(request: NextRequest) {
   }
 
   try {
-    const user = verifyToken(token);
+    const user = await verifyTokenEdge(token);
     if (!user) {
       return NextResponse.next();
     }

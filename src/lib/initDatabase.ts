@@ -1,6 +1,7 @@
 import { LeaveRequestModel } from '@/models/LeaveRequest';
 import { UserModel } from '@/models/User';
 import { TeamModel } from '@/models/Team';
+import { AuditLogModel } from '@/models/AuditLog';
 
 /**
  * Initialize all database indexes for optimal query performance.
@@ -15,6 +16,7 @@ export async function initializeDatabaseIndexes(): Promise<void> {
       LeaveRequestModel.createIndexes(),
       UserModel.createIndexes(),
       TeamModel.createIndexes(),
+      AuditLogModel.createIndexes(),
     ]);
     
     console.log('Database indexes initialized successfully');

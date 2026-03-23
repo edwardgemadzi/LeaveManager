@@ -22,16 +22,23 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '100');
+    const requestedLimit = parseInt(searchParams.get('limit') || '100', 10);
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.min(Math.max(requestedLimit, 1), 200)
+      : 100;
     const userId = searchParams.get('userId');
+
+    if (!user.teamId) {
+      return forbiddenError('Leader must be assigned to a team');
+    }
 
     let auditLogs;
     if (userId) {
-      // Get logs for a specific user
-      auditLogs = await AuditLogModel.findByUserId(userId, limit);
+      // Get logs for a specific user scoped to caller team
+      auditLogs = await AuditLogModel.findByUserIdInTeam(userId, user.teamId, limit);
     } else {
       // Get logs for the entire team
-      auditLogs = await AuditLogModel.findByTeamId(user.teamId!, limit);
+      auditLogs = await AuditLogModel.findByTeamId(user.teamId, limit);
     }
 
     return NextResponse.json({ auditLogs });

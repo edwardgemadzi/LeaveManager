@@ -27,10 +27,18 @@ export default function Navbar() {
     }
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    router.push('/login');
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch {
+      // Best-effort cookie cleanup
+    } finally {
+      localStorage.removeItem('user');
+      router.push('/login');
+    }
   };
 
   if (!user) return null;

@@ -9,41 +9,34 @@ export default function HomePage() {
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    // Check if user is already logged in
-    try {
-      const token = localStorage.getItem('token');
-      const user = localStorage.getItem('user');
-      
-      if (token && user) {
-        try {
-          const userData = JSON.parse(user);
-          // Validate user data structure
-          if (userData && userData.role) {
-            if (userData.role === 'leader') {
-              router.push('/leader/dashboard');
-              return;
-            } else if (userData.role === 'member') {
-              router.push('/member/dashboard');
-              return;
-            }
-          } else {
-            // Invalid user data, clear it
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-          }
-        } catch (parseError) {
-          // Invalid JSON in localStorage, clear it
-          console.error('Error parsing user data:', parseError);
-          localStorage.removeItem('token');
+    const checkSession = async () => {
+      try {
+        const response = await fetch('/api/users/profile', { credentials: 'include' });
+        if (!response.ok) {
           localStorage.removeItem('user');
+          return;
         }
+
+        const data = await response.json();
+        if (!data?.user?.role) {
+          localStorage.removeItem('user');
+          return;
+        }
+
+        localStorage.setItem('user', JSON.stringify(data.user));
+        if (data.user.role === 'leader') {
+          router.push('/leader/dashboard');
+          return;
+        }
+        router.push('/member/dashboard');
+      } catch (error) {
+        console.error('Error checking session:', error);
+      } finally {
+        setIsChecking(false);
       }
-    } catch (error) {
-      // localStorage might not be available (SSR)
-      console.error('Error accessing localStorage:', error);
-    } finally {
-      setIsChecking(false);
-    }
+    };
+
+    checkSession();
   }, [router]);
 
   if (isChecking) {

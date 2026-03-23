@@ -46,11 +46,8 @@ export default function TeamSettingsPage() {
   useEffect(() => {
     const fetchTeam = async () => {
       try {
-        const token = localStorage.getItem('token');
         const response = await fetch('/api/team', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
+          credentials: 'include',
         });
         
         if (!response.ok) {
@@ -160,13 +157,12 @@ export default function TeamSettingsPage() {
     }
 
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch('/api/team', {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ settings }),
       });
 
@@ -180,9 +176,7 @@ export default function TeamSettingsPage() {
         
         // Refresh team data to get updated settings
         const teamResponse = await fetch(`/api/team?t=${Date.now()}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
+          credentials: 'include',
           cache: 'no-store',
         });
         if (teamResponse.ok) {

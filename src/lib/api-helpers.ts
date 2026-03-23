@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTokenFromRequest, verifyToken } from '@/lib/auth';
+import { getTokenFromRequest, shouldRejectCsrf, verifyToken } from '@/lib/auth';
 import { AuthUser, User } from '@/types';
 import { getDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
@@ -40,6 +40,10 @@ export function requireAuth(
     unauthorizedMessage = 'Unauthorized',
     forbiddenMessage = 'Forbidden',
   } = options;
+
+  if (shouldRejectCsrf(request)) {
+    return forbiddenError('Invalid request origin');
+  }
 
   const token = getTokenFromRequest(request);
   if (!token) {

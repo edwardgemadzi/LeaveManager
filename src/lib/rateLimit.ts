@@ -60,16 +60,37 @@ interface RateLimitOptions {
   message?: string;
 }
 
+function getClientIp(request: NextRequest): string {
+  const isValidIp = (value: string): boolean =>
+    /^(?:\d{1,3}\.){3}\d{1,3}$/.test(value) || value.includes(':');
+
+  const directIp = (request as NextRequest & { ip?: string }).ip;
+  if (directIp && isValidIp(directIp)) {
+    return directIp;
+  }
+
+  const trustProxy = process.env.TRUST_PROXY_HEADERS === 'true';
+  if (trustProxy) {
+    const forwardedFor = request.headers.get('x-forwarded-for');
+    const forwardedIp = forwardedFor?.split(',')[0]?.trim();
+    if (forwardedIp && isValidIp(forwardedIp)) {
+      return forwardedIp;
+    }
+  }
+
+  const realIp = request.headers.get('x-real-ip')?.trim();
+  if (realIp && isValidIp(realIp)) {
+    return realIp;
+  }
+
+  return 'unknown';
+}
+
 export function rateLimit(options: RateLimitOptions) {
   const { windowMs, maxRequests, message = 'Too many requests' } = options;
 
   return (request: NextRequest): NextResponse | null => {
-    // Extract IP address from request headers
-    // x-forwarded-for can contain multiple IPs (client, proxy1, proxy2...)
-    const forwardedFor = request.headers.get('x-forwarded-for');
-    const ip = forwardedFor 
-      ? forwardedFor.split(',')[0].trim() // Take first IP (original client)
-      : request.headers.get('x-real-ip') || 'unknown';
+    const ip = getClientIp(request);
     
     const now = Date.now();
 
@@ -123,16 +144,13 @@ const authRateLimitConfig = rateLimit({
  * NEVER disable based on request headers (user-agent, etc.) - these can be spoofed!
  */
 export function authRateLimit(request: NextRequest): NextResponse | null {
-  // Only disable rate limiting via server-side environment variables
-  // NEVER disable based on request headers (user-agent, etc.) - these can be spoofed!
-  const shouldDisable = process.env.NODE_ENV === 'test' || 
-                        process.env.DISABLE_RATE_LIMIT === 'true';
-  
-  // Safety check: Warn if rate limiting is disabled in production
-  if (shouldDisable && process.env.NODE_ENV === 'production') {
-    console.error('[SECURITY WARNING] Rate limiting is disabled in production!');
+  // Allow disabling only in tests. Production must fail closed.
+  if (process.env.NODE_ENV === 'production' && process.env.DISABLE_RATE_LIMIT === 'true') {
+    console.error('[SECURITY ERROR] DISABLE_RATE_LIMIT is not allowed in production.');
   }
-  
+
+  const shouldDisable = process.env.NODE_ENV === 'test';
+
   if (shouldDisable) {
     return null;
   }

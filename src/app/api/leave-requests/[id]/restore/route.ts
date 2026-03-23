@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTokenFromRequest, verifyToken } from '@/lib/auth';
+import { getTokenFromRequest, shouldRejectCsrf, verifyToken } from '@/lib/auth';
 import { LeaveRequestModel } from '@/models/LeaveRequest';
 import { AuditLogModel } from '@/models/AuditLog';
 import { UserModel } from '@/models/User';
@@ -9,12 +9,22 @@ import { broadcastTeamUpdate } from '@/lib/teamEvents';
 import { invalidateAnalyticsCache } from '@/lib/analyticsCache';
 import { error as logError } from '@/lib/logger';
 import { internalServerError } from '@/lib/errors';
+import { apiRateLimit } from '@/lib/rateLimit';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const rateLimitResponse = apiRateLimit(request);
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
+    if (shouldRejectCsrf(request)) {
+      return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 });
+    }
+
     const token = getTokenFromRequest(request);
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

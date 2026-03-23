@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { UserModel } from '@/models/User';
-import { generateToken } from '@/lib/auth';
+import { generateToken, setAuthCookie } from '@/lib/auth';
 import { LoginRequest } from '@/types';
 import { authRateLimit } from '@/lib/rateLimit';
 import { validateRequest, schemas } from '@/lib/validation';
@@ -26,7 +26,8 @@ export async function POST(request: NextRequest) {
       return badRequestError('Invalid input', validation.errors);
     }
 
-    const { username, password } = validation.data;
+    const username = validation.data.username.toLowerCase();
+    const { password } = validation.data;
 
     const user = await UserModel.findByUsername(username);
     
@@ -58,8 +59,7 @@ export async function POST(request: NextRequest) {
 
     const token = generateToken(tokenData);
 
-    return NextResponse.json({
-      token,
+    const response = NextResponse.json({
       user: {
         id: user._id,
         username: user.username,
@@ -67,6 +67,9 @@ export async function POST(request: NextRequest) {
         teamId: user.teamId,
       },
     });
+
+    setAuthCookie(response, token);
+    return response;
   } catch (error) {
     logError('Login error:', error);
     return internalServerError();

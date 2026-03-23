@@ -89,15 +89,15 @@ Create a `.env.local` file in the root directory:
 ```env
 MONGODB_URI=your_mongodb_atlas_connection_string
 JWT_SECRET=your_super_secret_jwt_key_change_this_in_production
-NEXTAUTH_URL=http://localhost:3000
 ADMIN_ENABLED=false
+ENABLE_TEAMID_TYPE_DRIFT_FALLBACK=false
 ```
 
 **Environment Variables:**
 - `MONGODB_URI`: Your MongoDB Atlas connection string (required)
 - `JWT_SECRET`: A secure random string for JWT signing, at least 32 characters (required)
-- `NEXTAUTH_URL`: Your application URL (required)
 - `ADMIN_ENABLED`: Set to `true` to enable admin panel on localhost (optional, default: false)
+- `ENABLE_TEAMID_TYPE_DRIFT_FALLBACK`: Temporary fallback for mixed `teamId` types in `users` (optional; default: enabled in development, disabled otherwise)
 
 4. Run the development server:
 ```bash
@@ -145,12 +145,36 @@ This application is optimized for deployment on Vercel's free hobby plan:
 4. Deploy!
 
 ### Environment Variables for Vercel:
-- `MONGODB_URI`: Your MongoDB Atlas connection string
-- `JWT_SECRET`: A secure random string for JWT signing (at least 32 characters)
-- `NEXTAUTH_URL`: Your Vercel deployment URL (auto-set by Vercel)
-- `ADMIN_ENABLED`: Set to `false` for production (admin panel is localhost only)
+- `MONGODB_URI` (required): Your MongoDB Atlas connection string
+- `JWT_SECRET` (required): A secure random string for JWT signing (at least 32 characters)
+- `ADMIN_ENABLED` (optional): Keep `false` for production (admin panel is localhost only)
+- `ENABLE_TEAMID_TYPE_DRIFT_FALLBACK` (optional): Keep `false` in production unless actively handling legacy mixed `teamId` types
 
 See `DEPLOYMENT.md` for detailed deployment instructions.
+
+## Operations Runbook
+
+### Pre-deploy Checks
+Run these checks locally before deploying:
+
+```bash
+npm run lint
+npm run type-check
+npm run build
+```
+
+### Rollback
+1. Revert to the previous successful deployment in your hosting platform (for Vercel: redeploy the prior successful build).
+2. Confirm the rollback release is active.
+3. Verify health endpoints:
+   - `GET /api/health`
+   - `GET /api/ready`
+
+### Post-deploy Smoke Checks
+1. `GET /api/health` returns healthy status.
+2. `GET /api/ready` returns ready status.
+3. Confirm login works for a known account.
+4. Confirm the dashboard loads for both leader/member flows you support.
 
 ## Usage
 

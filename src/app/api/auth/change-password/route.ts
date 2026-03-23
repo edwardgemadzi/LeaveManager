@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTokenFromRequest, verifyToken } from '@/lib/auth';
+import { getTokenFromRequest, shouldRejectCsrf, verifyToken } from '@/lib/auth';
 import { getDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
@@ -10,6 +10,10 @@ import { internalServerError, unauthorizedError, badRequestError, notFoundError 
 
 export async function POST(request: NextRequest) {
   try {
+    if (shouldRejectCsrf(request)) {
+      return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 });
+    }
+
     // Apply rate limiting
     const rateLimitResponse = apiRateLimit(request);
     if (rateLimitResponse) {

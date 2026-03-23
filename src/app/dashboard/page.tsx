@@ -7,18 +7,34 @@ export default function DashboardPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // This will be handled by middleware, but as a fallback
-    const user = localStorage.getItem('user');
-    if (user) {
-      const userData = JSON.parse(user);
-      if (userData.role === 'leader') {
-        router.push('/leader/dashboard');
-      } else {
-        router.push('/member/dashboard');
+    const redirectBySession = async () => {
+      try {
+        const response = await fetch('/api/users/profile', { credentials: 'include' });
+        if (!response.ok) {
+          localStorage.removeItem('user');
+          router.push('/login');
+          return;
+        }
+
+        const data = await response.json();
+        if (!data?.user?.role) {
+          localStorage.removeItem('user');
+          router.push('/login');
+          return;
+        }
+
+        localStorage.setItem('user', JSON.stringify(data.user));
+        if (data.user.role === 'leader') {
+          router.push('/leader/dashboard');
+        } else {
+          router.push('/member/dashboard');
+        }
+      } catch {
+        router.push('/login');
       }
-    } else {
-      router.push('/login');
-    }
+    };
+
+    redirectBySession();
   }, [router]);
 
   return (

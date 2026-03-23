@@ -2,16 +2,31 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { UserModel } from '@/models/User';
 import { TeamModel } from '@/models/Team';
-import { generateToken } from '@/lib/auth';
+import { generateToken, setAuthCookie } from '@/lib/auth';
 import { RegisterMemberRequest, ShiftSchedule } from '@/types';
 import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
 import { error as logError } from '@/lib/logger';
 import { internalServerError, badRequestError, notFoundError } from '@/lib/errors';
+import { validateRequest, schemas } from '@/lib/validation';
+import { authRateLimit } from '@/lib/rateLimit';
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimitResponse = process.env.NODE_ENV !== 'test' ? authRateLimit(request) : null;
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const body: RegisterMemberRequest = await request.json();
-    const { username, fullName, password, teamUsername, shiftSchedule, maternityPaternityType } = body;
+    const validation = validateRequest(schemas.registerMember, body);
+    if (!validation.isValid) {
+      return badRequestError('Invalid input', validation.errors);
+    }
+
+    const username = validation.data.username.toLowerCase();
+    const teamUsername = validation.data.teamUsername.toLowerCase();
+    const { fullName, password, shiftSchedule } = validation.data;
+    const { maternityPaternityType } = body;
 
     if (!username || !fullName || !password || !teamUsername || !shiftSchedule) {
       return badRequestError('All fields are required');
@@ -116,8 +131,7 @@ export async function POST(request: NextRequest) {
 
     const token = generateToken(tokenData);
 
-    return NextResponse.json({
-      token,
+    const response = NextResponse.json({
       user: {
         id: user._id,
         username: user.username,
@@ -130,6 +144,9 @@ export async function POST(request: NextRequest) {
         teamUsername: team.teamUsername,
       },
     });
+
+    setAuthCookie(response, token);
+    return response;
   } catch (error) {
     logError('Member registration error:', error);
     return internalServerError();

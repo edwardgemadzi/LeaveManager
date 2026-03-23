@@ -1,4 +1,4 @@
-import { getDatabase } from '@/lib/mongodb';
+import { getDatabase, getDatabaseRaw } from '@/lib/mongodb';
 import { ObjectId, ClientSession, Filter } from 'mongodb';
 import { LeaveRequest } from '@/types';
 
@@ -96,14 +96,31 @@ export class LeaveRequestModel {
     }
   }
 
-  static async updateStatus(id: string, status: 'approved' | 'rejected'): Promise<void> {
+  static async updateStatus(
+    id: string,
+    status: 'approved' | 'rejected',
+    decision?: {
+      note?: string;
+      byUserId: string;
+      byUsername: string;
+    }
+  ): Promise<void> {
     const db = await getDatabase();
     const requests = db.collection<LeaveRequest>('leaveRequests');
     const objectId = new ObjectId(id);
     await requests.updateOne(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       { _id: objectId } as any,
-      { $set: { status, updatedAt: new Date() } }
+      {
+        $set: {
+          status,
+          decisionNote: decision?.note,
+          decisionAt: new Date(),
+          decisionBy: decision?.byUserId,
+          decisionByUsername: decision?.byUsername,
+          updatedAt: new Date(),
+        },
+      }
     );
   }
 
@@ -240,8 +257,37 @@ export class LeaveRequestModel {
     }
   }
 
-  static async createIndexes(): Promise<void> {
+  static async updatePendingRequest(
+    id: string,
+    updates: Pick<LeaveRequest, 'startDate' | 'endDate' | 'reason'>
+  ): Promise<LeaveRequest | null> {
     const db = await getDatabase();
+    const requests = db.collection<LeaveRequest>('leaveRequests');
+
+    try {
+      const objectId = new ObjectId(id);
+      await requests.updateOne(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { _id: objectId } as any,
+        {
+          $set: {
+            ...updates,
+            updatedAt: new Date(),
+          },
+        }
+      );
+
+      return await requests.findOne(
+        ({ _id: objectId } as unknown) as Filter<LeaveRequest>
+      );
+    } catch (error) {
+      console.error('LeaveRequestModel.updatePendingRequest error:', error);
+      return null;
+    }
+  }
+
+  static async createIndexes(): Promise<void> {
+    const db = await getDatabaseRaw();
     const requests = db.collection<LeaveRequest>('leaveRequests');
     
     try {

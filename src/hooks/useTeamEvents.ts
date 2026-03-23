@@ -83,17 +83,6 @@ export function useTeamEvents(
       return;
     }
 
-    // Get token from localStorage
-    const token = localStorage.getItem('token');
-    if (!token) {
-      console.warn('[useTeamEvents] No token found, cannot connect to SSE');
-      if (fallbackToPollingRef.current && pollingCallbackRef.current) {
-        setIsUsingFallback(true);
-        startPolling();
-      }
-      return;
-    }
-
     // Close existing connection if any
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
@@ -103,8 +92,10 @@ export function useTeamEvents(
     isConnectingRef.current = true;
 
     try {
-      // Create EventSource connection
-      const eventSource = new EventSource(`/api/events?token=${encodeURIComponent(token)}`);
+      // Create EventSource connection.
+      // Auth headers cannot be attached to EventSource. Until cookie-based auth is in place,
+      // unauthorized SSE connections will automatically fall back to polling.
+      const eventSource = new EventSource('/api/events');
       eventSourceRef.current = eventSource;
 
       // Handle connection open

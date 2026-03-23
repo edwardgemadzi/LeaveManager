@@ -30,6 +30,12 @@ interface CalendarEvent {
   };
 }
 
+type LeaveDateConstraintDay = {
+  selectable: boolean;
+  codes: string[];
+  message: string;
+};
+
 interface CalendarProps {
   teamId: string;
   members: User[];
@@ -66,6 +72,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
   const [customReason, setCustomReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [requestAsRange, setRequestAsRange] = useState(false); // Checkbox: request as range (default: individual dates)
+  const [dateConstraints, setDateConstraints] = useState<Record<string, LeaveDateConstraintDay>>({});
   
   const isMember = currentUser?.role === 'member';
   
@@ -83,11 +90,8 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
     
     const fetchTeamSettings = async () => {
       try {
-        const token = localStorage.getItem('token');
         const response = await fetch('/api/team', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
+          credentials: 'include',
         });
         const data = await response.json();
         if (data.team?.settings) {
@@ -244,11 +248,8 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
     if (teamId) {
       const fetchEvents = async () => {
         try {
-          const token = localStorage.getItem('token');
           const response = await fetch(`/api/leave-requests?teamId=${teamId}`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
+            credentials: 'include',
           });
           const requests: LeaveRequest[] = await response.json();
           processRequestsIntoEvents(requests);
@@ -260,6 +261,33 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
       fetchEvents();
     }
   }, [teamId, members, initialRequests, processRequestsIntoEvents]);
+
+  useEffect(() => {
+    if (!isMember) return;
+    const controller = new AbortController();
+
+    const fromDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const toDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 2, 0);
+    const from = fromDate.toISOString().split('T')[0];
+    const to = toDate.toISOString().split('T')[0];
+
+    const fetchConstraints = async () => {
+      try {
+        const response = await fetch(
+          `/api/leave-requests/constraints?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+          { credentials: 'include', signal: controller.signal }
+        );
+        if (!response.ok) return;
+        const data = await response.json();
+        setDateConstraints(data.days || {});
+      } catch {
+        // best-effort fetch for UX guidance
+      }
+    };
+
+    fetchConstraints();
+    return () => controller.abort();
+  }, [isMember, currentDate]);
 
   const eventStyleGetter = useCallback((event: CalendarEvent) => {
     // Extract reason from title (format: "Name - Reason" or "[EMERGENCY] Name - Reason")
@@ -351,6 +379,22 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
     if (!isMember) return;
 
     const clickedDate = normalizeDate(slotInfo.start);
+    const dateKey = clickedDate.toISOString().split('T')[0];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (clickedDate < today) {
+      showInfo('Past dates cannot be requested.');
+      return;
+    }
+    const constraint = dateConstraints[dateKey];
+    if (!constraint) {
+      showInfo('Date constraints are loading. Please try again.');
+      return;
+    }
+    if (!constraint.selectable) {
+      showInfo(constraint.message || 'This date cannot be requested.');
+      return;
+    }
 
     // Only allow selection of working days
       // Use User object to support historical schedules for past dates
@@ -393,7 +437,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
         }
       });
     }
-  }, [isMember, selectionMode, currentUser, normalizeDate, isSameDay, showInfo]);
+  }, [isMember, selectionMode, currentUser, normalizeDate, isSameDay, showInfo, dateConstraints]);
 
   // Style getter for highlighting working days and selected dates (only for members)
   const dayPropGetter = useCallback((date: Date) => {
@@ -403,7 +447,6 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
 
     // Check if date is selected (in selection mode)
     const isSelected = isMember && selectionMode && selectedDates.some(d => isSameDay(d, normalizedDate));
-    
     // Only highlight working days if currentUser is provided and has a role of 'member'
     // Use User object to support historical schedules for past dates
     const isWorking = currentUser && currentUser.role === 'member' && currentUser.shiftSchedule && isWorkingDay(date, currentUser);
@@ -458,11 +501,8 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
   // Helper function to refresh calendar events
   const refreshCalendar = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`/api/leave-requests?teamId=${teamId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        credentials: 'include',
       });
       if (!response.ok) {
         throw new Error('Failed to fetch leave requests');
@@ -586,8 +626,6 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
     setSubmitting(true);
 
     try {
-      const token = localStorage.getItem('token');
-
       if (requestAsRange) {
         // Request as a single range (when checkbox is checked)
         const startDate = sortedDates[0];
@@ -596,9 +634,9 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
         const response = await fetch('/api/leave-requests', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
+          credentials: 'include',
           body: JSON.stringify({
             startDate: formatDateSafe(startDate),
             endDate: formatDateSafe(endDate),
@@ -639,9 +677,9 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
           const response = await fetch('/api/leave-requests', {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
             },
+            credentials: 'include',
             body: JSON.stringify({
               startDate: formatDateSafe(date),
               endDate: formatDateSafe(date),

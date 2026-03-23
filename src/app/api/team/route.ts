@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTokenFromRequest, verifyToken } from '@/lib/auth';
+import { getTokenFromRequest, shouldRejectCsrf, verifyToken } from '@/lib/auth';
 import { TeamModel } from '@/models/Team';
 import { UserModel } from '@/models/User';
 import { apiRateLimit } from '@/lib/rateLimit';
@@ -115,6 +115,10 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    if (shouldRejectCsrf(request)) {
+      return forbiddenError('Invalid request origin');
+    }
+
     // Apply rate limiting
     const rateLimitResponse = apiRateLimit(request);
     if (rateLimitResponse) {

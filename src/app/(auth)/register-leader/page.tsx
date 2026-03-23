@@ -49,7 +49,6 @@ export default function RegisterLeaderPage() {
       const data = await response.json();
 
       if (response.ok) {
-        localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
         router.push('/leader/dashboard');
       } else {

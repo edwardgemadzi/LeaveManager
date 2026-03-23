@@ -41,7 +41,7 @@ export default function MemberDashboard() {
 
   const { data: dashboardData, mutate: mutateDashboard, isLoading: dashboardLoading } = useDashboardData({
     include: ['team', 'requests', 'analytics', 'currentUser'],
-    requestFields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'createdAt'],
+    requestFields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'decisionNote', 'decisionAt', 'decisionByUsername', 'createdAt'],
   });
 
   useEffect(() => {
@@ -142,27 +142,7 @@ export default function MemberDashboard() {
             return reqUserId === currentUserId;
           }) : [];
             
-            // Check for status changes
-            previousRequestsRef.current.forEach((prevRequest) => {
-              const currentRequest = currentRequests.find((r: LeaveRequest) => r._id === prevRequest._id);
-              if (currentRequest && prevRequest.status === 'pending' && currentRequest.status !== 'pending') {
-                const startDate = parseDateSafe(currentRequest.startDate).toLocaleDateString();
-                const endDate = parseDateSafe(currentRequest.endDate).toLocaleDateString();
-                
-                if (currentRequest.status === 'approved') {
-                  showNotification(
-                    'Leave Request Approved',
-                    `Your leave request for ${startDate} to ${endDate} has been approved!`
-                  );
-                } else if (currentRequest.status === 'rejected') {
-                  showNotification(
-                    'Leave Request Rejected',
-                    `Your leave request for ${startDate} to ${endDate} has been rejected.`
-                  );
-                }
-              }
-            });
-            
+            // Polling fallback only refreshes state; notifications are emitted from SSE handlers.
             // Update state if requests changed
             if (currentRequests.length !== myRequests.length || 
                 currentRequests.some((req: LeaveRequest, idx: number) => req._id !== myRequests[idx]?._id || req.status !== myRequests[idx]?.status)) {
@@ -194,7 +174,14 @@ export default function MemberDashboard() {
       
       // Handle leaveRequestUpdated (if it's for this user)
       if (event.type === 'leaveRequestUpdated') {
-        const data = event.data as { requestId: string; userId: string; newStatus: string };
+        const data = event.data as {
+          requestId: string;
+          userId: string;
+          newStatus: string;
+          decisionNote?: string;
+          decisionAt?: string;
+          decisionByUsername?: string;
+        };
         if (user && String(data.userId).trim() === String(user._id).trim()) {
           // Update request status
           refetchData();
@@ -203,12 +190,18 @@ export default function MemberDashboard() {
           if (data.newStatus === 'approved') {
             showNotification(
               'Leave Request Approved',
-              'Your leave request has been approved!'
+              'Your leave request has been approved!',
+              undefined,
+              { dedupeKey: `member-leave-${data.requestId}-approved`, cooldownMs: 60000 }
             );
           } else if (data.newStatus === 'rejected') {
             showNotification(
               'Leave Request Rejected',
-              'Your leave request has been rejected.'
+              typeof data.decisionNote === 'string' && data.decisionNote.trim().length > 0
+                ? `Your leave request has been rejected. Reason: ${data.decisionNote}`
+                : 'Your leave request has been rejected.',
+              undefined,
+              { dedupeKey: `member-leave-${data.requestId}-rejected`, cooldownMs: 60000 }
             );
           }
         }
@@ -246,7 +239,9 @@ export default function MemberDashboard() {
       highCompetitionNotifiedRef.current = true;
       showNotification(
         'High Competition Alert',
-        `Only ${Math.round(analytics.averageDaysPerMember)} days per member available. Consider coordinating with your team.`
+        `Only ${Math.round(analytics.averageDaysPerMember)} days per member available. Consider coordinating with your team.`,
+        undefined,
+        { dedupeKey: 'member-high-competition', cooldownMs: 86400000 }
       );
     }
   }, [analytics, showNotification]);
@@ -281,7 +276,9 @@ export default function MemberDashboard() {
       
       showNotification(
         'Warning: Days Will Be Lost',
-        message
+        message,
+        undefined,
+        { dedupeKey: 'member-days-will-be-lost', cooldownMs: 86400000 }
       );
     } else if (analytics.willCarryover > 0 && !losingDaysNotifiedRef.current) {
       // Also notify about carryover if there's no loss but carryover exists with limitations
@@ -305,7 +302,9 @@ export default function MemberDashboard() {
       losingDaysNotifiedRef.current = true;
       showNotification(
         'Carryover Information',
-        message
+        message,
+        undefined,
+        { dedupeKey: 'member-carryover-info', cooldownMs: 86400000 }
       );
     }
   }, [analytics, showNotification]);
@@ -325,7 +324,9 @@ export default function MemberDashboard() {
       leaveReminderNotifiedRef.current = true;
       showNotification(
         'Take Leave Reminder',
-        `You haven't taken leave recently and have ${Math.round(analytics.remainingLeaveBalance)} days remaining. Consider planning your leave.`
+        `You haven't taken leave recently and have ${Math.round(analytics.remainingLeaveBalance)} days remaining. Consider planning your leave.`,
+        undefined,
+        { dedupeKey: 'member-take-leave-reminder', cooldownMs: 86400000 }
       );
       return;
     }
@@ -343,7 +344,9 @@ export default function MemberDashboard() {
       leaveReminderNotifiedRef.current = true;
       showNotification(
         'Take Leave Reminder',
-        `You haven't taken leave in ${Math.round(monthsSinceLastLeave)} months and have ${Math.round(analytics.remainingLeaveBalance)} days remaining. Consider planning your leave.`
+        `You haven't taken leave in ${Math.round(monthsSinceLastLeave)} months and have ${Math.round(analytics.remainingLeaveBalance)} days remaining. Consider planning your leave.`,
+        undefined,
+        { dedupeKey: 'member-take-leave-reminder', cooldownMs: 86400000 }
       );
     }
   }, [analytics, myRequests, showNotification]);
@@ -1592,6 +1595,17 @@ export default function MemberDashboard() {
                           <p className="text-sm text-gray-700 dark:text-gray-300 font-medium bg-white/50 dark:bg-gray-800/50 px-3 py-1.5 rounded-lg inline-block">
                             {request.reason}
                           </p>
+                          {request.decisionNote && (
+                            <p className="text-xs text-indigo-700 dark:text-indigo-300 mt-2">
+                              Decision note: {request.decisionNote}
+                            </p>
+                          )}
+                          {request.decisionAt && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              Decided on {new Date(request.decisionAt).toLocaleDateString()}
+                              {request.decisionByUsername ? ` by ${request.decisionByUsername}` : ''}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>

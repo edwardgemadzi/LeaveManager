@@ -1,4 +1,4 @@
-import { getDatabase } from '@/lib/mongodb';
+import { getDatabase, getDatabaseRaw } from '@/lib/mongodb';
 
 export interface AuditLog {
   _id?: string;
@@ -51,6 +51,32 @@ export class AuditLogModel {
       .toArray();
   }
 
+  static async findByUserIdInTeam(userId: string, teamId: string, limit = 50): Promise<AuditLog[]> {
+    const db = await getDatabase();
+    const auditLogs = db.collection<AuditLog>('auditLogs');
+
+    return await auditLogs
+      .find({ userId, teamId })
+      .sort({ timestamp: -1 })
+      .limit(limit)
+      .toArray();
+  }
+
+  static async createIndexes(): Promise<void> {
+    const db = await getDatabaseRaw();
+    const auditLogs = db.collection<AuditLog>('auditLogs');
+
+    try {
+      // Compound indexes for filter + newest-first sort query patterns.
+      await auditLogs.createIndex({ teamId: 1, timestamp: -1 });
+      await auditLogs.createIndex({ userId: 1, timestamp: -1 });
+      console.log('AuditLog indexes created successfully');
+    } catch (error) {
+      console.error('Error creating AuditLog indexes:', error);
+      // Don't throw - indexes may already exist
+    }
+  }
+
   static async logLeaveAction(
     action: 'leave_approved' | 'leave_rejected' | 'leave_deleted',
     actorId: string,
@@ -65,6 +91,7 @@ export class AuditLogModel {
       endDate: string;
       reason: string;
       status?: string;
+      decisionNote?: string;
     },
     additionalDetails?: Record<string, unknown>
   ): Promise<void> {

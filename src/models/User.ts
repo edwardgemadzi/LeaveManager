@@ -1,11 +1,14 @@
-import { getDatabase } from '@/lib/mongodb';
+import { getDatabase, getDatabaseRaw } from '@/lib/mongodb';
 import { debug } from '@/lib/logger';
-import { ObjectId } from 'mongodb';
+import { ClientSession, ObjectId } from 'mongodb';
 import { User, ShiftSchedule } from '@/types';
 import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
 
 export class UserModel {
-  static async create(user: Omit<User, '_id' | 'createdAt'>): Promise<User> {
+  static async create(
+    user: Omit<User, '_id' | 'createdAt'>,
+    session?: ClientSession
+  ): Promise<User> {
     const db = await getDatabase();
     const users = db.collection<User>('users');
     
@@ -14,14 +17,23 @@ export class UserModel {
       createdAt: new Date(),
     };
     
-    const result = await users.insertOne(newUser);
+    const result = await users.insertOne(newUser, session ? { session } : undefined);
     return { ...newUser, _id: result.insertedId.toString() };
   }
 
   static async findByUsername(username: string): Promise<User | null> {
     const db = await getDatabase();
     const users = db.collection<User>('users');
-    return await users.findOne({ username });
+    const normalizedUsername = username.toLowerCase();
+    const exactMatch = await users.findOne({ username: normalizedUsername });
+    if (exactMatch) {
+      return exactMatch;
+    }
+
+    // Legacy compatibility: support older records created with mixed-case usernames.
+    return await users.findOne({
+      username: { $regex: `^${normalizedUsername}$`, $options: 'i' },
+    });
   }
 
   static async findById(id: string): Promise<User | null> {
@@ -42,6 +54,9 @@ export class UserModel {
     const users = db.collection<User>('users');
     
     try {
+      const fallbackFlag = process.env.ENABLE_TEAMID_TYPE_DRIFT_FALLBACK;
+      const fallbackEnabled = fallbackFlag === 'true' || (fallbackFlag === undefined && process.env.NODE_ENV === 'development');
+
       // Build query that handles both ObjectId and string formats
       const teamIdStr = teamId.toString().trim();
       
@@ -76,6 +91,11 @@ export class UserModel {
         debug(`UserModel.findByTeamId - found ${results.length} members with direct query`);
         return results;
       }
+
+      if (!fallbackEnabled) {
+        debug(`UserModel.findByTeamId - direct query returned 0 results, fallback disabled for teamId: ${teamIdStr}`);
+        return results;
+      }
       
       // Fallback: fetch all members and filter in JavaScript
       // This handles edge cases where teamId might be stored in unexpected formats
@@ -91,6 +111,11 @@ export class UserModel {
       return filteredResults;
     } catch (error) {
       console.error('UserModel.findByTeamId error:', error);
+      const fallbackFlag = process.env.ENABLE_TEAMID_TYPE_DRIFT_FALLBACK;
+      const fallbackEnabled = fallbackFlag === 'true' || (fallbackFlag === undefined && process.env.NODE_ENV === 'development');
+      if (!fallbackEnabled) {
+        return [];
+      }
       // If query fails, fall back to fetching all and filtering
       try {
         const allMembers = await users.find({ role: 'member' }).toArray();
@@ -202,7 +227,7 @@ export class UserModel {
   }
 
   static async createIndexes(): Promise<void> {
-    const db = await getDatabase();
+    const db = await getDatabaseRaw();
     const users = db.collection<User>('users');
     
     try {

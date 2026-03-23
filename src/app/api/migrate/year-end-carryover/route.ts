@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { updateAllTeamsCarryover, updateTeamCarryover } from '@/lib/carryoverYearEnd';
 import { TeamModel } from '@/models/Team';
 import { requireLocalhost } from '@/lib/localhost-helpers';
+import { getTokenFromRequest, shouldRejectCsrf, verifyToken } from '@/lib/auth';
+import { forbiddenError, unauthorizedError } from '@/lib/errors';
 
 /**
  * API endpoint to update carryover for all teams or a specific team at year end
@@ -13,9 +15,27 @@ import { requireLocalhost } from '@/lib/localhost-helpers';
  */
 export async function POST(request: NextRequest) {
   try {
+    if (shouldRejectCsrf(request)) {
+      return forbiddenError('Invalid request origin');
+    }
+
+    if (process.env.NODE_ENV !== 'development') {
+      return forbiddenError('Year-end migration endpoint is disabled outside development.');
+    }
+
     const localhostResult = requireLocalhost(request, 'ADMIN_ENABLED');
     if (localhostResult) {
       return localhostResult;
+    }
+
+    const token = getTokenFromRequest(request);
+    if (!token) {
+      return unauthorizedError('Missing admin token');
+    }
+
+    const user = verifyToken(token);
+    if (!user || user.role !== 'leader') {
+      return forbiddenError('Leader privileges are required for this endpoint.');
     }
 
     const { searchParams } = new URL(request.url);
@@ -60,8 +80,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error updating year-end carryover:', error);
     return NextResponse.json({ 
-      error: 'Failed to update carryover',
-      details: error instanceof Error ? error.message : String(error)
+      error: 'Failed to update carryover'
     }, { status: 500 });
   }
 }

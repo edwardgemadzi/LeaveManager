@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTokenFromRequest, verifyToken } from '@/lib/auth';
+import { getTokenFromRequest, shouldRejectCsrf, verifyToken } from '@/lib/auth';
 import { LeaveRequestModel } from '@/models/LeaveRequest';
 import { AuditLogModel } from '@/models/AuditLog';
 import { emailService } from '@/lib/email';
@@ -8,15 +8,27 @@ import { teamIdsMatch } from '@/lib/helpers';
 import { invalidateAnalyticsCache } from '@/lib/analyticsCache';
 import { error as logError } from '@/lib/logger';
 import { internalServerError, unauthorizedError, forbiddenError, badRequestError } from '@/lib/errors';
+import { apiRateLimit } from '@/lib/rateLimit';
+import { ObjectId } from 'mongodb';
+import { broadcastTeamUpdate } from '@/lib/teamEvents';
 
 interface BulkActionRequest {
   action: 'approve' | 'reject';
   requestIds: string[];
-  reason?: string; // For rejections
+  decisionNote?: string;
 }
 
 export async function PATCH(request: NextRequest) {
   try {
+    const rateLimitResponse = apiRateLimit(request);
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
+    if (shouldRejectCsrf(request)) {
+      return forbiddenError('Invalid request origin');
+    }
+
     const token = getTokenFromRequest(request);
     if (!token) {
       return unauthorizedError();
@@ -28,7 +40,9 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body: BulkActionRequest = await request.json();
-    const { action, requestIds, reason } = body;
+    const { action, requestIds, decisionNote } = body;
+    const normalizedDecisionNote =
+      typeof decisionNote === 'string' ? decisionNote.trim() : '';
 
     if (!action || !requestIds || !Array.isArray(requestIds) || requestIds.length === 0) {
       return badRequestError('Action and request IDs are required');
@@ -38,13 +52,30 @@ export async function PATCH(request: NextRequest) {
       return badRequestError('Invalid action. Must be approve or reject');
     }
 
+    if (requestIds.length > 100) {
+      return badRequestError('A maximum of 100 requests can be processed at once');
+    }
+
+    const dedupedRequestIds = [...new Set(requestIds.map(id => String(id).trim()))];
+    if (dedupedRequestIds.some(id => !ObjectId.isValid(id))) {
+      return badRequestError('All request IDs must be valid');
+    }
+
+    if (normalizedDecisionNote.length > 500) {
+      return badRequestError('Decision note must be 500 characters or fewer');
+    }
+
+    if (action === 'reject' && normalizedDecisionNote.length === 0) {
+      return badRequestError('Rejection reason is required for bulk rejection');
+    }
+
     const results = {
       successful: [] as string[],
       failed: [] as { id: string; error: string }[],
     };
 
     // Process each request
-    for (const requestId of requestIds) {
+    for (const requestId of dedupedRequestIds) {
       try {
         const leaveRequest = await LeaveRequestModel.findById(requestId);
         
@@ -65,11 +96,20 @@ export async function PATCH(request: NextRequest) {
 
         // Update the request status
         const newStatus = action === 'approve' ? 'approved' : 'rejected';
-        await LeaveRequestModel.updateStatus(requestId, newStatus);
+        const actorUser = await UserModel.findById(user.id);
+        if (!actorUser) {
+          results.failed.push({ id: requestId, error: 'User not found' });
+          continue;
+        }
+
+        await LeaveRequestModel.updateStatus(requestId, newStatus, {
+          note: normalizedDecisionNote || undefined,
+          byUserId: user.id,
+          byUsername: actorUser.username,
+        });
 
         // Get user details for audit and email
         const targetUser = await UserModel.findById(leaveRequest.userId);
-        const actorUser = await UserModel.findById(user.id);
 
         if (targetUser && actorUser) {
           // Log audit trail
@@ -86,8 +126,9 @@ export async function PATCH(request: NextRequest) {
               startDate: leaveRequest.startDate.toISOString().split('T')[0],
               endDate: leaveRequest.endDate.toISOString().split('T')[0],
               reason: leaveRequest.reason,
+              decisionNote: normalizedDecisionNote || undefined,
             },
-            { bulkAction: true, reason }
+            { bulkAction: true, reason: normalizedDecisionNote || undefined }
           );
 
           // Send email notification (placeholder - would need actual email addresses)
@@ -106,7 +147,7 @@ export async function PATCH(request: NextRequest) {
               leaveRequest.startDate.toISOString().split('T')[0],
               leaveRequest.endDate.toISOString().split('T')[0],
               leaveRequest.reason,
-              reason
+              normalizedDecisionNote || undefined
             );
           }
         }
@@ -116,20 +157,25 @@ export async function PATCH(request: NextRequest) {
         logError(`Error processing request ${requestId}:`, error);
         results.failed.push({ 
           id: requestId, 
-          error: error instanceof Error ? error.message : 'Unknown error' 
+          error: 'Failed to process request' 
         });
       }
     }
 
     if (results.successful.length > 0) {
       invalidateAnalyticsCache(user.teamId!);
+      broadcastTeamUpdate(user.teamId!, 'leaveRequestUpdated', {
+        updateType: 'bulk_review',
+        requestIds: results.successful,
+        updatedBy: user.id,
+      });
     }
 
     return NextResponse.json({
       success: true,
       results,
       summary: {
-        total: requestIds.length,
+        total: dedupedRequestIds.length,
         successful: results.successful.length,
         failed: results.failed.length,
       },

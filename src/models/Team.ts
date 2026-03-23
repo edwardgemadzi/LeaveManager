@@ -1,9 +1,12 @@
-import { getDatabase } from '@/lib/mongodb';
-import { ObjectId } from 'mongodb';
+import { getDatabase, getDatabaseRaw } from '@/lib/mongodb';
+import { ClientSession, ObjectId } from 'mongodb';
 import { Team, TeamSettings } from '@/types';
 
 export class TeamModel {
-  static async create(team: Omit<Team, '_id' | 'createdAt'>): Promise<Team> {
+  static async create(
+    team: Omit<Team, '_id' | 'createdAt'>,
+    session?: ClientSession
+  ): Promise<Team> {
     const db = await getDatabase();
     const teams = db.collection<Team>('teams');
     
@@ -12,14 +15,23 @@ export class TeamModel {
       createdAt: new Date(),
     };
     
-    const result = await teams.insertOne(newTeam);
+    const result = await teams.insertOne(newTeam, session ? { session } : undefined);
     return { ...newTeam, _id: result.insertedId.toString() };
   }
 
   static async findByTeamUsername(teamUsername: string): Promise<Team | null> {
     const db = await getDatabase();
     const teams = db.collection<Team>('teams');
-    return await teams.findOne({ teamUsername });
+    const normalizedTeamUsername = teamUsername.toLowerCase();
+    const exactMatch = await teams.findOne({ teamUsername: normalizedTeamUsername });
+    if (exactMatch) {
+      return exactMatch;
+    }
+
+    // Legacy compatibility: support older records created with mixed-case team usernames.
+    return await teams.findOne({
+      teamUsername: { $regex: `^${normalizedTeamUsername}$`, $options: 'i' },
+    });
   }
 
   static async findById(id: string): Promise<Team | null> {
@@ -68,7 +80,7 @@ export class TeamModel {
   }
 
   static async createIndexes(): Promise<void> {
-    const db = await getDatabase();
+    const db = await getDatabaseRaw();
     const teams = db.collection<Team>('teams');
     
     try {

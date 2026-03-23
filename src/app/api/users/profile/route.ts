@@ -4,6 +4,7 @@ import { ObjectId } from 'mongodb';
 import { error as logError } from '@/lib/logger';
 import { internalServerError, badRequestError, notFoundError } from '@/lib/errors';
 import { requireAuth, requireSafeUserData } from '@/lib/api-helpers';
+import { validateRequest, schemas } from '@/lib/validation';
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,7 +21,11 @@ export async function GET(request: NextRequest) {
       return userDataResult;
     }
 
-    return NextResponse.json({ user: userDataResult });
+    const normalizedUser = {
+      ...userDataResult,
+      id: (userDataResult as { _id?: string })._id || (userDataResult as { id?: string }).id,
+    };
+    return NextResponse.json({ user: normalizedUser });
 
   } catch (error) {
     logError('Get profile error:', error);
@@ -38,9 +43,9 @@ export async function PATCH(request: NextRequest) {
     const user = authResult;
 
     const { fullName } = await request.json();
-
-    if (!fullName || fullName.trim().length === 0) {
-      return badRequestError('Full name is required');
+    const validation = validateRequest(schemas.updateProfile, { fullName });
+    if (!validation.isValid) {
+      return badRequestError('Validation failed', validation.errors);
     }
 
     // Update user profile
@@ -49,7 +54,7 @@ export async function PATCH(request: NextRequest) {
     
     const result = await users.updateOne(
       { _id: new ObjectId(user.id) },
-      { $set: { fullName: fullName.trim() } }
+      { $set: { fullName: validation.data.fullName.trim() } }
     );
 
     if (result.matchedCount === 0) {
@@ -61,7 +66,10 @@ export async function PATCH(request: NextRequest) {
     if (updatedUserResult instanceof NextResponse) {
       return updatedUserResult;
     }
-    const safeUserData = updatedUserResult;
+    const safeUserData = {
+      ...updatedUserResult,
+      id: (updatedUserResult as { _id?: string })._id || (updatedUserResult as { id?: string }).id,
+    };
 
     return NextResponse.json({ 
       success: true, 

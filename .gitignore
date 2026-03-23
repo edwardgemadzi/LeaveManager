@@ -165,6 +165,9 @@ backups/
 *.sublime-project
 *.sublime-workspace
 
+# Cursor workspace artifacts
+.cursor/
+
 # OS generated files
 .DS_Store
 .DS_Store?

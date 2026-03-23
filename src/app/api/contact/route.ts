@@ -4,6 +4,7 @@ import { getDatabase } from '@/lib/mongodb';
 import { error as logError, info } from '@/lib/logger';
 import { internalServerError, badRequestError } from '@/lib/errors';
 import { validateRequest, schemas } from '@/lib/validation';
+import { apiRateLimit } from '@/lib/rateLimit';
 
 interface ContactSubmission {
   name: string;
@@ -22,6 +23,11 @@ interface ContactSubmission {
  */
 export async function POST(request: NextRequest) {
   try {
+    const rateLimitResponse = apiRateLimit(request);
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const body = await request.json();
     const { name, email, subject, message, type, userId, username } = body;
 
@@ -50,14 +56,14 @@ export async function POST(request: NextRequest) {
       subject: validatedData.subject.trim(),
       message: validatedData.message.trim(),
       type: validatedData.type,
-      userId: authenticatedUser?.id || validatedData.userId || undefined,
-      username: authenticatedUser?.username || validatedData.username || undefined,
+      userId: authenticatedUser?.id || undefined,
+      username: authenticatedUser?.username || undefined,
       createdAt: new Date(),
     };
 
     await contacts.insertOne(submission);
 
-    info(`[Contact] New ${type} submission from ${name} (${email})`);
+    info(`[Contact] New ${type} submission received`);
 
     // TODO: In production, you might want to send an email notification here
     // For now, we just store it in the database

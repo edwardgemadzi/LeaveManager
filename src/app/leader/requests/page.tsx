@@ -63,12 +63,14 @@ export default function LeaderRequestsPage() {
   const [teamId, setTeamId] = useState<string | null>(null);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [visibleCount, setVisibleCount] = useState(50);
+  const [selectedRequestIds, setSelectedRequestIds] = useState<string[]>([]);
+  const [sortMode, setSortMode] = useState<'default' | 'oldestPending' | 'startDateSoonest'>('default');
 
   const { data: teamData, mutate: mutateTeam, isLoading: teamLoading } = useTeamData({ members: 'full' });
   const { data: requestsData, mutate: mutateRequests, isLoading: requestsLoading } = useRequests({
     teamId,
     includeDeleted: true,
-    fields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'createdAt', 'updatedAt', 'deletedAt', 'deletedBy', 'requestedBy'],
+    fields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'decisionNote', 'decisionAt', 'decisionByUsername', 'createdAt', 'updatedAt', 'deletedAt', 'deletedBy', 'requestedBy'],
   });
 
   useEffect(() => {
@@ -92,6 +94,7 @@ export default function LeaderRequestsPage() {
 
   useEffect(() => {
     setVisibleCount(50);
+    setSelectedRequestIds([]);
   }, [filter]);
 
   // Real-time updates using SSE
@@ -113,19 +116,22 @@ export default function LeaderRequestsPage() {
   });
 
   const handleApprove = async (requestId: string) => {
+    const decisionNote = prompt('Optional approval note (leave blank to skip):') || '';
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`/api/leave-requests/${requestId}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status: 'approved' }),
+        credentials: 'include',
+        body: JSON.stringify({ status: 'approved', decisionNote }),
       });
 
       if (response.ok) {
         await mutateRequests();
+      } else {
+        const error = await response.json();
+        showError(error.error || 'Failed to approve request');
       }
     } catch (err) {
       console.error('Error approving request:', err);
@@ -133,19 +139,27 @@ export default function LeaderRequestsPage() {
   };
 
   const handleReject = async (requestId: string) => {
+    const decisionNote = prompt('Rejection reason (required):') || '';
+    if (!decisionNote.trim()) {
+      showInfo('A rejection reason is required.');
+      return;
+    }
+
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`/api/leave-requests/${requestId}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status: 'rejected' }),
+        credentials: 'include',
+        body: JSON.stringify({ status: 'rejected', decisionNote: decisionNote.trim() }),
       });
 
       if (response.ok) {
         await mutateRequests();
+      } else {
+        const error = await response.json();
+        showError(error.error || 'Failed to reject request');
       }
     } catch (err) {
       console.error('Error rejecting request:', err);
@@ -159,12 +173,9 @@ export default function LeaderRequestsPage() {
 
     setDeleting(requestId);
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`/api/leave-requests/${requestId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        credentials: 'include',
       });
 
       if (response.ok) {
@@ -187,12 +198,9 @@ export default function LeaderRequestsPage() {
   const handleRestore = async (requestId: string) => {
     setDeleting(requestId);
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`/api/leave-requests/${requestId}/restore`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        credentials: 'include',
       });
 
       if (response.ok) {
@@ -216,13 +224,12 @@ export default function LeaderRequestsPage() {
     setSubmittingEmergency(true);
 
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch('/api/leave-requests/emergency', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           ...emergencyForm,
           isEmergency: true
@@ -263,11 +270,8 @@ export default function LeaderRequestsPage() {
 
     const fetchExistingRanges = async () => {
       try {
-        const token = localStorage.getItem('token');
         const response = await fetch('/api/leave-requests', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
+          credentials: 'include',
         });
         
         if (response.ok) {
@@ -316,16 +320,14 @@ export default function LeaderRequestsPage() {
     let errorCount = 0;
 
     try {
-      const token = localStorage.getItem('token');
-      
       // Create leave requests for each selected range
       const promises = selectedRanges.map(range => 
         fetch('/api/leave-requests', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
+          credentials: 'include',
           body: JSON.stringify({
             startDate: formatDateSafe(range.startDate),
             endDate: formatDateSafe(range.endDate),
@@ -384,6 +386,13 @@ export default function LeaderRequestsPage() {
   });
 
   const sortedRequests = [...filteredRequests].sort((a, b) => {
+    if (sortMode === 'oldestPending' && a.status === 'pending' && b.status === 'pending') {
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    }
+    if (sortMode === 'startDateSoonest' && a.status === 'pending' && b.status === 'pending') {
+      return parseDateSafe(a.startDate).getTime() - parseDateSafe(b.startDate).getTime();
+    }
+
     if (filter === 'deleted') {
       const aDeleted = a.deletedAt ? new Date(a.deletedAt).getTime() : 0;
       const bDeleted = b.deletedAt ? new Date(b.deletedAt).getTime() : 0;
@@ -398,6 +407,83 @@ export default function LeaderRequestsPage() {
   });
 
   const pagedRequests = sortedRequests.slice(0, visibleCount);
+
+  const getPendingAgeDays = (request: LeaveRequest) =>
+    Math.max(1, Math.ceil((Date.now() - new Date(request.createdAt).getTime()) / (1000 * 60 * 60 * 24)));
+
+  const getOverlapCount = (request: LeaveRequest) => {
+    const reqStart = parseDateSafe(request.startDate).getTime();
+    const reqEnd = parseDateSafe(request.endDate).getTime();
+    return requests.filter(r => {
+      if (r._id === request._id || r.status !== 'approved' || r.deletedAt) return false;
+      const otherStart = parseDateSafe(r.startDate).getTime();
+      const otherEnd = parseDateSafe(r.endDate).getTime();
+      return otherStart <= reqEnd && otherEnd >= reqStart;
+    }).length;
+  };
+
+  const toggleRequestSelection = (requestId: string) => {
+    setSelectedRequestIds(prev =>
+      prev.includes(requestId) ? prev.filter(id => id !== requestId) : [...prev, requestId]
+    );
+  };
+
+  const selectAllVisiblePending = () => {
+    const pendingIds = pagedRequests
+      .filter(request => request.status === 'pending' && request._id)
+      .map(request => request._id!) as string[];
+    setSelectedRequestIds(pendingIds);
+  };
+
+  const clearSelection = () => setSelectedRequestIds([]);
+
+  const runBulkAction = async (action: 'approve' | 'reject') => {
+    if (selectedRequestIds.length === 0) {
+      showInfo('Select at least one pending request for bulk review.');
+      return;
+    }
+
+    const decisionNote = prompt(
+      action === 'reject'
+        ? 'Rejection reason for selected requests (required):'
+        : 'Optional approval note for selected requests:'
+    ) || '';
+
+    if (action === 'reject' && !decisionNote.trim()) {
+      showInfo('A rejection reason is required for bulk rejection.');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/leave-requests/bulk', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          action,
+          requestIds: selectedRequestIds,
+          decisionNote: decisionNote.trim(),
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        showError(data.error || 'Bulk action failed');
+        return;
+      }
+
+      await mutateRequests();
+      setSelectedRequestIds([]);
+      showSuccess(
+        `${data.summary?.successful || 0} request(s) ${action === 'approve' ? 'approved' : 'rejected'} successfully.`
+      );
+    } catch (error) {
+      console.error('Bulk action error:', error);
+      showError('Network error. Please try again.');
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -703,7 +789,7 @@ export default function LeaderRequestsPage() {
         {/* Filter Tabs - Enhanced */}
         <div className="card mb-8">
           <div className="p-5 sm:p-6">
-            <div className="border-b border-gray-200 dark:border-gray-800">
+            <div className="border-b border-gray-200 dark:border-gray-800 mb-4">
               <nav className="-mb-px flex flex-wrap gap-4 sm:gap-8">
                 {[
                   { key: 'all', label: 'All Requests' },
@@ -725,6 +811,32 @@ export default function LeaderRequestsPage() {
                   </button>
                 ))}
               </nav>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <select
+                value={sortMode}
+                onChange={(e) => setSortMode(e.target.value as 'default' | 'oldestPending' | 'startDateSoonest')}
+                className="input-modern w-auto"
+              >
+                <option value="default">Default sort</option>
+                <option value="oldestPending">Oldest pending first</option>
+                <option value="startDateSoonest">Start date soonest</option>
+              </select>
+              <button type="button" onClick={selectAllVisiblePending} className="btn-secondary px-3 py-2 text-sm">
+                Select All Pending
+              </button>
+              <button type="button" onClick={clearSelection} className="btn-secondary px-3 py-2 text-sm">
+                Clear
+              </button>
+              <button type="button" onClick={() => runBulkAction('approve')} className="btn-success px-3 py-2 text-sm">
+                Bulk Approve
+              </button>
+              <button type="button" onClick={() => runBulkAction('reject')} className="btn-danger px-3 py-2 text-sm">
+                Bulk Reject
+              </button>
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                {selectedRequestIds.length} selected
+              </span>
             </div>
           </div>
         </div>
@@ -750,6 +862,14 @@ export default function LeaderRequestsPage() {
                       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center flex-wrap gap-3 mb-3">
+                            {request.status === 'pending' && request._id && (
+                              <input
+                                type="checkbox"
+                                checked={selectedRequestIds.includes(request._id)}
+                                onChange={() => toggleRequestSelection(request._id!)}
+                                className="h-4 w-4"
+                              />
+                            )}
                             <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
                               {member?.fullName || member?.username || 'Unknown User'}
                             </h4>
@@ -766,10 +886,31 @@ export default function LeaderRequestsPage() {
                             {parseDateSafe(request.startDate).toLocaleDateString()} - {parseDateSafe(request.endDate).toLocaleDateString()}
                           </p>
                           <p className="text-base text-gray-700 dark:text-gray-300 mb-3">{request.reason}</p>
+                          {request.status === 'pending' && (
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300">
+                                Pending {getPendingAgeDays(request)}d
+                              </span>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300">
+                                {getOverlapCount(request)} overlap(s)
+                              </span>
+                            </div>
+                          )}
+                          {request.decisionNote && (
+                            <p className="text-sm text-indigo-700 dark:text-indigo-300 mb-2">
+                              Decision note: {request.decisionNote}
+                            </p>
+                          )}
                           <div className="flex items-center flex-wrap gap-2">
                             <p className="text-xs text-gray-500 dark:text-gray-400">
                               Requested on {new Date(request.createdAt).toLocaleDateString()}
                             </p>
+                            {request.decisionAt && (
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                Decided on {new Date(request.decisionAt).toLocaleDateString()}
+                                {request.decisionByUsername ? ` by ${request.decisionByUsername}` : ''}
+                              </p>
+                            )}
                             {request.requestedBy && (() => {
                               const isEmergency = request.reason && isEmergencyReason(request.reason);
                               const isHistorical = !isEmergency && 
@@ -792,6 +933,11 @@ export default function LeaderRequestsPage() {
                               }
                               return null;
                             })()}
+                            {request.requestedBy && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
+                                Created by leader
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-2 sm:ml-4 sm:flex-shrink-0">

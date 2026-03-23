@@ -1,11 +1,8 @@
 import useSWR from 'swr';
 
 const authedFetcher = async <T,>(url: string): Promise<T> => {
-  const token = localStorage.getItem('token');
   const response = await fetch(url, {
-    headers: {
-      Authorization: token ? `Bearer ${token}` : '',
-    },
+    credentials: 'include',
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));

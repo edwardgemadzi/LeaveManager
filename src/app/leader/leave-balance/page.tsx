@@ -506,7 +506,6 @@ export default function LeaderLeaveBalancePage() {
 
     setUpdating(memberId);
     try {
-      const token = localStorage.getItem('token');
       const currentYear = new Date().getFullYear();
       const maxLeave = team?.settings.maxLeavePerYear || 20;
       const effectiveManualYearToDateUsed = getEffectiveManualYearToDateUsed(member, currentYear);
@@ -556,9 +555,9 @@ export default function LeaderLeaveBalancePage() {
       const response = await fetch(`/api/users/${memberId}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ manualLeaveBalance: manualBalance }),
       });
 
@@ -595,14 +594,12 @@ export default function LeaderLeaveBalancePage() {
 
     setUpdating(memberId);
     try {
-      const token = localStorage.getItem('token');
-      
       const response = await fetch(`/api/users/${memberId}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ manualLeaveBalance: null }),
       });
 
@@ -647,15 +644,14 @@ export default function LeaderLeaveBalancePage() {
 
     setUpdating(memberId);
     try {
-      const token = localStorage.getItem('token');
       const currentYear = new Date().getFullYear();
       
       const response = await fetch(`/api/users/${memberId}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ manualYearToDateUsed: daysTakenValue, manualYearToDateUsedYear: currentYear }),
       });
 
@@ -672,9 +668,7 @@ export default function LeaderLeaveBalancePage() {
         // Refetch analytics to ensure remaining balance is updated
         try {
           const analyticsResponse = await fetch('/api/analytics', {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
+            credentials: 'include',
           });
           if (analyticsResponse.ok) {
             const analyticsData = await analyticsResponse.json();
@@ -720,8 +714,6 @@ export default function LeaderLeaveBalancePage() {
 
     setUpdating(memberId);
     try {
-      const token = localStorage.getItem('token');
-      
       // Get days used - use manualMaternityYearToDateUsed if set, otherwise calculate from approved maternity requests
       let daysUsed: number;
       if (member.manualMaternityYearToDateUsed !== undefined) {
@@ -788,9 +780,9 @@ export default function LeaderLeaveBalancePage() {
       const response = await fetch(`/api/users/${memberId}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ 
           manualMaternityLeaveBalance: newManualMaternityLeaveBalance,
           manualMaternityYearToDateUsed: daysUsed
@@ -846,14 +838,12 @@ export default function LeaderLeaveBalancePage() {
 
     setUpdating(memberId);
     try {
-      const token = localStorage.getItem('token');
-      
       const response = await fetch(`/api/users/${memberId}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ manualMaternityYearToDateUsed: daysTakenValue }),
       });
 
@@ -901,14 +891,12 @@ export default function LeaderLeaveBalancePage() {
 
     setUpdating(memberId);
     try {
-      const token = localStorage.getItem('token');
-      
       const response = await fetch(`/api/users/${memberId}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ carryoverFromPreviousYear: carryoverValue }),
       });
 
@@ -945,9 +933,8 @@ export default function LeaderLeaveBalancePage() {
   const fetchCarryoverReport = async () => {
     setCarryoverReportLoading(true);
     try {
-      const token = localStorage.getItem('token');
       const res = await fetch('/api/team/carryover-report', {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'include',
       });
       if (!res.ok) throw new Error(res.status === 403 ? 'Leaders only' : 'Failed to load report');
       const data = await res.json();
@@ -967,14 +954,12 @@ export default function LeaderLeaveBalancePage() {
 
     setUpdating(memberId);
     try {
-      const token = localStorage.getItem('token');
-      
       const response = await fetch(`/api/users/${memberId}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ manualYearToDateUsed: null, manualYearToDateUsedYear: null }),
       });
 
@@ -993,9 +978,7 @@ export default function LeaderLeaveBalancePage() {
         // Refetch analytics to ensure remaining balance is updated
         try {
           const analyticsResponse = await fetch('/api/analytics', {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
+            credentials: 'include',
           });
           if (analyticsResponse.ok) {
             const analyticsData = await analyticsResponse.json();

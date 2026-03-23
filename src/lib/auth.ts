@@ -1,5 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { AuthUser } from '@/types';
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
 // Validate JWT_SECRET on initialization - fail fast if missing or invalid
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -71,5 +73,118 @@ export const getTokenFromRequest = (request: Request): string | null => {
     }
     return token;
   }
+
+  // Fallback to HttpOnly auth cookie when available (NextRequest).
+  const requestWithCookies = request as Request & {
+    cookies?: { get: (name: string) => { value: string } | undefined };
+  };
+  const cookieToken = requestWithCookies.cookies?.get('token')?.value;
+  if (cookieToken && cookieToken.trim().length > 0) {
+    return cookieToken.trim();
+  }
+
   return null;
 };
+
+function getAllowedOrigins(request: NextRequest): Set<string> {
+  const allowed = new Set<string>([request.nextUrl.origin]);
+  const envAllowed = process.env.CSRF_ALLOWED_ORIGINS;
+  if (!envAllowed) {
+    return allowed;
+  }
+
+  envAllowed
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean)
+    .forEach(origin => {
+      try {
+        allowed.add(new URL(origin).origin);
+      } catch {
+        // Ignore malformed configured origin values
+      }
+    });
+
+  return allowed;
+}
+
+function extractRequestOrigin(request: NextRequest): string | null {
+  const originHeader = request.headers.get('origin');
+  if (originHeader) {
+    try {
+      return new URL(originHeader).origin;
+    } catch {
+      return null;
+    }
+  }
+
+  const refererHeader = request.headers.get('referer');
+  if (refererHeader) {
+    try {
+      return new URL(refererHeader).origin;
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * CSRF guard for cookie-authenticated mutating requests.
+ * Returns true when request should be rejected.
+ */
+export function shouldRejectCsrf(request: NextRequest): boolean {
+  const method = request.method.toUpperCase();
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    return false;
+  }
+
+  // Bearer-auth API clients are not vulnerable to browser CSRF by default.
+  const authHeader = request.headers.get('authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return false;
+  }
+
+  // Only enforce CSRF checks for cookie-authenticated requests.
+  const cookieToken = request.cookies.get('token')?.value;
+  if (!cookieToken) {
+    return false;
+  }
+
+  const secFetchSite = request.headers.get('sec-fetch-site');
+  if (
+    secFetchSite &&
+    !['same-origin', 'same-site', 'none'].includes(secFetchSite)
+  ) {
+    return true;
+  }
+
+  const requestOrigin = extractRequestOrigin(request);
+  if (!requestOrigin) {
+    return true;
+  }
+
+  return !getAllowedOrigins(request).has(requestOrigin);
+}
+
+export function setAuthCookie(response: NextResponse, token: string): void {
+  const isProduction = process.env.NODE_ENV === 'production';
+  response.cookies.set('token', token, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 60 * 60 * 24 * 7, // 7 days
+  });
+}
+
+export function clearAuthCookie(response: NextResponse): void {
+  response.cookies.set('token', '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 0,
+  });
+}

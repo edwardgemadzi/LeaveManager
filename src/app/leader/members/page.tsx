@@ -56,12 +56,9 @@ export default function LeaderMembersPage() {
 
     setDeleting(memberId);
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`/api/users/${memberId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        credentials: 'include',
       });
 
       if (response.ok) {
@@ -82,13 +79,12 @@ export default function LeaderMembersPage() {
   const handleUpdateShiftTag = async (memberId: string, newShiftTag: 'day' | 'night' | 'mixed') => {
     setUpdating(memberId);
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`/api/users/${memberId}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ shiftTag: newShiftTag }),
       });
 
@@ -113,13 +109,12 @@ export default function LeaderMembersPage() {
   const handleUpdateSubgroup = async (memberId: string, newSubgroupTag: string) => {
     setUpdating(memberId);
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`/api/users/${memberId}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ subgroupTag: newSubgroupTag.trim() || undefined }),
       });
 
@@ -145,13 +140,12 @@ export default function LeaderMembersPage() {
   const handleUpdateMaternityPaternityType = async (memberId: string, newType: 'maternity' | 'paternity' | null) => {
     setUpdating(memberId);
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`/api/users/${memberId}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ maternityPaternityType: newType }),
       });
 
@@ -190,13 +184,12 @@ export default function LeaderMembersPage() {
 
     setUpdating(memberId);
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`/api/users/${memberId}/schedule`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ shiftSchedule: tempSchedule }),
       });
 
@@ -241,13 +234,12 @@ export default function LeaderMembersPage() {
 
     setResettingPassword(memberId);
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch(`/api/users/${memberId}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ newPassword: newPassword.trim() }),
       });
 
@@ -385,8 +377,6 @@ export default function LeaderMembersPage() {
   const handleSaveGroupNames = async () => {
     setSavingGroupNames(true);
     try {
-      const token = localStorage.getItem('token');
-      
       // Start with existing group names from team settings
       const existingNames = team?.settings.workingDaysGroupNames || {};
       const updatedNames = { ...existingNames };
@@ -416,9 +406,9 @@ export default function LeaderMembersPage() {
       const response = await fetch('/api/team', {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           settings: {
             ...currentSettings,

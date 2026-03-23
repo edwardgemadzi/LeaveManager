@@ -1,4 +1,5 @@
 import { MongoClient, Db } from 'mongodb';
+import { initializeDatabaseIndexes } from '@/lib/initDatabase';
 
 if (!process.env.MONGODB_URI) {
   throw new Error('Please add your MongoDB URI to .env.local');
@@ -9,6 +10,7 @@ const options = {};
 
 let client: MongoClient;
 let clientPromise: Promise<MongoClient>;
+let indexesInitPromise: Promise<void> | null = null;
 
 if (process.env.NODE_ENV === 'development') {
   // In development mode, use a global variable so that the value
@@ -30,11 +32,28 @@ if (process.env.NODE_ENV === 'development') {
 
 export default clientPromise;
 
-export const getDatabase = async (): Promise<Db> => {
+export const getDatabaseRaw = async (): Promise<Db> => {
   const client = await clientPromise;
   return client.db('leave-manager');
 };
 
+const ensureIndexesInitialized = async (): Promise<void> => {
+  if (!indexesInitPromise) {
+    indexesInitPromise = initializeDatabaseIndexes().catch((error) => {
+      // Keep startup resilient if index creation fails unexpectedly.
+      console.error('Failed to initialize database indexes:', error);
+    });
+  }
+
+  await indexesInitPromise;
+};
+
+export const getDatabase = async (): Promise<Db> => {
+  await ensureIndexesInitialized();
+  return getDatabaseRaw();
+};
+
 export const getClient = async (): Promise<MongoClient> => {
+  await ensureIndexesInitialized();
   return await clientPromise;
 };
