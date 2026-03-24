@@ -45,6 +45,7 @@ export default function MemberProfilePage() {
   const [testTelegramLoading, setTestTelegramLoading] = useState(false);
   const [testEmailLoading, setTestEmailLoading] = useState(false);
   const [telegramLinking, setTelegramLinking] = useState(false);
+  const [telegramUnlinking, setTelegramUnlinking] = useState(false);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -233,6 +234,43 @@ export default function MemberProfilePage() {
     } finally {
       setTestEmailLoading(false);
       window.setTimeout(() => scrollToProfileFeedback(), 80);
+    }
+  };
+
+  const handleUnlinkTelegram = async () => {
+    if (
+      !window.confirm(
+        'Disconnect Telegram from this account? You can use “Log in with Telegram” again afterward.'
+      )
+    ) {
+      return;
+    }
+    setError('');
+    setMessage('');
+    setTelegramUnlinking(true);
+    try {
+      const res = await fetch('/api/users/telegram/unlink', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (res.ok && data.user) {
+        setUser(data.user);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        setMessage(
+          data.message ||
+            'Telegram disconnected. Scroll to Notifications and use “Log in with Telegram” to link again.'
+        );
+        window.setTimeout(() => scrollToProfileFeedback(), 80);
+      } else {
+        setError(data.error || 'Failed to disconnect Telegram');
+        window.setTimeout(() => scrollToProfileFeedback(), 80);
+      }
+    } catch {
+      setError('Network error disconnecting Telegram');
+      window.setTimeout(() => scrollToProfileFeedback(), 80);
+    } finally {
+      setTelegramUnlinking(false);
     }
   };
 
@@ -514,6 +552,14 @@ export default function MemberProfilePage() {
                           className="mt-3 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 disabled:opacity-50"
                         >
                           {testTelegramLoading ? 'Sending test…' : 'Send test Telegram message'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleUnlinkTelegram}
+                          disabled={telegramUnlinking}
+                          className="mt-2 block text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
+                        >
+                          {telegramUnlinking ? 'Disconnecting…' : 'Disconnect Telegram (link again)'}
                         </button>
                       </div>
                     ) : process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ? (
