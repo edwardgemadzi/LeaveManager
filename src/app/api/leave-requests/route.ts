@@ -10,6 +10,9 @@ import {
   createLeaveRequest,
   getLeaveRequests,
 } from '@/services/leaveRequestsService';
+import { notifyLeaveSubmitted } from '@/services/notificationService';
+import { UserModel } from '@/models/User';
+import { TeamModel } from '@/models/Team';
 
 export async function GET(request: NextRequest) {
   try {
@@ -97,6 +100,16 @@ export async function POST(request: NextRequest) {
     info(`[LeaveRequest] Broadcasting leaveRequestCreated event for team ${user.teamId}:`, eventData);
     invalidateAnalyticsCache(user.teamId!);
     broadcastTeamUpdate(user.teamId!, 'leaveRequestCreated', eventData);
+
+    const memberUser = await UserModel.findById(leaveRequest.userId.toString());
+    const team = await TeamModel.findById(user.teamId!);
+    if (memberUser && team) {
+      await notifyLeaveSubmitted({
+        leaveRequest,
+        member: memberUser,
+        teamName: team.name,
+      });
+    }
 
     return NextResponse.json(leaveRequest);
   } catch (error) {

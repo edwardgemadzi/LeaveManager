@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { User, Team } from '@/types';
@@ -18,7 +18,11 @@ export default function LeaderProfilePage() {
   });
   const [profileForm, setProfileForm] = useState({
     fullName: '',
+    email: '',
+    notifyEmail: true,
+    notifyTelegram: true,
   });
+  const telegramMountRef = useRef<HTMLDivElement>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -35,6 +39,9 @@ export default function LeaderProfilePage() {
           setUser(userData.user);
           setProfileForm({
             fullName: userData.user.fullName || '',
+            email: (userData.user as { email?: string }).email || '',
+            notifyEmail: (userData.user as { notifyEmail?: boolean }).notifyEmail !== false,
+            notifyTelegram: (userData.user as { notifyTelegram?: boolean }).notifyTelegram !== false,
           });
         }
 
@@ -56,6 +63,53 @@ export default function LeaderProfilePage() {
 
     fetchUserData();
   }, []);
+
+  useEffect(() => {
+    const bot = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
+    if (!bot || !telegramMountRef.current) return;
+    const el = telegramMountRef.current;
+    if ((user as { telegramUserId?: string } | null)?.telegramUserId) return;
+
+    type TelegramUser = Record<string, string | number | undefined>;
+    const w = window as unknown as { onTelegramAuth?: (u: TelegramUser) => void };
+    w.onTelegramAuth = async (telegramUser: TelegramUser) => {
+      setError('');
+      setMessage('');
+      try {
+        const res = await fetch('/api/users/telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(telegramUser),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setUser(data.user);
+          setMessage('Telegram linked successfully.');
+          localStorage.setItem('user', JSON.stringify(data.user));
+        } else {
+          setError(data.error || 'Failed to link Telegram');
+        }
+      } catch {
+        setError('Network error linking Telegram');
+      }
+    };
+
+    el.innerHTML = '';
+    const script = document.createElement('script');
+    script.src = 'https://telegram.org/js/telegram-widget.js?22';
+    script.async = true;
+    script.setAttribute('data-telegram-login', bot);
+    script.setAttribute('data-size', 'large');
+    script.setAttribute('data-onauth', 'onTelegramAuth');
+    script.setAttribute('data-request-access', 'write');
+    el.appendChild(script);
+
+    return () => {
+      el.innerHTML = '';
+      delete w.onTelegramAuth;
+    };
+  }, [user]);
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,6 +193,9 @@ export default function LeaderProfilePage() {
         credentials: 'include',
         body: JSON.stringify({
           fullName: profileForm.fullName.trim(),
+          email: profileForm.email.trim(),
+          notifyEmail: profileForm.notifyEmail,
+          notifyTelegram: profileForm.notifyTelegram,
         }),
       });
 
@@ -241,6 +298,63 @@ export default function LeaderProfilePage() {
                       </p>
                     </div>
                   )}
+
+                  <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Notifications</h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                      Add your email and optionally link Telegram to receive leave request updates.
+                    </p>
+                    <div className="mb-3">
+                      <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        id="email"
+                        autoComplete="email"
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        value={profileForm.email}
+                        onChange={(e) =>
+                          setProfileForm({ ...profileForm, email: e.target.value })
+                        }
+                        placeholder="you@example.com"
+                      />
+                    </div>
+                    <label className="flex items-center gap-2 mb-2 text-sm text-gray-700 dark:text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={profileForm.notifyEmail}
+                        disabled={!profileForm.email.trim()}
+                        onChange={(e) =>
+                          setProfileForm({ ...profileForm, notifyEmail: e.target.checked })
+                        }
+                      />
+                      Email me about leave updates
+                    </label>
+                    <label className="flex items-center gap-2 mb-3 text-sm text-gray-700 dark:text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={profileForm.notifyTelegram}
+                        onChange={(e) =>
+                          setProfileForm({ ...profileForm, notifyTelegram: e.target.checked })
+                        }
+                      />
+                      Telegram notifications (after linking below)
+                    </label>
+                    {(user as { telegramUserId?: string })?.telegramUserId ? (
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Telegram linked
+                        {(user as { telegramUsername?: string }).telegramUsername
+                          ? ` (@${(user as { telegramUsername?: string }).telegramUsername})`
+                          : ''}
+                        .
+                      </p>
+                    ) : process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ? (
+                      <div ref={telegramMountRef} className="min-h-[56px]" />
+                    ) : (
+                      <p className="text-xs text-gray-500">Telegram linking is not configured.</p>
+                    )}
+                  </div>
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Member Since</label>

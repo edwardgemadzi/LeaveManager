@@ -258,19 +258,36 @@ export const schemas = {
       })
   }),
 
-  // Profile update schema
+  // Profile update — at least one field required
   updateProfile: Joi.object({
     fullName: Joi.string()
       .min(2)
       .max(100)
       .pattern(/^[a-zA-Z\s'-]+$/)
-      .required()
+      .optional()
       .messages({
         'string.min': 'Full name must be at least 2 characters long',
         'string.max': 'Full name must be no more than 100 characters long',
         'string.pattern.base': 'Full name can only contain letters, spaces, hyphens, and apostrophes',
-        'any.required': 'Full name is required'
-      })
+      }),
+    email: Joi.string().email().max(320).allow('', null).optional(),
+    notifyEmail: Joi.boolean().optional(),
+    notifyTelegram: Joi.boolean().optional(),
+    dismissNotificationPrompt: Joi.boolean().optional(),
+  })
+    .min(1)
+    .messages({
+      'object.min': 'At least one field is required to update',
+    }),
+
+  telegramLogin: Joi.object({
+    id: Joi.alternatives().try(Joi.number(), Joi.string()).required(),
+    first_name: Joi.string().allow('').optional(),
+    last_name: Joi.string().allow('').optional(),
+    username: Joi.string().allow('').optional(),
+    photo_url: Joi.string().allow('').optional(),
+    auth_date: Joi.alternatives().try(Joi.number(), Joi.string()).required(),
+    hash: Joi.string().required(),
   }),
 
   // Team settings schema

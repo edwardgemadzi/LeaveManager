@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTokenFromRequest, shouldRejectCsrf, verifyToken } from '@/lib/auth';
 import { LeaveRequestModel } from '@/models/LeaveRequest';
 import { AuditLogModel } from '@/models/AuditLog';
-import { emailService } from '@/lib/email';
+import { notifyLeaveDecision } from '@/services/notificationService';
 import { UserModel } from '@/models/User';
 import { teamIdsMatch } from '@/lib/helpers';
 import { ObjectId } from 'mongodb';
@@ -133,25 +133,13 @@ export async function PATCH(
         }
       );
 
-      // Send email notification (placeholder - would need actual email addresses)
-      if (status === 'approved') {
-        await emailService.sendLeaveApprovalNotification(
-          `${targetUser.username}@company.com`, // Placeholder email
-          targetUser.username,
-          leaveRequest.startDate.toISOString().split('T')[0],
-          leaveRequest.endDate.toISOString().split('T')[0],
-          leaveRequest.reason
-        );
-      } else {
-        await emailService.sendLeaveRejectionNotification(
-          `${targetUser.username}@company.com`, // Placeholder email
-          targetUser.username,
-          leaveRequest.startDate.toISOString().split('T')[0],
-          leaveRequest.endDate.toISOString().split('T')[0],
-          leaveRequest.reason,
-          decisionNote || undefined
-        );
-      }
+      await notifyLeaveDecision({
+        leaveRequest,
+        member: targetUser,
+        status,
+        decisionNote: decisionNote || undefined,
+        leaderUsername: actorUser.username,
+      });
     }
 
     // Broadcast event after status change

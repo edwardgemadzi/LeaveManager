@@ -286,6 +286,45 @@ export class LeaveRequestModel {
     }
   }
 
+  /** Approved, not deleted, leave starting within the next ~15 UTC calendar days (for reminder cron). */
+  static async findApprovedForReminderScan(now: Date): Promise<LeaveRequest[]> {
+    const db = await getDatabase();
+    const requests = db.collection<LeaveRequest>('leaveRequests');
+
+    const todayStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+    );
+    const windowEnd = new Date(todayStart);
+    windowEnd.setUTCDate(windowEnd.getUTCDate() + 16);
+
+    const query = {
+      $and: [
+        { status: 'approved' as const },
+        LeaveRequestModel.buildNotDeletedQuery(),
+        { startDate: { $gte: todayStart, $lt: windowEnd } },
+      ],
+    };
+
+    return requests.find(query).toArray();
+  }
+
+  static async markReminderSent(id: string, which: '10' | '5'): Promise<void> {
+    const db = await getDatabase();
+    const requests = db.collection<LeaveRequest>('leaveRequests');
+    const objectId = new ObjectId(id);
+    const field = which === '10' ? 'reminder10DaysSentAt' : 'reminder5DaysSentAt';
+    await requests.updateOne(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { _id: objectId } as any,
+      {
+        $set: {
+          [field]: new Date(),
+          updatedAt: new Date(),
+        },
+      }
+    );
+  }
+
   static async createIndexes(): Promise<void> {
     const db = await getDatabaseRaw();
     const requests = db.collection<LeaveRequest>('leaveRequests');

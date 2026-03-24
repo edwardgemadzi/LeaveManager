@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTokenFromRequest, shouldRejectCsrf, verifyToken } from '@/lib/auth';
 import { LeaveRequestModel } from '@/models/LeaveRequest';
 import { AuditLogModel } from '@/models/AuditLog';
-import { emailService } from '@/lib/email';
+import { notifyLeaveDecision } from '@/services/notificationService';
 import { UserModel } from '@/models/User';
 import { teamIdsMatch } from '@/lib/helpers';
 import { invalidateAnalyticsCache } from '@/lib/analyticsCache';
@@ -131,25 +131,13 @@ export async function PATCH(request: NextRequest) {
             { bulkAction: true, reason: normalizedDecisionNote || undefined }
           );
 
-          // Send email notification (placeholder - would need actual email addresses)
-          if (action === 'approve') {
-            await emailService.sendLeaveApprovalNotification(
-              `${targetUser.username}@company.com`, // Placeholder email
-              targetUser.username,
-              leaveRequest.startDate.toISOString().split('T')[0],
-              leaveRequest.endDate.toISOString().split('T')[0],
-              leaveRequest.reason
-            );
-          } else {
-            await emailService.sendLeaveRejectionNotification(
-              `${targetUser.username}@company.com`, // Placeholder email
-              targetUser.username,
-              leaveRequest.startDate.toISOString().split('T')[0],
-              leaveRequest.endDate.toISOString().split('T')[0],
-              leaveRequest.reason,
-              normalizedDecisionNote || undefined
-            );
-          }
+          await notifyLeaveDecision({
+            leaveRequest,
+            member: targetUser,
+            status: newStatus,
+            decisionNote: normalizedDecisionNote || undefined,
+            leaderUsername: actorUser.username,
+          });
         }
 
         results.successful.push(requestId);

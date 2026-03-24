@@ -18,6 +18,19 @@ export interface User {
   maternityPaternityType?: 'maternity' | 'paternity' | null; // Type of parental leave assigned by leader
   carryoverFromPreviousYear?: number; // Days carried over from previous year
   carryoverExpiryDate?: Date; // Date when carryover days expire
+  /** Optional email for transactional notifications */
+  email?: string | null;
+  /** Lowercase email for lookups (set server-side) */
+  emailNormalized?: string | null;
+  /** Telegram user id from Login Widget (string for bigint safety) */
+  telegramUserId?: string | null;
+  telegramUsername?: string | null;
+  /** When false, skip email channel (default true if email set) */
+  notifyEmail?: boolean;
+  /** When false, skip Telegram (default true if Telegram linked) */
+  notifyTelegram?: boolean;
+  /** Last prompt version the user acknowledged (see NEXT_PUBLIC_NOTIFICATION_PROMPT_VERSION) */
+  notificationPromptVersionSeen?: number;
   createdAt: Date;
 }
 
@@ -75,6 +88,10 @@ export interface LeaveRequest {
   decisionByUsername?: string;
   deletedAt?: Date;
   deletedBy?: string;
+  /** Set when the 10-day-upcoming reminder was sent (idempotency for cron). */
+  reminder10DaysSentAt?: Date;
+  /** Set when the 5-day-upcoming reminder was sent (idempotency for cron). */
+  reminder5DaysSentAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }

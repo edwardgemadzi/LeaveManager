@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import NotificationPromptBanner from '@/components/shared/NotificationPromptBanner';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -103,5 +104,10 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
     return null;
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      <div className="pb-28">{children}</div>
+      <NotificationPromptBanner />
+    </>
+  );
 }
