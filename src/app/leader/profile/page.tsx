@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { User, Team } from '@/types';
+import TimezoneSelect from '@/components/profile/TimezoneSelect';
 
 export default function LeaderProfilePage() {
   const [user, setUser] = useState<User | null>(null);
@@ -19,6 +20,7 @@ export default function LeaderProfilePage() {
   const [profileForm, setProfileForm] = useState({
     fullName: '',
     email: '',
+    timezone: 'UTC',
     notifyEmail: true,
     notifyTelegram: true,
   });
@@ -40,6 +42,7 @@ export default function LeaderProfilePage() {
           setProfileForm({
             fullName: userData.user.fullName || '',
             email: (userData.user as { email?: string }).email || '',
+            timezone: (userData.user as { timezone?: string | null }).timezone || 'UTC',
             notifyEmail: (userData.user as { notifyEmail?: boolean }).notifyEmail !== false,
             notifyTelegram: (userData.user as { notifyTelegram?: boolean }).notifyTelegram !== false,
           });
@@ -194,6 +197,7 @@ export default function LeaderProfilePage() {
         body: JSON.stringify({
           fullName: profileForm.fullName.trim(),
           email: profileForm.email.trim(),
+          timezone: profileForm.timezone,
           notifyEmail: profileForm.notifyEmail,
           notifyTelegram: profileForm.notifyTelegram,
         }),
@@ -298,6 +302,23 @@ export default function LeaderProfilePage() {
                       </p>
                     </div>
                   )}
+
+                  <div>
+                    <label
+                      htmlFor="timezone"
+                      className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                    >
+                      Time zone
+                    </label>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 mb-2">
+                      Used for leave reminders so &quot;10 days before&quot; matches the calendar where you live.
+                    </p>
+                    <TimezoneSelect
+                      id="timezone"
+                      value={profileForm.timezone}
+                      onChange={(timezone) => setProfileForm({ ...profileForm, timezone })}
+                    />
+                  </div>
 
                   <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Notifications</h3>

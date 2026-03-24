@@ -107,7 +107,7 @@ export async function getSafeUserData(
 
   // Remove sensitive data and convert ObjectId to string
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { password, ...safeUserData } = userData;
+  const { password, emailNormalized, ...safeUserData } = userData;
   
   // Convert _id from ObjectId to string if it exists
   const result: Omit<User, 'password'> = {

@@ -31,6 +31,8 @@ export interface User {
   notifyTelegram?: boolean;
   /** Last prompt version the user acknowledged (see NEXT_PUBLIC_NOTIFICATION_PROMPT_VERSION) */
   notificationPromptVersionSeen?: number;
+  /** IANA timezone for calendar-based UX (reminders, etc.); unset defaults to UTC server-side */
+  timezone?: string | null;
   createdAt: Date;
 }
 

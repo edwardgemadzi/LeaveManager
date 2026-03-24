@@ -56,6 +56,7 @@ export async function PATCH(request: NextRequest) {
     const data = validation.data as {
       fullName?: string;
       email?: string | null;
+      timezone?: string | null;
       notifyEmail?: boolean;
       notifyTelegram?: boolean;
       dismissNotificationPrompt?: boolean;
@@ -68,6 +69,14 @@ export async function PATCH(request: NextRequest) {
 
     if (data.fullName !== undefined) {
       $set.fullName = data.fullName.trim();
+    }
+
+    if (data.timezone !== undefined) {
+      const raw =
+        data.timezone === null || data.timezone === ''
+          ? ''
+          : String(data.timezone).trim();
+      $set.timezone = raw === '' ? null : raw;
     }
 
     if (data.email !== undefined) {

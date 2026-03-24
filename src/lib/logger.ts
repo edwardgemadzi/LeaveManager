@@ -16,17 +16,26 @@ export function debug(message: string, data?: unknown): void {
 }
 
 /**
- * Log info messages (always logged)
+ * Log info messages. Extra payloads only in development or when DEBUG_LOGS=true
+ * to avoid leaking structured data in production logs.
  */
 export function info(message: string, data?: unknown): void {
-  console.log(`[INFO] ${message}`, data || '');
+  if (isDevelopment || isDebugEnabled) {
+    console.log(`[INFO] ${message}`, data ?? '');
+  } else {
+    console.log(`[INFO] ${message}`);
+  }
 }
 
 /**
- * Log warning messages (always logged)
+ * Log warning messages (payload gated like info)
  */
 export function warn(message: string, data?: unknown): void {
-  console.warn(`[WARN] ${message}`, data || '');
+  if (isDevelopment || isDebugEnabled) {
+    console.warn(`[WARN] ${message}`, data ?? '');
+  } else {
+    console.warn(`[WARN] ${message}`);
+  }
 }
 
 /**

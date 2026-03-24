@@ -271,6 +271,27 @@ export const schemas = {
         'string.pattern.base': 'Full name can only contain letters, spaces, hyphens, and apostrophes',
       }),
     email: Joi.string().email().max(320).allow('', null).optional(),
+    timezone: Joi.string()
+      .max(64)
+      .allow('', null)
+      .optional()
+      .custom((value, helpers) => {
+        if (value === '' || value === null || value === undefined) {
+          return value;
+        }
+        const t = String(value).trim();
+        if (!t) return '';
+        try {
+          Intl.DateTimeFormat(undefined, { timeZone: t });
+          return t;
+        } catch {
+          return helpers.error('any.invalid');
+        }
+      })
+      .messages({
+        'any.invalid': 'Invalid timezone identifier',
+        'string.max': 'Timezone must be at most 64 characters',
+      }),
     notifyEmail: Joi.boolean().optional(),
     notifyTelegram: Joi.boolean().optional(),
     dismissNotificationPrompt: Joi.boolean().optional(),

@@ -2,17 +2,7 @@ import { LeaveRequestModel } from '@/models/LeaveRequest';
 import { UserModel } from '@/models/User';
 import { TeamModel } from '@/models/Team';
 import { notifyLeaveApproachingReminder } from '@/services/notificationService';
-
-/** Whole UTC calendar days from `today` until the leave `startDate` (start-of-day UTC). */
-export function utcCalendarDaysUntilStart(startDate: Date, today: Date): number {
-  const t = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
-  const s = Date.UTC(
-    startDate.getUTCFullYear(),
-    startDate.getUTCMonth(),
-    startDate.getUTCDate()
-  );
-  return Math.round((s - t) / 86400000);
-}
+import { calendarDaysUntilLeaveStartInZone } from '@/lib/timezone';
 
 export type LeaveReminderRunResult = {
   processed: number;
@@ -41,22 +31,21 @@ export async function runLeaveApproachingReminders(now = new Date()): Promise<Le
     if (!req._id) continue;
     result.processed++;
 
-    const days = utcCalendarDaysUntilStart(
-      req.startDate instanceof Date ? req.startDate : new Date(req.startDate),
-      now
-    );
+    const member = await UserModel.findById(String(req.userId));
+    if (!member) {
+      result.failed++;
+      continue;
+    }
+
+    const start =
+      req.startDate instanceof Date ? req.startDate : new Date(req.startDate);
+    const days = calendarDaysUntilLeaveStartInZone(start, now, member.timezone);
 
     const need10 = days === 10 && !req.reminder10DaysSentAt;
     const need5 = days === 5 && !req.reminder5DaysSentAt;
 
     if (!need10 && !need5) {
       result.skipped++;
-      continue;
-    }
-
-    const member = await UserModel.findById(String(req.userId));
-    if (!member) {
-      result.failed++;
       continue;
     }
 

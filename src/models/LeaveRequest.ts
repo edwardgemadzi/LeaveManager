@@ -286,22 +286,25 @@ export class LeaveRequestModel {
     }
   }
 
-  /** Approved, not deleted, leave starting within the next ~15 UTC calendar days (for reminder cron). */
+  /**
+   * Approved, not deleted, leave with startDate in a wide UTC window for reminder cron.
+   * Wider than "10 days" in UTC so members ahead/behind UTC still get correct in-zone day counts.
+   */
   static async findApprovedForReminderScan(now: Date): Promise<LeaveRequest[]> {
     const db = await getDatabase();
     const requests = db.collection<LeaveRequest>('leaveRequests');
 
-    const todayStart = new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
-    );
-    const windowEnd = new Date(todayStart);
-    windowEnd.setUTCDate(windowEnd.getUTCDate() + 16);
+    const y = now.getUTCFullYear();
+    const m = now.getUTCMonth();
+    const d = now.getUTCDate();
+    const windowStart = new Date(Date.UTC(y, m, d - 3));
+    const windowEnd = new Date(Date.UTC(y, m, d + 23));
 
     const query = {
       $and: [
         { status: 'approved' as const },
         LeaveRequestModel.buildNotDeletedQuery(),
-        { startDate: { $gte: todayStart, $lt: windowEnd } },
+        { startDate: { $gte: windowStart, $lt: windowEnd } },
       ],
     };
 
