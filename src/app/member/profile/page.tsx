@@ -8,6 +8,7 @@ import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
 import { UserIcon } from '@heroicons/react/24/outline';
 import TimezoneSelect from '@/components/profile/TimezoneSelect';
 import TelegramStartHint from '@/components/profile/TelegramStartHint';
+import TelegramLocalDevHint from '@/components/profile/TelegramLocalDevHint';
 
 export default function MemberProfilePage() {
   const [user, setUser] = useState<User | null>(null);
@@ -411,6 +412,9 @@ export default function MemberProfilePage() {
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
                       Add your email and optionally link Telegram to receive leave request updates. Uses the team&apos;s mail/Telegram settings from the server.
                     </p>
+                    {process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ? (
+                      <TelegramLocalDevHint />
+                    ) : null}
                     <div className="mb-3">
                       <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                         Email
