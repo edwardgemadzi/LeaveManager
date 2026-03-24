@@ -28,6 +28,7 @@ export default function LeaderProfilePage() {
   const telegramMountRef = useRef<HTMLDivElement>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [testTelegramLoading, setTestTelegramLoading] = useState(false);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -89,9 +90,13 @@ export default function LeaderProfilePage() {
         const data = await res.json();
         if (res.ok) {
           setUser(data.user);
+          setError('');
+          if (data.telegramWelcomeError) {
+            setError(String(data.telegramWelcomeError));
+          }
           if (data.telegramWelcomeDelivered === false) {
             setMessage(
-              'Telegram linked on the website. Open your bot in the Telegram app, tap Start, then try a leave action to confirm DMs work.'
+              'Telegram linked on the website. Open your bot in the Telegram app, tap Start, then use “Send test Telegram message” below.'
             );
           } else if (data.telegramWelcomeDelivered === true) {
             setMessage('Telegram linked successfully. Check the bot chat for a confirmation message.');
@@ -181,6 +186,29 @@ export default function LeaderProfilePage() {
       setError('Network error. Please try again.');
     } finally {
       setChangingPassword(false);
+    }
+  };
+
+  const handleTestTelegram = async () => {
+    setError('');
+    setMessage('');
+    setTestTelegramLoading(true);
+    try {
+      const res = await fetch('/api/users/telegram/test', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (res.ok && data.delivered) {
+        setMessage(data.message || 'Test message sent. Check Telegram.');
+      } else {
+        const parts = [data.message, data.telegramDescription].filter(Boolean);
+        setError(parts.join(' — ') || data.error || 'Test failed');
+      }
+    } catch {
+      setError('Network error sending test message');
+    } finally {
+      setTestTelegramLoading(false);
     }
   };
 
@@ -385,6 +413,14 @@ export default function LeaderProfilePage() {
                             botUsername={process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME}
                           />
                         ) : null}
+                        <button
+                          type="button"
+                          onClick={handleTestTelegram}
+                          disabled={testTelegramLoading}
+                          className="mt-3 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 disabled:opacity-50"
+                        >
+                          {testTelegramLoading ? 'Sending test…' : 'Send test Telegram message'}
+                        </button>
                       </div>
                     ) : process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ? (
                       <>

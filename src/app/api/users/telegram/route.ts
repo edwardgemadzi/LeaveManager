@@ -6,7 +6,10 @@ import { requireAuth, requireSafeUserData } from '@/lib/api-helpers';
 import { apiRateLimit } from '@/lib/rateLimit';
 import { validateRequest, schemas } from '@/lib/validation';
 import { verifyTelegramLoginPayload } from '@/lib/telegramAuth';
-import { sendTelegramMessageWithOutcome } from '@/lib/telegram';
+import {
+  normalizeTelegramUserChatId,
+  sendTelegramMessageWithOutcome,
+} from '@/lib/telegram';
 import { badRequestError, internalServerError } from '@/lib/errors';
 import { error as logError } from '@/lib/logger';
 import { computeNeedsNotificationSetup } from '@/lib/notificationPrompt';
@@ -49,7 +52,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid Telegram authentication' }, { status: 401 });
     }
 
-    const telegramUserId = stringMap.id!;
+    const telegramUserId = normalizeTelegramUserChatId(stringMap.id);
+    if (!telegramUserId) {
+      return badRequestError('Invalid Telegram user id from login payload');
+    }
     const telegramUsername = stringMap.username || undefined;
 
     const db = await getDatabase();
@@ -82,6 +88,7 @@ export async function POST(request: NextRequest) {
     };
 
     let telegramWelcomeDelivered: boolean | undefined;
+    let telegramWelcomeError: string | undefined;
     if (process.env.TELEGRAM_BOT_TOKEN?.trim()) {
       const appName = process.env.APP_NAME?.trim() || 'Leave Manager';
       const welcome = await sendTelegramMessageWithOutcome({
@@ -89,6 +96,9 @@ export async function POST(request: NextRequest) {
         text: `✅ ${appName}: your account is linked. Leave notifications will be sent here.`,
       });
       telegramWelcomeDelivered = welcome.ok;
+      if (!welcome.ok) {
+        telegramWelcomeError = welcome.description;
+      }
     }
 
     return NextResponse.json({
@@ -96,6 +106,7 @@ export async function POST(request: NextRequest) {
       user: safe,
       /** Omitted if TELEGRAM_BOT_TOKEN unset; false if Telegram refused the DM (usually need Start in bot chat). */
       ...(telegramWelcomeDelivered !== undefined && { telegramWelcomeDelivered }),
+      ...(telegramWelcomeError && { telegramWelcomeError }),
     });
   } catch (error) {
     logError('Telegram link error:', error);
