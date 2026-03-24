@@ -31,6 +31,7 @@ export default function MemberProfilePage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [testTelegramLoading, setTestTelegramLoading] = useState(false);
+  const [testEmailLoading, setTestEmailLoading] = useState(false);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -191,6 +192,29 @@ export default function MemberProfilePage() {
     }
   };
 
+  const handleTestEmail = async () => {
+    setError('');
+    setMessage('');
+    setTestEmailLoading(true);
+    try {
+      const res = await fetch('/api/users/profile/test-email', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (res.ok && data.delivered) {
+        setMessage(data.message || 'Test email sent.');
+      } else {
+        const parts = [data.message, data.smtpError].filter(Boolean);
+        setError(parts.join(' — ') || data.error || 'Test email failed');
+      }
+    } catch {
+      setError('Network error sending test email');
+    } finally {
+      setTestEmailLoading(false);
+    }
+  };
+
   const handleTestTelegram = async () => {
     setError('');
     setMessage('');
@@ -246,7 +270,18 @@ export default function MemberProfilePage() {
 
       if (response.ok) {
         setUser(data.user);
-        setMessage('Profile updated successfully!');
+        if (data.emailConfirmationSent === true) {
+          setMessage(
+            'Profile updated successfully! A short confirmation was sent to your email (check spam).'
+          );
+        } else {
+          setMessage('Profile updated successfully!');
+        }
+        if (data.emailConfirmationError) {
+          setError(
+            `Profile saved, but confirmation email was not sent: ${String(data.emailConfirmationError)}`
+          );
+        }
         // Update localStorage with new data
         localStorage.setItem('user', JSON.stringify(data.user));
       } else {
@@ -391,6 +426,21 @@ export default function MemberProfilePage() {
                         }
                         placeholder="you@example.com"
                       />
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Saving a new or changed email sends a short confirmation if the server has Gmail
+                        configured. Leave notifications use the same SMTP settings.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleTestEmail}
+                        disabled={
+                          testEmailLoading ||
+                          !(user as { email?: string | null })?.email?.trim()
+                        }
+                        className="mt-2 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 disabled:opacity-50"
+                      >
+                        {testEmailLoading ? 'Sending…' : 'Send test email (saved address)'}
+                      </button>
                     </div>
                     <label className="flex items-center gap-2 mb-2 text-sm text-gray-700 dark:text-gray-300">
                       <input

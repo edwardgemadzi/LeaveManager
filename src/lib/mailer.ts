@@ -12,9 +12,9 @@ export function getTransport(): Transporter | null {
   const pass = process.env.GMAIL_APP_PASSWORD?.replace(/\s/g, '') ?? '';
 
   if (!user || !pass) {
-    if (!transportLoggedMissing && process.env.NODE_ENV === 'development') {
-      console.info(
-        '[mailer] GMAIL_USER or GMAIL_APP_PASSWORD not set — email sending is disabled.'
+    if (!transportLoggedMissing) {
+      console.warn(
+        '[mailer] GMAIL_USER or GMAIL_APP_PASSWORD not set — outbound email is disabled (set both for Gmail SMTP).'
       );
       transportLoggedMissing = true;
     }
@@ -103,14 +103,18 @@ export function escapeForHtml(s: string): string {
   return escapeHtml(s);
 }
 
-export async function sendHtmlEmail(params: {
+export type SendHtmlEmailOutcome =
+  | { ok: true }
+  | { ok: false; error: string };
+
+export async function sendHtmlEmailWithOutcome(params: {
   to: string;
   subject: string;
   html: string;
-}): Promise<boolean> {
+}): Promise<SendHtmlEmailOutcome> {
   const transport = getTransport();
   if (!transport) {
-    return false;
+    return { ok: false, error: 'Email is not configured (GMAIL_USER / GMAIL_APP_PASSWORD)' };
   }
   const from = process.env.GMAIL_USER?.trim() || 'noreply@localhost';
   try {
@@ -120,9 +124,20 @@ export async function sendHtmlEmail(params: {
       subject: params.subject,
       html: params.html,
     });
-    return true;
+    return { ok: true };
   } catch (e) {
-    console.error('[mailer] sendMail failed:', e);
-    return false;
+    const msg =
+      e instanceof Error ? e.message : typeof e === 'string' ? e : 'sendMail failed';
+    console.error('[mailer] sendMail failed:', msg);
+    return { ok: false, error: msg };
   }
+}
+
+export async function sendHtmlEmail(params: {
+  to: string;
+  subject: string;
+  html: string;
+}): Promise<boolean> {
+  const out = await sendHtmlEmailWithOutcome(params);
+  return out.ok;
 }

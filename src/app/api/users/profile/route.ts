@@ -9,6 +9,7 @@ import {
   computeNeedsNotificationSetup,
   getNotificationPromptVersion,
 } from '@/lib/notificationPrompt';
+import { shell, sendHtmlEmailWithOutcome } from '@/lib/mailer';
 
 const PROMPT_VERSION = getNotificationPromptVersion();
 
@@ -64,6 +65,17 @@ export async function PATCH(request: NextRequest) {
 
     const db = await getDatabase();
     const users = db.collection('users');
+
+    let previousEmailNormalized = '';
+    if (data.email !== undefined) {
+      const existing = await users.findOne(
+        { _id: new ObjectId(user.id) },
+        { projection: { email: 1 } }
+      );
+      previousEmailNormalized = String(existing?.email ?? '')
+        .trim()
+        .toLowerCase();
+    }
 
     const $set: Record<string, unknown> = {};
 
@@ -128,10 +140,40 @@ export async function PATCH(request: NextRequest) {
       ),
     };
 
+    let emailConfirmationSent: boolean | undefined;
+    let emailConfirmationError: string | undefined;
+    if (data.email !== undefined) {
+      const raw =
+        data.email === null || data.email === '' ? '' : String(data.email).trim();
+      if (raw !== '') {
+        const nextNorm = raw.toLowerCase();
+        if (nextNorm !== previousEmailNormalized) {
+          const appName = process.env.APP_NAME?.trim() || 'Leave Manager';
+          const inner = `
+      <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">This address is now saved on your profile. Leave-related updates will be sent here when email notifications are enabled.</p>
+      <p style="margin:0;font-size:14px;line-height:1.5;color:#64748b;">If you did not add this email, sign in and remove it from your profile.</p>`;
+          const sent = await sendHtmlEmailWithOutcome({
+            to: raw,
+            subject: `${appName}: email saved`,
+            html: shell(inner, {
+              title: 'Email saved',
+              preheader: 'Your notification address was updated',
+            }),
+          });
+          emailConfirmationSent = sent.ok;
+          if (!sent.ok) {
+            emailConfirmationError = sent.error;
+          }
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       user: safeUserData,
       message: 'Profile updated successfully',
+      ...(emailConfirmationSent !== undefined && { emailConfirmationSent }),
+      ...(emailConfirmationError && { emailConfirmationError }),
     });
   } catch (error) {
     logError('Update profile error:', error);
