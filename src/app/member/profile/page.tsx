@@ -9,6 +9,17 @@ import { UserIcon } from '@heroicons/react/24/outline';
 import TimezoneSelect from '@/components/profile/TimezoneSelect';
 import TelegramStartHint from '@/components/profile/TelegramStartHint';
 import TelegramLocalDevHint from '@/components/profile/TelegramLocalDevHint';
+import ProfilePageFeedback from '@/components/profile/ProfilePageFeedback';
+
+function scrollToProfileFeedback() {
+  if (typeof window === 'undefined') return;
+  requestAnimationFrame(() => {
+    document.getElementById('profile-page-feedback')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  });
+}
 
 export default function MemberProfilePage() {
   const [user, setUser] = useState<User | null>(null);
@@ -33,6 +44,7 @@ export default function MemberProfilePage() {
   const [error, setError] = useState('');
   const [testTelegramLoading, setTestTelegramLoading] = useState(false);
   const [testEmailLoading, setTestEmailLoading] = useState(false);
+  const [telegramLinking, setTelegramLinking] = useState(false);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -84,6 +96,7 @@ export default function MemberProfilePage() {
     w.onTelegramAuth = async (telegramUser: TelegramUser) => {
       setError('');
       setMessage('');
+      setTelegramLinking(true);
       try {
         const res = await fetch('/api/users/telegram', {
           method: 'POST',
@@ -113,6 +126,9 @@ export default function MemberProfilePage() {
         }
       } catch {
         setError('Network error linking Telegram');
+      } finally {
+        setTelegramLinking(false);
+        window.setTimeout(() => scrollToProfileFeedback(), 80);
       }
     };
 
@@ -178,16 +194,19 @@ export default function MemberProfilePage() {
           newPassword: '',
           confirmPassword: '',
         });
+        window.setTimeout(() => scrollToProfileFeedback(), 80);
       } else {
         // Show validation details if available, otherwise show error message
         const errorMessage = data.details && data.details.length > 0
           ? data.details.join(', ')
           : (data.error || 'Failed to change password');
         setError(errorMessage);
+        window.setTimeout(() => scrollToProfileFeedback(), 80);
       }
     } catch (error) {
       console.error('Error changing password:', error);
       setError('Network error. Please try again.');
+      window.setTimeout(() => scrollToProfileFeedback(), 80);
     } finally {
       setChangingPassword(false);
     }
@@ -213,6 +232,7 @@ export default function MemberProfilePage() {
       setError('Network error sending test email');
     } finally {
       setTestEmailLoading(false);
+      window.setTimeout(() => scrollToProfileFeedback(), 80);
     }
   };
 
@@ -236,6 +256,7 @@ export default function MemberProfilePage() {
       setError('Network error sending test message');
     } finally {
       setTestTelegramLoading(false);
+      window.setTimeout(() => scrollToProfileFeedback(), 80);
     }
   };
 
@@ -285,12 +306,15 @@ export default function MemberProfilePage() {
         }
         // Update localStorage with new data
         localStorage.setItem('user', JSON.stringify(data.user));
+        window.setTimeout(() => scrollToProfileFeedback(), 80);
       } else {
         setError(data.error || 'Failed to update profile');
+        window.setTimeout(() => scrollToProfileFeedback(), 80);
       }
     } catch (error) {
       console.error('Error updating profile:', error);
       setError('Network error. Please try again.');
+      window.setTimeout(() => scrollToProfileFeedback(), 80);
     } finally {
       setUpdatingProfile(false);
     }
@@ -324,6 +348,8 @@ export default function MemberProfilePage() {
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">My Profile</h1>
             <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400">Manage your account settings and password</p>
           </div>
+
+          <ProfilePageFeedback error={error} message={message} />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
             {/* Profile Information */}
@@ -495,6 +521,17 @@ export default function MemberProfilePage() {
                         <TelegramStartHint
                           botUsername={process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME}
                         />
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 max-w-lg">
+                          <strong>After your phone number in Telegram:</strong> return to this browser tab.
+                          A <strong>green or red notice appears at the top</strong> of the page when linking
+                          finishes, and this section will show &quot;Telegram linked&quot;. A DM from the bot is
+                          separate—use <strong>Send test Telegram message</strong> after you tap Start in the bot.
+                        </p>
+                        {telegramLinking ? (
+                          <p className="mt-2 text-sm font-medium text-indigo-600 dark:text-indigo-400">
+                            Finishing link with the server…
+                          </p>
+                        ) : null}
                         <div ref={telegramMountRef} className="min-h-[56px]" />
                       </>
                     ) : (
@@ -598,18 +635,6 @@ export default function MemberProfilePage() {
                       })}
                     />
                   </div>
-
-                  {error && (
-                    <div className="text-red-600 dark:text-red-400 text-sm bg-red-50 dark:bg-red-900/30 p-3 rounded-md border border-red-200 dark:border-red-800">
-                      {error}
-                    </div>
-                  )}
-
-                  {message && (
-                    <div className="text-green-600 dark:text-green-400 text-sm bg-green-50 dark:bg-green-900/30 p-3 rounded-md border border-green-200 dark:border-green-800">
-                      {message}
-                    </div>
-                  )}
 
                   <button
                     type="submit"
