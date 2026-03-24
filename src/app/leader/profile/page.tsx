@@ -8,6 +8,7 @@ import TimezoneSelect from '@/components/profile/TimezoneSelect';
 import TelegramStartHint from '@/components/profile/TelegramStartHint';
 import TelegramLocalDevHint from '@/components/profile/TelegramLocalDevHint';
 import ProfilePageFeedback from '@/components/profile/ProfilePageFeedback';
+import { isTelegramLinked } from '@/lib/telegramLinked';
 
 function scrollToProfileFeedback() {
   if (typeof window === 'undefined') return;
@@ -88,7 +89,7 @@ export default function LeaderProfilePage() {
     const bot = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
     if (!bot || !telegramMountRef.current) return;
     const el = telegramMountRef.current;
-    if ((user as { telegramUserId?: string } | null)?.telegramUserId) return;
+    if (isTelegramLinked(user)) return;
 
     type TelegramUser = Record<string, string | number | undefined>;
     const w = window as unknown as { onTelegramAuth?: (u: TelegramUser) => void };
@@ -238,7 +239,7 @@ export default function LeaderProfilePage() {
   const handleUnlinkTelegram = async () => {
     if (
       !window.confirm(
-        'Disconnect Telegram from this account? You can use “Log in with Telegram” again afterward.'
+        'Clear the Telegram link on this account? The “Log in with Telegram” button will appear again so you can reconnect.'
       )
     ) {
       return;
@@ -517,54 +518,62 @@ export default function LeaderProfilePage() {
                       />
                       Telegram notifications (after linking below)
                     </label>
-                    {(user as { telegramUserId?: string })?.telegramUserId ? (
-                      <div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          Telegram linked
-                          {(user as { telegramUsername?: string }).telegramUsername
-                            ? ` (@${(user as { telegramUsername?: string }).telegramUsername})`
-                            : ''}
-                          .
-                        </p>
-                        {process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ? (
-                          <TelegramStartHint
-                            botUsername={process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME}
-                          />
-                        ) : null}
-                        <button
-                          type="button"
-                          onClick={handleTestTelegram}
-                          disabled={testTelegramLoading}
-                          className="mt-3 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 disabled:opacity-50"
-                        >
-                          {testTelegramLoading ? 'Sending test…' : 'Send test Telegram message'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleUnlinkTelegram}
-                          disabled={telegramUnlinking}
-                          className="mt-2 block text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
-                        >
-                          {telegramUnlinking ? 'Disconnecting…' : 'Disconnect Telegram (link again)'}
-                        </button>
-                      </div>
-                    ) : process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ? (
+                    {process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ? (
                       <>
-                        <TelegramStartHint
-                          botUsername={process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME}
-                        />
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 max-w-lg">
-                          <strong>After your phone number in Telegram:</strong> return to this browser tab.
-                          A <strong>green or red notice appears at the top</strong> of the page when linking
-                          finishes, and this section will show &quot;Telegram linked&quot;. A DM from the bot is
-                          separate—use <strong>Send test Telegram message</strong> after you tap Start in the bot.
-                        </p>
-                        {telegramLinking ? (
-                          <p className="mt-2 text-sm font-medium text-indigo-600 dark:text-indigo-400">
-                            Finishing link with the server…
+                        {isTelegramLinked(user) ? (
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              Telegram linked
+                              {(user as { telegramUsername?: string }).telegramUsername
+                                ? ` (@${(user as { telegramUsername?: string }).telegramUsername})`
+                                : ''}
+                              .
+                            </p>
+                            <TelegramStartHint
+                              botUsername={process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME}
+                            />
+                            <button
+                              type="button"
+                              onClick={handleTestTelegram}
+                              disabled={testTelegramLoading}
+                              className="mt-3 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 disabled:opacity-50"
+                            >
+                              {testTelegramLoading ? 'Sending test…' : 'Send test Telegram message'}
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <TelegramStartHint
+                              botUsername={process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME}
+                            />
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 max-w-lg">
+                              <strong>After your phone number in Telegram:</strong> return to this browser tab.
+                              A <strong>green or red notice appears at the top</strong> of the page when linking
+                              finishes, and this section will show &quot;Telegram linked&quot;. A DM from the bot is
+                              separate—use <strong>Send test Telegram message</strong> after you tap Start in the bot.
+                            </p>
+                            {telegramLinking ? (
+                              <p className="mt-2 text-sm font-medium text-indigo-600 dark:text-indigo-400">
+                                Finishing link with the server…
+                              </p>
+                            ) : null}
+                            <div ref={telegramMountRef} className="min-h-[56px]" />
+                          </>
+                        )}
+                        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                            Can&apos;t see the login button, or need to link a different Telegram account? Clear the
+                            saved link below, then use <strong>Log in with Telegram</strong> again.
                           </p>
-                        ) : null}
-                        <div ref={telegramMountRef} className="min-h-[56px]" />
+                          <button
+                            type="button"
+                            onClick={handleUnlinkTelegram}
+                            disabled={telegramUnlinking}
+                            className="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm font-medium text-gray-900 dark:text-gray-100 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                          >
+                            {telegramUnlinking ? 'Working…' : 'Disconnect or reset Telegram link'}
+                          </button>
+                        </div>
                       </>
                     ) : (
                       <p className="text-xs text-gray-500">Telegram linking is not configured.</p>
