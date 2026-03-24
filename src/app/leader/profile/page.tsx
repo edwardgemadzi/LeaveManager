@@ -5,6 +5,7 @@ import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { User, Team } from '@/types';
 import TimezoneSelect from '@/components/profile/TimezoneSelect';
+import TelegramStartHint from '@/components/profile/TelegramStartHint';
 
 export default function LeaderProfilePage() {
   const [user, setUser] = useState<User | null>(null);
@@ -88,7 +89,15 @@ export default function LeaderProfilePage() {
         const data = await res.json();
         if (res.ok) {
           setUser(data.user);
-          setMessage('Telegram linked successfully.');
+          if (data.telegramWelcomeDelivered === false) {
+            setMessage(
+              'Telegram linked on the website. Open your bot in the Telegram app, tap Start, then try a leave action to confirm DMs work.'
+            );
+          } else if (data.telegramWelcomeDelivered === true) {
+            setMessage('Telegram linked successfully. Check the bot chat for a confirmation message.');
+          } else {
+            setMessage('Telegram linked successfully.');
+          }
           localStorage.setItem('user', JSON.stringify(data.user));
         } else {
           setError(data.error || 'Failed to link Telegram');
@@ -363,15 +372,27 @@ export default function LeaderProfilePage() {
                       Telegram notifications (after linking below)
                     </label>
                     {(user as { telegramUserId?: string })?.telegramUserId ? (
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Telegram linked
-                        {(user as { telegramUsername?: string }).telegramUsername
-                          ? ` (@${(user as { telegramUsername?: string }).telegramUsername})`
-                          : ''}
-                        .
-                      </p>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Telegram linked
+                          {(user as { telegramUsername?: string }).telegramUsername
+                            ? ` (@${(user as { telegramUsername?: string }).telegramUsername})`
+                            : ''}
+                          .
+                        </p>
+                        {process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ? (
+                          <TelegramStartHint
+                            botUsername={process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME}
+                          />
+                        ) : null}
+                      </div>
                     ) : process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ? (
-                      <div ref={telegramMountRef} className="min-h-[56px]" />
+                      <>
+                        <TelegramStartHint
+                          botUsername={process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME}
+                        />
+                        <div ref={telegramMountRef} className="min-h-[56px]" />
+                      </>
                     ) : (
                       <p className="text-xs text-gray-500">Telegram linking is not configured.</p>
                     )}

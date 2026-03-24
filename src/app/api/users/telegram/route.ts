@@ -6,6 +6,7 @@ import { requireAuth, requireSafeUserData } from '@/lib/api-helpers';
 import { apiRateLimit } from '@/lib/rateLimit';
 import { validateRequest, schemas } from '@/lib/validation';
 import { verifyTelegramLoginPayload } from '@/lib/telegramAuth';
+import { sendTelegramMessageWithOutcome } from '@/lib/telegram';
 import { badRequestError, internalServerError } from '@/lib/errors';
 import { error as logError } from '@/lib/logger';
 import { computeNeedsNotificationSetup } from '@/lib/notificationPrompt';
@@ -80,9 +81,21 @@ export async function POST(request: NextRequest) {
       ),
     };
 
+    let telegramWelcomeDelivered: boolean | undefined;
+    if (process.env.TELEGRAM_BOT_TOKEN?.trim()) {
+      const appName = process.env.APP_NAME?.trim() || 'Leave Manager';
+      const welcome = await sendTelegramMessageWithOutcome({
+        chatId: telegramUserId,
+        text: `✅ ${appName}: your account is linked. Leave notifications will be sent here.`,
+      });
+      telegramWelcomeDelivered = welcome.ok;
+    }
+
     return NextResponse.json({
       success: true,
       user: safe,
+      /** Omitted if TELEGRAM_BOT_TOKEN unset; false if Telegram refused the DM (usually need Start in bot chat). */
+      ...(telegramWelcomeDelivered !== undefined && { telegramWelcomeDelivered }),
     });
   } catch (error) {
     logError('Telegram link error:', error);
