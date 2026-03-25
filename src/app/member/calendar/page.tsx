@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
+import Link from 'next/link';
 import Navbar from '@/components/shared/Navbar';
 import TeamCalendar from '@/components/shared/Calendar';
 import { Team, User, LeaveRequest } from '@/types';
@@ -23,7 +24,7 @@ export default function MemberCalendarPage() {
 
   const [allRequests, setAllRequests] = useState<LeaveRequest[]>([]);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [selectionSummary, setSelectionSummary] = useState<{ selectionMode: boolean; selectedCount: number }>({
+  const [selectionSummary, setSelectionSummary] = useState<{ selectionMode: boolean; selectedCount: number; clearSelection?: () => void }>({
     selectionMode: false,
     selectedCount: 0,
   });
@@ -149,7 +150,7 @@ export default function MemberCalendarPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black">
+      <div className="min-h-screen bg-white dark:bg-zinc-950">
         <Navbar />
         <div className="flex items-center justify-center h-64 pt-24">
           <div className="text-center">
@@ -162,72 +163,110 @@ export default function MemberCalendarPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black">
+    <div className="min-h-screen bg-white dark:bg-zinc-950">
       <Navbar />
       
-      <div className="w-full px-0 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12">
-        {/* Header Section */}
-        <div className="mb-4 sm:mb-8 fade-in px-4 sm:px-0">
-          <div className="flex items-center justify-between gap-3 sm:gap-4">
-            <div className="min-w-0">
-              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white tracking-tight truncate">
-                {team?.settings?.enableSubgrouping && user?.subgroupTag 
-                  ? `${user.subgroupTag} Calendar`
-                  : 'Team Calendar'}
-              </h1>
-              <p className="text-sm sm:text-lg lg:text-xl text-gray-500 dark:text-gray-400 mt-0.5 sm:mt-1">
-                {team?.settings?.enableSubgrouping && user?.subgroupTag
-                  ? 'Your subgroup leave requests'
-                  : 'Team leave requests'}
-              </p>
-            </div>
-
-            {/* Filter Dropdown */}
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <FunnelIcon className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 dark:text-gray-500" />
-              <select
-                value={filter}
-                onChange={(e) => setFilter(e.target.value as CalendarFilter)}
-                className="text-xs sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-              >
-                <option value="all">All</option>
-                <option value="my-leave">Mine</option>
-                <option value="same-working-days">Same Days</option>
-              </select>
-            </div>
+      <div className="w-full px-0 sm:px-6 pt-16 lg:pt-20 lg:pl-24 pb-6 lg:h-[calc(100vh-5rem)] app-page-shell">
+        {/* Page header */}
+        <div className="flex items-center justify-between py-5 border-b border-zinc-200 dark:border-zinc-800 mb-6 px-4 sm:px-0">
+          <div>
+            <h1 className="app-page-heading text-base font-semibold text-zinc-900 dark:text-zinc-100">
+              {team?.settings?.enableSubgrouping && user?.subgroupTag
+                ? `${user.subgroupTag} Calendar`
+                : 'Team Calendar'}
+            </h1>
+            <p className="app-page-subheading text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
+              {team?.settings?.enableSubgrouping && user?.subgroupTag
+                ? 'Your subgroup leave requests'
+                : 'Team leave requests'}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <FunnelIcon className="h-4 w-4 text-zinc-400 dark:text-zinc-500" />
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value as CalendarFilter)}
+              className="input-modern py-1.5 text-sm w-auto"
+            >
+              <option value="all">All</option>
+              <option value="my-leave">Mine</option>
+              <option value="same-working-days">Same Days</option>
+            </select>
           </div>
         </div>
 
-        <div className="card rounded-none sm:rounded-2xl relative z-10 border-x-0 sm:border-x shadow-none sm:shadow">
-          <div className="px-0 sm:px-6 py-2 sm:py-8 relative z-10">
-            {team?._id ? (
-              <TeamCalendar 
-                teamId={team._id} 
-                members={filteredMembers} 
-                currentUser={user || undefined}
-                teamSettings={team?.settings ? { 
-                  minimumNoticePeriod: team.settings.minimumNoticePeriod || 1,
-                  bypassNoticePeriod: team.settings.bypassNoticePeriod,
-                  maternityLeave: team.settings.maternityLeave,
-                  paternityLeave: team.settings.paternityLeave
-                } : undefined}
-                initialRequests={filteredRequests}
-                onMemberSelectionChange={setSelectionSummary}
-              />
-            ) : (
-              <div className="flex items-center justify-center h-64">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-gray-400 dark:border-t-gray-500 mx-auto mb-4"></div>
-                  <p className="text-gray-500 dark:text-gray-400 text-lg">Loading team data...</p>
+        <div className="grid lg:grid-cols-12 gap-6 min-w-0">
+          <div className="lg:col-span-9 min-w-0">
+            <div className="card rounded-none sm:rounded-2xl relative z-10 border-x-0 sm:border-x shadow-none sm:shadow min-w-0 overflow-x-hidden">
+              <div className="px-0 sm:px-6 py-2 sm:py-8 relative z-10">
+                {team?._id ? (
+                  <TeamCalendar 
+                    teamId={team._id} 
+                    members={filteredMembers} 
+                    currentUser={user || undefined}
+                    teamSettings={team?.settings ? { 
+                      minimumNoticePeriod: team.settings.minimumNoticePeriod || 1,
+                      bypassNoticePeriod: team.settings.bypassNoticePeriod,
+                      maternityLeave: team.settings.maternityLeave,
+                      paternityLeave: team.settings.paternityLeave
+                    } : undefined}
+                    initialRequests={filteredRequests}
+                    onMemberSelectionChange={setSelectionSummary}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-gray-400 dark:border-t-gray-500 mx-auto mb-4"></div>
+                      <p className="text-gray-500 dark:text-gray-400 text-lg">Loading team data...</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <aside className="hidden lg:block lg:col-span-3">
+            <div className="sticky top-14 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5">
+              <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Selection</p>
+              {selectionSummary.selectedCount > 0 ? (
+                <div className="mt-2">
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                    {selectionSummary.selectedCount} day{selectionSummary.selectedCount === 1 ? '' : 's'} selected
+                  </p>
+                  <p className="app-page-subheading text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Use the floating panel to submit.</p>
+                  {selectionSummary.clearSelection && (
+                    <button
+                      onClick={selectionSummary.clearSelection}
+                      className="mt-2 text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 underline"
+                    >
+                      Clear selection
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                  Click dates on the calendar to start selecting leave.
+                </div>
+              )}
+
+              <div className="mt-4 pt-4 border-t border-zinc-200/70 dark:border-zinc-800/70">
+                <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Quick links</p>
+                <div className="mt-2 grid gap-2">
+                  <Link href="/member/requests" className="btn-secondary text-sm justify-center">
+                    New request
+                  </Link>
+                  <Link href="/member/analytics" className="btn-secondary text-sm justify-center">
+                    Analytics
+                  </Link>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          </aside>
         </div>
 
         {/* Page-level floating “mini cart” (members only) */}
         {user?.role === 'member' && selectionSummary.selectionMode && selectionSummary.selectedCount > 0 ? (
-          <div className="fixed bottom-6 right-6 z-50 w-[min(380px,calc(100vw-3rem))]">
+          <div className="fixed bottom-6 right-6 z-50 w-[min(380px,calc(100vw-3rem))] lg:hidden">
             <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-900/95 backdrop-blur shadow-2xl">
               <div className="p-4 flex items-start gap-3">
                 <div className="flex-1 min-w-0">

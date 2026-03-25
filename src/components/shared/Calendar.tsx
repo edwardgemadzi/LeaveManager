@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Calendar, momentLocalizer, View, Views } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
@@ -47,7 +47,7 @@ interface CalendarProps {
     paternityLeave?: { countingMethod?: 'calendar' | 'working' };
   }; // Optional: team settings (if provided, skip fetching)
   initialRequests?: LeaveRequest[]; // Optional: initial requests (if provided, skip fetching)
-  onMemberSelectionChange?: (summary: { selectionMode: boolean; selectedCount: number }) => void;
+  onMemberSelectionChange?: (summary: { selectionMode: boolean; selectedCount: number; clearSelection: () => void }) => void;
 }
 
 export default function TeamCalendar({ teamId, members, currentUser, teamSettings: providedTeamSettings, initialRequests, onMemberSelectionChange }: CalendarProps) {
@@ -56,7 +56,8 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [currentView, setCurrentView] = useState<View>(Views.MONTH);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [calendarHeight, setCalendarHeight] = useState(850);
+  const [calendarHeight, setCalendarHeight] = useState(600);
+  const calendarContainerRef = useRef<HTMLDivElement>(null);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [showModal, setShowModal] = useState(false);
   
@@ -80,15 +81,32 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
   
   const leaveReasons = useMemo(() => LEAVE_REASONS, []);
 
-  // Responsive calendar height: compact on mobile, full on desktop
+  // Responsive calendar height using ResizeObserver for smooth resize handling
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 767px)');
-    const update = (e: MediaQueryListEvent | MediaQueryList) => {
-      setCalendarHeight(e.matches ? 560 : 850);
+    const container = calendarContainerRef.current;
+    if (!container) return;
+
+    const updateHeight = () => {
+      const width = container.offsetWidth;
+      // Use viewport height minus offset, clamped between 480px and 900px
+      const vh = window.innerHeight;
+      const isMobileWidth = width < 768;
+      const height = isMobileWidth
+        ? Math.max(480, Math.min(600, vh * 0.65))
+        : Math.max(500, Math.min(900, vh * 0.72));
+      setCalendarHeight(Math.round(height));
     };
-    update(mq);
-    mq.addEventListener('change', update);
-    return () => mq.removeEventListener('change', update);
+
+    updateHeight();
+
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(container);
+    window.addEventListener('resize', updateHeight);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateHeight);
+    };
   }, []);
 
   // Fetch team settings for validation (only if not provided as prop)
@@ -769,34 +787,12 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
     onMemberSelectionChange({
       selectionMode: Boolean(selectionMode),
       selectedCount: selectedDates.length,
+      clearSelection: clearSelectionMode,
     });
-  }, [isMember, onMemberSelectionChange, selectionMode, selectedDates.length]);
+  }, [isMember, onMemberSelectionChange, selectionMode, selectedDates.length, clearSelectionMode]);
 
   return (
-    <div className="min-h-[600px] relative">
-      {/* Selection mode indicator */}
-      {isMember && selectionMode && (
-        <div className="mb-4 bg-indigo-50 border border-indigo-200 rounded-lg p-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-indigo-800">
-              <span className="font-semibold">Selection Mode Active</span> - Click working days to toggle individual dates
-              {selectedDates.length > 0 && (
-                <span className="ml-2">({selectedDates.length} date{selectedDates.length !== 1 ? 's' : ''} selected)</span>
-              )}
-              {currentUser && currentUser.shiftSchedule && (
-                <span className="block mt-1 text-xs text-indigo-600">Only your scheduled working days can be selected</span>
-              )}
-            </p>
-            <button
-              onClick={clearSelectionMode}
-              className="text-xs text-indigo-600 hover:text-indigo-800 underline"
-            >
-              Cancel Selection
-            </button>
-          </div>
-        </div>
-      )}
-
+    <div className="relative w-full min-w-0 max-w-full" ref={calendarContainerRef}>
       {/* Floating request panel is rendered at page-level (member/calendar). */}
 
       <div className="relative z-10">

@@ -155,26 +155,20 @@ export default function MemberAnalyticsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black">
-        <Navbar />
-        <div className="flex items-center justify-center h-64 pt-24">
-          <div className="text-center">
-            <div className="spinner w-16 h-16 mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-400 text-lg">Loading analytics...</p>
-          </div>
-        </div>
+      <div className="min-h-screen bg-white dark:bg-zinc-950 flex items-center justify-center">
+        <div className="w-5 h-5 border-2 border-zinc-200 dark:border-zinc-700 border-t-indigo-600 rounded-full animate-spin" />
       </div>
     );
   }
 
   if (!analytics || !team) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black">
+      <div className="min-h-screen bg-white dark:bg-zinc-950">
         <Navbar />
         <div className="flex items-center justify-center h-64 pt-24">
           <div className="text-center">
-            <p className="text-gray-600 dark:text-gray-400 text-lg mb-2">No analytics data available</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-zinc-600 dark:text-zinc-400 text-lg mb-2">No analytics data available</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
               {!analytics ? 'Analytics data not loaded' : ''}
               {!team ? 'Team data not loaded' : ''}
             </p>
@@ -520,53 +514,86 @@ export default function MemberAnalyticsPage() {
 
   return (
     <ProtectedRoute requiredRole="member">
-      <div className="min-h-screen bg-gray-50 dark:bg-black">
+      <div className="min-h-screen bg-white dark:bg-zinc-950">
         <Navbar />
         
-        <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12">
-          {/* Header Section - Enhanced */}
-          <div className="mb-8 fade-in">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-              <div>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">My Leave Analytics</h1>
-                <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400">
-                  Detailed insights into your leave usage and patterns for {selectedYear}
-            </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <label htmlFor="year-select" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Year:
-                </label>
-                <select
-                  id="year-select"
-                  value={selectedYear}
-                  onChange={(e) => {
-                    const year = parseInt(e.target.value);
-                    setSelectedYear(year);
-                  }}
-                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  {Array.from({ length: 5 }, (_, i) => {
-                    const year = new Date().getFullYear() - i;
-                    return (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
+        <div className="w-full px-4 sm:px-6 pt-16 lg:pt-20 lg:pl-24 pb-6 lg:h-[calc(100vh-5rem)] app-page-shell">
+          {/* Page header */}
+          <div className="flex items-center justify-between py-5 border-b border-zinc-200 dark:border-zinc-800 mb-6">
+            <div>
+              <h1 className="app-page-heading text-base font-semibold text-zinc-900 dark:text-zinc-100">My Leave Analytics</h1>
+              <p className="app-page-subheading text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
+                Usage insights for {selectedYear}
+              </p>
             </div>
+            <select
+              id="year-select"
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              className="input-modern py-1.5 text-sm w-auto"
+            >
+              {Array.from({ length: 5 }, (_, i) => {
+                const year = new Date().getFullYear() - i;
+                return <option key={year} value={year}>{year}</option>;
+              })}
+            </select>
           </div>
 
-          {/* Analytics Cards - Enhanced */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 mb-8">
+          {/* Editorial summary */}
+          {(() => {
+            const monthly = getMonthlyUsage();
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const values = months.map((_, i) => monthly[i] || 0);
+            const max = Math.max(1, ...values);
+
+            return (
+              <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden mb-6">
+                <div className="p-5 sm:p-6 border-b border-zinc-200/70 dark:border-zinc-800/70 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Usage over time</p>
+                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mt-1">Leave days per month</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <span className="px-2 py-1 rounded-md bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+                      Remaining: {Math.round(analytics.remainingLeaveBalance ?? 0)}
+                    </span>
+                    <span className="px-2 py-1 rounded-md bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+                      Realistic: {Math.round(analytics.realisticUsableDays ?? 0)}
+                    </span>
+                    <span className={`px-2 py-1 rounded-md ${Math.round(analytics.willLose ?? 0) > 0 ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200'}`}>
+                      At risk: {Math.round(analytics.willLose ?? 0)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-5 sm:p-6">
+                  <div className="grid grid-cols-12 gap-2 items-end h-32">
+                    {values.map((v, idx) => (
+                      <div key={months[idx]} className="col-span-1 flex flex-col items-center justify-end gap-2">
+                        <div className="w-full rounded-md bg-zinc-100 dark:bg-zinc-800 overflow-hidden h-24 flex items-end">
+                          <div
+                            className="w-full bg-indigo-600/80 dark:bg-indigo-500/70"
+                            style={{ height: `${Math.round((v / max) * 96)}px` }}
+                          />
+                        </div>
+                        <div className="text-[10px] text-zinc-500 dark:text-zinc-400">{months[idx]}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Detailed analytics — scrollable below the chart */}
+          <div className="lg:overflow-auto lg:max-h-[calc(100vh-540px)] mt-4">
+              <div className="grid grid-cols-1 gap-5">
             <div className="stat-card group">
               <div className="p-5 sm:p-6">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Realistic Days</p>
+                      <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">Realistic Days</p>
                       <button
                         onClick={() => toggleSection('realistic-usable')}
                         className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -575,12 +602,12 @@ export default function MemberAnalyticsPage() {
                         <InformationCircleIcon className="h-4 w-4" />
                       </button>
                     </div>
-                    <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
+                    <p className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-1 fade-in">
                       {Math.round(analytics.realisticUsableDays ?? 0)}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-500">With constraints</p>
                     {expandedSections.has('realistic-usable') && (
-                      <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-xs text-gray-700 dark:text-gray-300">
+                      <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-xs text-zinc-700 dark:text-zinc-300">
                         <p className="font-semibold mb-1">Realistic Days:</p>
                         <p>This is the number of days you can realistically use, considering team competition and concurrent leave limits. It accounts for carryover limitations if set.</p>
                       </div>
@@ -600,7 +627,7 @@ export default function MemberAnalyticsPage() {
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Available Days</p>
+                      <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">Available Days</p>
                       <button
                         onClick={() => toggleSection('usable-days')}
                         className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -609,12 +636,12 @@ export default function MemberAnalyticsPage() {
                         <InformationCircleIcon className="h-4 w-4" />
                       </button>
                     </div>
-                    <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
+                    <p className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-1 fade-in">
                       {Math.round(analytics.usableDays ?? 0)}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-500">Available</p>
                     {expandedSections.has('usable-days') && (
-                      <div className="mt-2 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg text-xs text-gray-700 dark:text-gray-300">
+                      <div className="mt-2 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg text-xs text-zinc-700 dark:text-zinc-300">
                         <p className="font-semibold mb-1">Available Days:</p>
                         <p>Days that can be used when shared among members who can use them, adjusted for concurrent leave limits.</p>
                       </div>
@@ -634,7 +661,7 @@ export default function MemberAnalyticsPage() {
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Theoretical Days</p>
+                      <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">Theoretical Days</p>
                       <button
                         onClick={() => toggleSection('theoretical-days')}
                         className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -643,20 +670,20 @@ export default function MemberAnalyticsPage() {
                         <InformationCircleIcon className="h-4 w-4" />
                       </button>
                     </div>
-                    <p className="text-2xl sm:text-3xl font-bold text-gray-700 dark:text-gray-300 mb-1 fade-in">
+                    <p className="text-2xl sm:text-3xl font-bold text-zinc-700 dark:text-zinc-300 mb-1 fade-in">
                       {Math.round(analytics.theoreticalWorkingDays ?? 0)}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-500">Without constraints</p>
                     {expandedSections.has('theoretical-days') && (
-                      <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-900/20 rounded-lg text-xs text-gray-700 dark:text-gray-300">
+                      <div className="mt-2 p-3 bg-zinc-50 dark:bg-zinc-900/20 rounded-lg text-xs text-zinc-700 dark:text-zinc-300">
                         <p className="font-semibold mb-1">Theoretical Working Days:</p>
                         <p>Total working days remaining from today to end of year, not adjusted for concurrent leave sharing.</p>
                       </div>
                     )}
                   </div>
                   <div className="flex-shrink-0 ml-3">
-                    <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center">
-                      <ArrowTrendingUpIcon className="h-6 w-6 text-gray-700 dark:text-gray-300" />
+                    <div className="w-12 h-12 bg-zinc-100 dark:bg-zinc-800 rounded-xl flex items-center justify-center">
+                      <ArrowTrendingUpIcon className="h-6 w-6 text-zinc-700 dark:text-zinc-300" />
                     </div>
                   </div>
                 </div>
@@ -668,7 +695,7 @@ export default function MemberAnalyticsPage() {
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Team Competition</p>
+                      <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">Team Competition</p>
                       <button
                         onClick={() => toggleSection('team-competition')}
                         className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -680,18 +707,18 @@ export default function MemberAnalyticsPage() {
                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
                           analytics.partialOverlapMembersWithBalance > 0
                             ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                            : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
                         }`}>
                           {analytics.partialOverlapMembersWithBalance > 0 ? '⚠️' : 'ℹ️'} {analytics.partialOverlapMembersCount}
                         </span>
                       )}
                     </div>
-                    <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
+                    <p className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-1 fade-in">
                       {analytics.membersSharingSameShift ?? 0}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-500">Same shift members</p>
                     {expandedSections.has('team-competition') && (
-                      <div className="mt-2 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg text-xs text-gray-700 dark:text-gray-300">
+                      <div className="mt-2 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg text-xs text-zinc-700 dark:text-zinc-300">
                         <p className="font-semibold mb-1">Team Competition:</p>
                         <p>Number of team members with the same working days pattern{(() => {
                           if (!user || !user.shiftSchedule) return '';
@@ -717,7 +744,7 @@ export default function MemberAnalyticsPage() {
                 </div>
               </div>
             </div>
-          </div>
+              </div>
 
           {/* Competition Context Card - Enhanced */}
           <div className="card border-2 border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/30 mb-8">
@@ -733,7 +760,7 @@ export default function MemberAnalyticsPage() {
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                         analytics.partialOverlapMembersWithBalance > 0
                           ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border border-orange-300 dark:border-orange-700'
-                          : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                          : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
                       }`}>
                         {analytics.partialOverlapMembersWithBalance > 0 ? '⚠️' : 'ℹ️'} {analytics.partialOverlapMembersCount} partial overlap
                       </span>
@@ -757,7 +784,7 @@ export default function MemberAnalyticsPage() {
                     </p>
                   )}
                   {analytics.hasPartialCompetition && analytics.partialOverlapMembersWithBalance === 0 && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 leading-relaxed">
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-2 leading-relaxed">
                       ℹ️ {analytics.partialOverlapMembersCount} member{analytics.partialOverlapMembersCount !== 1 ? 's' : ''} with different shift patterns but overlapping working days (no active leave balances).
                     </p>
                   )}
@@ -814,23 +841,23 @@ export default function MemberAnalyticsPage() {
           </div>
 
           {/* Year-End Outlook Card - Enhanced */}
-          <div className={`card mb-8 ${analytics.willLose > 0 ? 'border-2 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30' : analytics.willCarryover > 0 ? 'border-2 border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/30' : 'border-2 border-gray-300 dark:border-gray-700'}`}>
+          <div className={`card mb-8 ${analytics.willLose > 0 ? 'border-2 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30' : analytics.willCarryover > 0 ? 'border-2 border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/30' : 'border-2 border-zinc-300 dark:border-zinc-700'}`}>
             <div className="p-5 sm:p-6">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Year-End Outlook</h3>
+              <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-4">Year-End Outlook</h3>
               
               {analytics.allowCarryover ? (
                 <div>
                   {/* No carryover on file hint when team allows carryover but user has none */}
                   {!(analytics.carryoverBalance > 0) && (user?.carryoverFromPreviousYear ?? 0) <= 0 && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
                       No carryover on file. If you had days from last year, your leader can set them in Leave balance.
                     </p>
                   )}
                   {/* Carryover history: carried over / used / remaining */}
                   {(user?.carryoverFromPreviousYear ?? 0) > 0 && (
                     <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
-                      <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Carryover history (this year)</p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                      <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-2">Carryover history (this year)</p>
+                      <p className="text-xs text-zinc-600 dark:text-zinc-400">
                         Carried over: <strong>{Math.round(user?.carryoverFromPreviousYear ?? 0)}</strong> days · Used: <strong>{Math.round(analytics.carryoverDaysUsed ?? 0)}</strong> · Remaining: <strong>{Math.round(analytics.carryoverExpired ? (analytics.carryoverRemainingDisplay ?? 0) : (analytics.carryoverBalance ?? 0))}</strong>
                         {(analytics.carryoverExpired ?? false) && <span className="ml-1 text-red-600 dark:text-red-400 font-medium">Expired</span>}
                       </p>
@@ -978,25 +1005,25 @@ export default function MemberAnalyticsPage() {
                     </div>
                   ) : (
                     <div className="flex items-center space-x-3 mb-2">
-                      <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center">
-                        <CheckCircleIcon className="h-6 w-6 text-gray-700 dark:text-gray-300" />
+                      <div className="w-12 h-12 bg-zinc-100 dark:bg-zinc-800 rounded-xl flex items-center justify-center">
+                        <CheckCircleIcon className="h-6 w-6 text-zinc-700 dark:text-zinc-300" />
                       </div>
                       <div>
-                        <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">No days to carry over</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">All leave will be used or retained</p>
+                        <p className="text-lg font-semibold text-zinc-700 dark:text-zinc-300">No days to carry over</p>
+                        <p className="text-sm text-zinc-600 dark:text-zinc-400">All leave will be used or retained</p>
                       </div>
                     </div>
                   )}
                   {analytics.willCarryover > 0 ? (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-4">
                     Your team allows leave carryover. Unused days will be available next year.
                   </p>
                   ) : analytics.allowCarryover ? (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-4">
                       Your team allows leave carryover, but you don&apos;t have any days that will carry over.
                     </p>
                   ) : (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-4">
                       Your team does not allow leave carryover. Unused days will be lost at year end.
                     </p>
                   )}
@@ -1024,7 +1051,7 @@ export default function MemberAnalyticsPage() {
                       </div>
                     </div>
                   )}
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-4">
                     Your team does not allow leave carryover. Unused days will be lost at year end.
                   </p>
                 </div>
@@ -1032,7 +1059,7 @@ export default function MemberAnalyticsPage() {
 
               {/* Progress Bar */}
               <div className="mt-6">
-                <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mb-2">
+                <div className="flex justify-between text-xs text-zinc-600 dark:text-zinc-400 mb-2">
                   <span>Leave Balance Usage</span>
                   {(() => {
                     const baseBalance = analytics.baseLeaveBalance ?? (team?.settings.maxLeavePerYear || 20);
@@ -1055,7 +1082,7 @@ export default function MemberAnalyticsPage() {
                     );
                   })()}
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
                   {(() => {
                     const baseBalance = analytics.baseLeaveBalance ?? (team?.settings.maxLeavePerYear || 20);
                     const used = baseBalance - (analytics.remainingLeaveBalance ?? 0);
@@ -1068,43 +1095,43 @@ export default function MemberAnalyticsPage() {
           </div>
 
           {/* Leave Balance Summary Card */}
-          <div className="card mb-8">
+          <div className="card mb-5">
             <div className="p-5 sm:p-6">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Leave Balance Summary</h3>
+              <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-4">Leave Balance Summary</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Remaining Balance</p>
-                  <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-lg">
+                  <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">Remaining Balance</p>
+                  <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
                     {Math.round(analytics.remainingLeaveBalance ?? 0)}
                   </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">total (carryover used first)</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">total (carryover used first)</p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                     {Math.round((analytics.remainingLeaveBalance ?? 0) - (analytics.carryoverBalance ?? 0))} of {team?.settings.maxLeavePerYear || 20} days annual allocation remaining
                   </p>
                 </div>
                 {((user?.carryoverFromPreviousYear ?? 0) > 0 && ((analytics.carryoverBalance ?? 0) > 0 || (analytics.carryoverExpired && (analytics.carryoverRemainingDisplay ?? 0) > 0))) && (
                   <div className={`p-4 rounded-lg ${analytics.carryoverExpired ? 'bg-red-50 dark:bg-red-900/20' : 'bg-blue-50 dark:bg-blue-900/20'}`}>
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Carryover Balance</p>
+                    <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">Carryover Balance</p>
                     <p className={`text-3xl font-bold ${analytics.carryoverExpired ? 'text-red-900 dark:text-red-300' : 'text-blue-900 dark:text-blue-300'}`}>
                       {Math.round(analytics.carryoverExpired ? (analytics.carryoverRemainingDisplay ?? 0) : (analytics.carryoverBalance ?? 0))}
                       {(analytics.carryoverExpired ?? false) && <span className="ml-2 text-sm font-semibold uppercase">Expired</span>}
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{analytics.carryoverExpired ? 'expired (no longer usable)' : 'from previous year'}</p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{analytics.carryoverExpired ? 'expired (no longer usable)' : 'from previous year'}</p>
                   </div>
                 )}
-                <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Working Days Used</p>
-                  <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-lg">
+                  <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">Working Days Used</p>
+                  <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
                     {Math.round(analytics.workingDaysUsed ?? 0)}
                   </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">this year</p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">this year</p>
                 </div>
-                <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Surplus Balance</p>
+                <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-lg">
+                  <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">Surplus Balance</p>
                   <p className="text-3xl font-bold text-green-600 dark:text-green-400">
                     {Math.round(analytics.surplusBalance ?? 0)}
                   </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">additional days</p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">additional days</p>
                 </div>
               </div>
             </div>
@@ -1123,11 +1150,11 @@ export default function MemberAnalyticsPage() {
             // Show "Not available" if type is assigned but not enabled
             if (hasTypeAssigned && !isTypeEnabled) {
               return (
-                <div className="card mb-8 border-2 border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30 opacity-60">
+                <div className="card mb-5 border-2 border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/30 opacity-60">
                   <div className="p-5 sm:p-6">
                     <div className="flex items-center gap-3 mb-4">
                       <CalendarIcon className="h-6 w-6 text-gray-400 dark:text-gray-600" />
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                      <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">
                         {userType === 'maternity' ? '🤱 Maternity Leave' : '👨‍👩‍👧 Paternity Leave'}
                       </h3>
                     </div>
@@ -1147,22 +1174,22 @@ export default function MemberAnalyticsPage() {
             // Show normal section if type is assigned, enabled, and analytics exist
             if (hasTypeAssigned && isTypeEnabled && maternityAnalytics) {
               return (
-            <div className="card mb-8 border-2 border-pink-300 dark:border-pink-700 bg-pink-50 dark:bg-pink-900/30">
+            <div className="card mb-5 border-2 border-pink-300 dark:border-pink-700 bg-pink-50 dark:bg-pink-900/30">
               <div className="p-5 sm:p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <CalendarIcon className="h-6 w-6 text-pink-700 dark:text-pink-400" />
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                  <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">
                     {user.maternityPaternityType === 'maternity' ? '🤱 Maternity Leave' : '👨‍👩‍👧 Paternity Leave'}
                   </h3>
                 </div>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
                   <div className="bg-white dark:bg-gray-900/50 p-4 rounded-lg">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Remaining Balance</p>
-                    <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                    <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">Remaining Balance</p>
+                    <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
                       {Math.round(maternityAnalytics.remainingMaternityLeaveBalance)}
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                       out of {(() => {
                         const userType = user.maternityPaternityType;
                         return userType === 'paternity'
@@ -1173,23 +1200,23 @@ export default function MemberAnalyticsPage() {
                   </div>
                   
                   <div className="bg-white dark:bg-gray-900/50 p-4 rounded-lg">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Days Used</p>
-                    <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                    <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">Days Used</p>
+                    <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
                       {Math.round(maternityAnalytics.maternityDaysUsed)}
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">this year</p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">this year</p>
                   </div>
                   
                   <div className="bg-white dark:bg-gray-900/50 p-4 rounded-lg">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Base Balance</p>
-                    <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                    <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">Base Balance</p>
+                    <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
                       {Math.round(maternityAnalytics.baseMaternityLeaveBalance)}
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">allocated</p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">allocated</p>
                   </div>
                   
                   <div className="bg-white dark:bg-gray-900/50 p-4 rounded-lg">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Usage Progress</p>
+                    <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">Usage Progress</p>
                     <div className="mt-2">
                       <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-4">
                         <div
@@ -1206,7 +1233,7 @@ export default function MemberAnalyticsPage() {
                           }}
                         ></div>
                       </div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                         {maternityAnalytics.baseMaternityLeaveBalance > 0
                           ? Math.round((maternityAnalytics.maternityDaysUsed / maternityAnalytics.baseMaternityLeaveBalance) * 100)
                           : 0}% used
@@ -1217,7 +1244,7 @@ export default function MemberAnalyticsPage() {
 
                 {/* Maternity/Paternity Leave Request History */}
                 <div className="mt-6">
-                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Request History</h4>
+                  <h4 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-3">Request History</h4>
                   {(() => {
                     const userType = user.maternityPaternityType;
                     const maternityRequests = leaveRequests.filter(req => {
@@ -1233,7 +1260,7 @@ export default function MemberAnalyticsPage() {
 
                     if (maternityRequests.length === 0) {
                       return (
-                        <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center py-4">
                           No {userType === 'maternity' ? 'maternity' : 'paternity'} leave requests yet.
                         </p>
                       );
@@ -1251,13 +1278,13 @@ export default function MemberAnalyticsPage() {
                           });
                           
                           return (
-                            <div key={req._id} className="bg-white dark:bg-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-800">
+                            <div key={req._id} className="bg-white dark:bg-gray-900/50 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800">
                               <div className="flex items-center justify-between">
                                 <div>
-                                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                                     {startDate.toLocaleDateString()} - {endDate.toLocaleDateString()}
                                   </p>
-                                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                                     {days} {days === 1 ? 'day' : 'days'} • {req.reason}
                                   </p>
                                 </div>
@@ -1282,10 +1309,10 @@ export default function MemberAnalyticsPage() {
           })()}
 
           {/* Monthly Usage Breakdown */}
-          <div className="card mb-8">
+          <div className="card mb-5">
             <div className="p-5 sm:p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Monthly Usage Breakdown</h3>
+                <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Monthly Usage Breakdown</h3>
                 <button
                   onClick={() => toggleSection('monthly-usage')}
                   className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -1295,13 +1322,13 @@ export default function MemberAnalyticsPage() {
                 </button>
               </div>
               {expandedSections.has('monthly-usage') && (
-                <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-gray-700 dark:text-gray-300">
+                <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-zinc-700 dark:text-zinc-300">
                   <p className="font-semibold mb-1">Monthly Usage Breakdown:</p>
                   <p>Shows how many working days you&apos;ve used each month this year. This helps identify usage patterns and trends.</p>
                 </div>
               )}
               {Object.values(monthlyUsage).every(days => days === 0) ? (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <div className="text-center py-8 text-zinc-500 dark:text-zinc-400">
                   <p className="text-sm">No leave usage data available for this year.</p>
                   <p className="text-xs mt-2">Approved leave requests will appear here once you have taken leave.</p>
                 </div>
@@ -1314,7 +1341,7 @@ export default function MemberAnalyticsPage() {
                     const percentage = maxDays > 0 ? (days / maxDays) * 100 : 0;
                     return (
                       <div key={index} className="flex items-center gap-3">
-                        <div className="w-16 text-sm font-medium text-gray-700 dark:text-gray-300">{month}</div>
+                        <div className="w-16 text-sm font-medium text-zinc-700 dark:text-zinc-300">{month}</div>
                         <div className="flex-1 bg-gray-200 dark:bg-gray-800 rounded-full h-6 relative">
                           <div
                             className={`h-6 rounded-full transition-all duration-300 ${
@@ -1323,7 +1350,7 @@ export default function MemberAnalyticsPage() {
                             style={{ width: `${Math.max(percentage, days > 0 ? 5 : 0)}%` }}
                           ></div>
                         </div>
-                        <div className="w-20 text-right text-sm font-semibold text-gray-900 dark:text-white">
+                        <div className="w-20 text-right text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                           {days > 0 ? `${days} day${days !== 1 ? 's' : ''}` : '0 days'}
                         </div>
                       </div>
@@ -1336,15 +1363,15 @@ export default function MemberAnalyticsPage() {
 
           {/* Optimal Usage Recommendations */}
           {optimalRecommendations.length > 0 && (
-            <div className="card mb-8 border-2 border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30">
+            <div className="card mb-5 border-2 border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/30">
               <div className="p-5 sm:p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <LightBulbIcon className="h-6 w-6 text-blue-700 dark:text-blue-400" />
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">Optimal Usage Recommendations</h3>
+                  <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Optimal Usage Recommendations</h3>
                 </div>
                 <ul className="space-y-2">
                   {optimalRecommendations.map((rec, index) => (
-                    <li key={index} className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                    <li key={index} className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">
                       {rec}
                     </li>
                   ))}
@@ -1367,7 +1394,7 @@ export default function MemberAnalyticsPage() {
                     riskAnalysis.riskLevel === 'Medium' ? 'text-orange-700 dark:text-orange-400' :
                     'text-green-700 dark:text-green-400'
                   }`} />
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">Risk Analysis</h3>
+                  <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Risk Analysis</h3>
                 </div>
                 <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
                   riskAnalysis.riskLevel === 'High' ? 'bg-red-200 dark:bg-red-900/50 text-red-900 dark:text-red-300' :
@@ -1379,20 +1406,20 @@ export default function MemberAnalyticsPage() {
               </div>
               {riskAnalysis.risks.length > 0 && (
                 <div className="mb-4">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Identified Risks:</p>
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Identified Risks:</p>
                   <ul className="space-y-1">
                     {riskAnalysis.risks.map((risk, index) => (
-                      <li key={index} className="text-sm text-gray-700 dark:text-gray-300">• {risk}</li>
+                      <li key={index} className="text-sm text-zinc-700 dark:text-zinc-300">• {risk}</li>
                     ))}
                   </ul>
                 </div>
               )}
               {riskAnalysis.mitigations.length > 0 && (
                 <div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Mitigation Strategies:</p>
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Mitigation Strategies:</p>
                   <ul className="space-y-1">
                     {riskAnalysis.mitigations.map((mitigation, index) => (
-                      <li key={index} className="text-sm text-gray-700 dark:text-gray-300">✓ {mitigation}</li>
+                      <li key={index} className="text-sm text-zinc-700 dark:text-zinc-300">✓ {mitigation}</li>
                     ))}
                   </ul>
                 </div>
@@ -1401,10 +1428,10 @@ export default function MemberAnalyticsPage() {
           </div>
 
           {/* Request History Patterns */}
-          <div className="card mb-8">
+          <div className="card mb-5">
             <div className="p-5 sm:p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Request History Patterns</h3>
+                <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Request History Patterns</h3>
                 <button
                   onClick={() => toggleSection('request-patterns')}
                   className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -1414,32 +1441,32 @@ export default function MemberAnalyticsPage() {
                 </button>
               </div>
               {expandedSections.has('request-patterns') && (
-                <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-gray-700 dark:text-gray-300">
+                <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-zinc-700 dark:text-zinc-300">
                   <p className="font-semibold mb-1">Request History Patterns:</p>
                   <p>Analyzes your leave request history to identify patterns in duration, frequency, reasons, and preferred months.</p>
                 </div>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Total Approved</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{requestPatterns.totalApproved}</p>
+                <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-lg">
+                  <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">Total Approved</p>
+                  <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{requestPatterns.totalApproved}</p>
                 </div>
-                <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Avg Duration</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{requestPatterns.avgDuration} days</p>
+                <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-lg">
+                  <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">Avg Duration</p>
+                  <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{requestPatterns.avgDuration} days</p>
                 </div>
-                <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Avg Days Between</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{requestPatterns.avgDaysBetween} days</p>
+                <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-lg">
+                  <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">Avg Days Between</p>
+                  <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{requestPatterns.avgDaysBetween} days</p>
                 </div>
-                <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Most Common Reason</p>
-                  <p className="text-lg font-bold text-gray-900 dark:text-white truncate">{requestPatterns.mostCommonReason}</p>
+                <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-lg">
+                  <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">Most Common Reason</p>
+                  <p className="text-lg font-bold text-zinc-900 dark:text-zinc-100 truncate">{requestPatterns.mostCommonReason}</p>
                 </div>
               </div>
               {requestPatterns.preferredMonths.length > 0 && (
                 <div className="mt-4">
-                  <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Preferred Months:</p>
+                  <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">Preferred Months:</p>
                   <div className="flex gap-2">
                     {requestPatterns.preferredMonths.map((month, index) => (
                       <span key={index} className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-full text-sm font-medium">
@@ -1453,10 +1480,10 @@ export default function MemberAnalyticsPage() {
           </div>
 
           {/* Efficiency Metrics */}
-          <div className="card mb-8">
+          <div className="card mb-5">
             <div className="p-5 sm:p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Efficiency Metrics</h3>
+                <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Efficiency Metrics</h3>
                 <button
                   onClick={() => toggleSection('efficiency-metrics')}
                   className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -1466,15 +1493,15 @@ export default function MemberAnalyticsPage() {
                 </button>
               </div>
               {expandedSections.has('efficiency-metrics') && (
-                <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-gray-700 dark:text-gray-300">
+                <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-zinc-700 dark:text-zinc-300">
                   <p className="font-semibold mb-1">Efficiency Metrics:</p>
                   <p>Measures how efficiently you&apos;re using your leave: usage efficiency (used vs available), planning efficiency (advance notice), and balance efficiency (distribution throughout year).</p>
                 </div>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Usage Efficiency</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{efficiencyMetrics.usageEfficiency}%</p>
+                <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-lg">
+                  <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">Usage Efficiency</p>
+                  <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{efficiencyMetrics.usageEfficiency}%</p>
                   <div className="mt-2 w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2">
                     <div
                       className={`h-2 rounded-full transition-all duration-300 ${
@@ -1486,19 +1513,20 @@ export default function MemberAnalyticsPage() {
                     ></div>
                   </div>
                 </div>
-                <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Planning Efficiency</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{efficiencyMetrics.planningEfficiency}%</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Avg {efficiencyMetrics.avgAdvanceNotice} days notice</p>
+                <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-lg">
+                  <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">Planning Efficiency</p>
+                  <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{efficiencyMetrics.planningEfficiency}%</p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Avg {efficiencyMetrics.avgAdvanceNotice} days notice</p>
                 </div>
-                <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Balance Efficiency</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{efficiencyMetrics.balanceEfficiency}%</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Distribution across months</p>
+                <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-lg">
+                  <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">Balance Efficiency</p>
+                  <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{efficiencyMetrics.balanceEfficiency}%</p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Distribution across months</p>
                 </div>
               </div>
             </div>
           </div>
+          </div>{/* end scrollable analytics */}
         </div>
       </div>
     </ProtectedRoute>

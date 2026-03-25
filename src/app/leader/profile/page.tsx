@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { User, Team } from '@/types';
@@ -11,6 +12,7 @@ import LeaveReminderDayChips from '@/components/profile/LeaveReminderDayChips';
 import TelegramLocalDevHint from '@/components/profile/TelegramLocalDevHint';
 import ProfilePageFeedback from '@/components/profile/ProfilePageFeedback';
 import { isTelegramLinked } from '@/lib/telegramLinked';
+import { setStoredUser } from '@/lib/clientUserStorage';
 
 function scrollToProfileFeedback() {
   if (typeof window === 'undefined') return;
@@ -219,7 +221,7 @@ export default function LeaderProfilePage() {
       const data = await res.json();
       if (res.ok && data.user) {
         setUser(data.user);
-        localStorage.setItem('user', JSON.stringify(data.user));
+        setStoredUser(data.user);
         setMessage(
           data.message ||
             'Telegram disconnected. Scroll to Notifications and use “Log in with Telegram” to link again.'
@@ -336,7 +338,7 @@ export default function LeaderProfilePage() {
           );
         }
         // Update localStorage with new data
-        localStorage.setItem('user', JSON.stringify(data.user));
+        setStoredUser(data.user);
         window.setTimeout(() => scrollToProfileFeedback(), 80);
       } else {
         setError(data.error || 'Failed to update profile');
@@ -353,31 +355,23 @@ export default function LeaderProfilePage() {
 
   if (loading) {
     return (
-      <ProtectedRoute requiredRole="leader">
-        <div className="min-h-screen bg-gray-50 dark:bg-black">
-          <Navbar />
-          <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12">
-            <div className="flex justify-center items-center h-64">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-indigo-600 dark:border-t-indigo-400 mx-auto mb-4"></div>
-                <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">Loading profile...</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </ProtectedRoute>
+      <div className="min-h-screen bg-white dark:bg-zinc-950 flex items-center justify-center">
+        <div className="w-5 h-5 border-2 border-zinc-200 dark:border-zinc-700 border-t-indigo-600 rounded-full animate-spin" />
+      </div>
     );
   }
 
   return (
     <ProtectedRoute requiredRole="leader">
-      <div className="min-h-screen bg-gray-50 dark:bg-black">
+      <div className="min-h-screen bg-white dark:bg-zinc-950">
         <Navbar />
-        <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12">
-          {/* Header Section - Enhanced */}
-          <div className="mb-8 fade-in">
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">My Profile</h1>
-            <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400">Manage your account settings and password</p>
+        <div className="w-full px-4 sm:px-6 pt-16 lg:pt-20 lg:pl-24 pb-6 lg:h-[calc(100vh-5rem)] app-page-shell">
+          {/* Page header */}
+          <div className="flex items-center justify-between py-5 border-b border-zinc-200 dark:border-zinc-800 mb-6">
+            <div>
+              <h1 className="app-page-heading text-base font-semibold text-zinc-900 dark:text-zinc-100">My Profile</h1>
+              <p className="app-page-subheading text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Account settings and preferences</p>
+            </div>
           </div>
 
           <ProfilePageFeedback error={error} message={message} />
@@ -390,30 +384,58 @@ export default function LeaderProfilePage() {
             </div>
           ) : null}
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
-            {/* Profile Information */}
-            <div className="card">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <aside className="lg:col-span-4">
+              <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5">
+                <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Profile</p>
+                <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mt-2">{user?.username}</p>
+                {team?.name ? <p className="app-page-subheading text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">{team.name}</p> : null}
+
+                <div className="mt-4 pt-4 border-t border-zinc-200/70 dark:border-zinc-800/70 space-y-2 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-zinc-500 dark:text-zinc-400">Role</span>
+                    <span className="text-zinc-900 dark:text-zinc-100 font-medium">Leader</span>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-zinc-200/70 dark:border-zinc-800/70 grid gap-2">
+                  <Link href="/leader/requests" className="btn-secondary text-sm justify-center">
+                    Requests
+                  </Link>
+                  <Link href="/leader/members" className="btn-secondary text-sm justify-center">
+                    Members
+                  </Link>
+                  <Link href="/leader/settings" className="btn-secondary text-sm justify-center">
+                    Settings
+                  </Link>
+                </div>
+              </div>
+            </aside>
+
+            <div className="lg:col-span-8 space-y-6">
+              {/* Profile Information */}
+              <div className="card">
               <div className="p-5 sm:p-6">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Profile Information</h2>
+                <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-6">Profile Information</h2>
                 
                 <form onSubmit={handleProfileUpdate} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Username</label>
-                    <p className="mt-1 text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded-md border border-gray-200 dark:border-gray-800">
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Username</label>
+                    <p className="mt-1 text-sm text-zinc-900 dark:text-zinc-100 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 rounded-md border border-zinc-200 dark:border-zinc-800">
                       {user?.username}
                     </p>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Username cannot be changed</p>
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Username cannot be changed</p>
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                       Name
                     </label>
                     <div className="mt-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <input
                         type="text"
                         required
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
+                        className="mt-1 block w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
                         placeholder="First"
                         value={profileForm.firstName}
                         onChange={(e) => {
@@ -424,7 +446,7 @@ export default function LeaderProfilePage() {
                       />
                       <input
                         type="text"
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
+                        className="mt-1 block w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
                         placeholder="Middle (optional)"
                         value={profileForm.middleName}
                         onChange={(e) => {
@@ -436,7 +458,7 @@ export default function LeaderProfilePage() {
                       <input
                         type="text"
                         required
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
+                        className="mt-1 block w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
                         placeholder="Last"
                         value={profileForm.lastName}
                         onChange={(e) => {
@@ -446,22 +468,22 @@ export default function LeaderProfilePage() {
                         }}
                       />
                     </div>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                       Required to use the app.
                     </p>
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Role</label>
-                    <p className="mt-1 text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded-md border border-gray-200 dark:border-gray-800">
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Role</label>
+                    <p className="mt-1 text-sm text-zinc-900 dark:text-zinc-100 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 rounded-md border border-zinc-200 dark:border-zinc-800">
                       👑 Team Leader
                     </p>
                   </div>
 
                   {team && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Team</label>
-                      <p className="mt-1 text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded-md border border-gray-200 dark:border-gray-800">
+                      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Team</label>
+                      <p className="mt-1 text-sm text-zinc-900 dark:text-zinc-100 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 rounded-md border border-zinc-200 dark:border-zinc-800">
                         {team.name}
                       </p>
                     </div>
@@ -470,11 +492,11 @@ export default function LeaderProfilePage() {
                   <div>
                     <label
                       htmlFor="timezone"
-                      className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                      className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
                     >
                       Time zone
                     </label>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 mb-2">
                       Used for leave reminders so &quot;10 days before&quot; matches the calendar where you live.
                     </p>
                     <TimezoneSelect
@@ -485,29 +507,29 @@ export default function LeaderProfilePage() {
                   </div>
 
                   <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Notifications</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                    <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3">Notifications</h3>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
                       Add your email and optionally link Telegram to receive leave request updates.
                     </p>
                     {process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ? (
                       <TelegramLocalDevHint />
                     ) : null}
                     <div className="mb-3">
-                      <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <label htmlFor="email" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                         Email
                       </label>
                       <input
                         type="email"
                         id="email"
                         autoComplete="email"
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        className="mt-1 block w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                         value={profileForm.email}
                         onChange={(e) =>
                           setProfileForm({ ...profileForm, email: e.target.value })
                         }
                         placeholder="you@example.com"
                       />
-                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                         Saving a new or changed email sends a short confirmation if the server has Gmail
                         configured. Leave notifications use the same SMTP settings.
                       </p>
@@ -523,7 +545,7 @@ export default function LeaderProfilePage() {
                         {testEmailLoading ? 'Sending…' : 'Send test email (saved address)'}
                       </button>
                     </div>
-                    <label className="flex items-center gap-2 mb-2 text-sm text-gray-700 dark:text-gray-300">
+                    <label className="flex items-center gap-2 mb-2 text-sm text-zinc-700 dark:text-zinc-300">
                       <input
                         type="checkbox"
                         checked={profileForm.notifyEmail}
@@ -534,7 +556,7 @@ export default function LeaderProfilePage() {
                       />
                       Email me about leave updates
                     </label>
-                    <label className="flex items-center gap-2 mb-3 text-sm text-gray-700 dark:text-gray-300">
+                    <label className="flex items-center gap-2 mb-3 text-sm text-zinc-700 dark:text-zinc-300">
                       <input
                         type="checkbox"
                         checked={profileForm.notifyTelegram}
@@ -545,18 +567,18 @@ export default function LeaderProfilePage() {
                       Telegram notifications (after linking below)
                     </label>
                     <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-3 space-y-1">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                         Upcoming leave reminders
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
                         Uses your time zone. Sent by email and/or Telegram when those are enabled above. Uncheck all
                         days to turn off that type of reminder.
                       </p>
                       <div className="mt-3">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                           Reminder time
                         </label>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                           Sent around this time in your profile time zone (cron runs hourly).
                         </p>
                         <input
@@ -568,7 +590,7 @@ export default function LeaderProfilePage() {
                               leaveReminderTimeLocal: e.target.value || '09:00',
                             })
                           }
-                          className="mt-1 block w-full max-w-[220px] px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                          className="mt-1 block w-full max-w-[220px] px-3 py-2 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                         />
                       </div>
                       <LeaveReminderDayChips
@@ -592,7 +614,7 @@ export default function LeaderProfilePage() {
                       <>
                         {isTelegramLinked(user) ? (
                           <div>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                            <p className="text-sm text-zinc-600 dark:text-zinc-400">
                               Telegram linked
                               {(user as { telegramUsername?: string }).telegramUsername
                                 ? ` (@${(user as { telegramUsername?: string }).telegramUsername})`
@@ -621,7 +643,7 @@ export default function LeaderProfilePage() {
                           />
                         )}
                         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                          <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-2">
                             To use a different Telegram account, disconnect below, then generate a new link.
                           </p>
                           <button
@@ -640,8 +662,8 @@ export default function LeaderProfilePage() {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Member Since</label>
-                    <p className="mt-1 text-sm text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded-md border border-gray-200 dark:border-gray-800">
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Member Since</label>
+                    <p className="mt-1 text-sm text-zinc-900 dark:text-zinc-100 bg-zinc-50 dark:bg-zinc-900 px-3 py-2 rounded-md border border-zinc-200 dark:border-zinc-800">
                       {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown'}
                     </p>
                   </div>
@@ -657,21 +679,21 @@ export default function LeaderProfilePage() {
               </div>
             </div>
 
-            {/* Change Password */}
-            <div className="card">
+              {/* Change Password */}
+              <div className="card">
               <div className="p-5 sm:p-6">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Change Password</h2>
+                <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-6">Change Password</h2>
                 
                 <form onSubmit={handlePasswordChange} className="space-y-4">
                   <div>
-                    <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label htmlFor="currentPassword" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                       Current Password
                     </label>
                     <input
                       type="password"
                       id="currentPassword"
                       required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
+                      className="mt-1 block w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
                       value={passwordForm.currentPassword}
                       onChange={(e) => setPasswordForm({
                         ...passwordForm,
@@ -681,34 +703,34 @@ export default function LeaderProfilePage() {
                   </div>
 
                   <div>
-                    <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label htmlFor="newPassword" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                       New Password
                     </label>
                     <input
                       type="password"
                       id="newPassword"
                       required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
+                      className="mt-1 block w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
                       value={passwordForm.newPassword}
                       onChange={(e) => setPasswordForm({
                         ...passwordForm,
                         newPassword: e.target.value
                       })}
                     />
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                       Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)
                     </p>
                   </div>
 
                   <div>
-                    <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label htmlFor="confirmPassword" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                       Confirm New Password
                     </label>
                     <input
                       type="password"
                       id="confirmPassword"
                       required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
+                      className="mt-1 block w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
                       value={passwordForm.confirmPassword}
                       onChange={(e) => setPasswordForm({
                         ...passwordForm,
@@ -726,8 +748,9 @@ export default function LeaderProfilePage() {
                   </button>
                 </form>
               </div>
+              </div>
             </div>
-          </div>
+            </div>
         </div>
       </div>
     </ProtectedRoute>

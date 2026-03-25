@@ -200,7 +200,7 @@ export default function LeaderCalendarPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black">
+      <div className="min-h-screen bg-white dark:bg-zinc-950">
         <Navbar />
         <div className="flex items-center justify-center h-64 pt-24">
           <div className="text-center">
@@ -213,45 +213,49 @@ export default function LeaderCalendarPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black">
+    <div className="min-h-screen bg-white dark:bg-zinc-950">
       <Navbar />
       
-      <div className="w-full px-0 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12">
-        {/* Header Section */}
-        <div className="mb-4 sm:mb-8 fade-in px-4 sm:px-0">
-          <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white tracking-tight">Team Calendar</h1>
-          <p className="text-sm sm:text-lg lg:text-xl text-gray-500 dark:text-gray-400 mt-0.5 sm:mt-1">View all leave requests for your team</p>
-        </div>
-
-        {/* Filter Tabs */}
-        <div className="card mb-4 sm:mb-8 mx-4 sm:mx-0">
-          <div className="p-5 sm:p-6">
-            <div className="border-b border-gray-200 dark:border-gray-800">
-              <nav className="-mb-px flex flex-wrap gap-4 sm:gap-8">
-              {[
-                { key: 'all', label: 'All Requests' },
-                { key: 'pending', label: 'Pending' },
-                { key: 'approved', label: 'Approved' },
-              ].map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setStatusFilter(tab.key as 'all' | 'pending' | 'approved')}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                    statusFilter === tab.key
-                      ? 'tab-active'
-                      : 'tab-inactive'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-              </nav>
-            </div>
+      <div className="w-full px-0 sm:px-6 pt-16 lg:pt-20 lg:pl-24 pb-6 lg:h-[calc(100vh-5rem)] app-page-shell">
+        {/* Page header */}
+        <div className="flex items-center justify-between py-5 border-b border-zinc-200 dark:border-zinc-800 mb-6 px-4 sm:px-0">
+          <div>
+            <h1 className="app-page-heading text-base font-semibold text-zinc-900 dark:text-zinc-100">Team Calendar</h1>
+            <p className="app-page-subheading text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">View all leave requests for your team</p>
           </div>
         </div>
 
-        {/* Filters Section */}
-        <div className="mb-4 sm:mb-8 space-y-3 sm:space-y-4 mx-4 sm:mx-0">
+        <div className="grid lg:grid-cols-12 gap-6 min-w-0">
+          <aside className="lg:col-span-3 lg:order-2 order-1 px-4 sm:px-0 min-w-0">
+            {/* Filter Tabs */}
+            <div className="card mb-4">
+              <div className="p-5 sm:p-6">
+                <div className="border-b border-gray-200 dark:border-gray-800">
+                  <nav className="-mb-px flex flex-wrap gap-4 sm:gap-8">
+                  {[
+                    { key: 'all', label: 'All Requests' },
+                    { key: 'pending', label: 'Pending' },
+                    { key: 'approved', label: 'Approved' },
+                  ].map((tab) => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setStatusFilter(tab.key as 'all' | 'pending' | 'approved')}
+                      className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                        statusFilter === tab.key
+                          ? 'tab-active'
+                          : 'tab-inactive'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                  </nav>
+                </div>
+              </div>
+            </div>
+
+            {/* Filters Section */}
+            <div className="space-y-3">
           {/* Member Filter */}
           <div className="card p-5 sm:p-6">
             <div className="flex items-center justify-between mb-3">
@@ -369,29 +373,33 @@ export default function LeaderCalendarPage() {
               )}
             </div>
           )}
-        </div>
+            </div>
+          </aside>
 
-        <div className="card rounded-none sm:rounded-2xl relative z-10 border-x-0 sm:border-x shadow-none sm:shadow">
-          <div className="px-0 sm:px-6 py-2 sm:py-8 relative z-10">
-            {team?._id ? (
-              <TeamCalendar 
-                teamId={team._id} 
-                members={members}
-                teamSettings={team?.settings ? { 
-                  minimumNoticePeriod: team.settings.minimumNoticePeriod || 1,
-                  maternityLeave: team.settings.maternityLeave,
-                  paternityLeave: team.settings.paternityLeave
-                } : undefined}
-                initialRequests={filteredRequests}
-              />
-            ) : (
-              <div className="flex items-center justify-center h-64">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-gray-400 dark:border-t-gray-500 mx-auto mb-4"></div>
-                  <p className="text-gray-500 dark:text-gray-400 text-lg">Loading team data...</p>
-                </div>
+          <div className="lg:col-span-9 lg:order-1 order-2 min-w-0">
+            <div className="card rounded-none sm:rounded-2xl relative z-10 border-x-0 sm:border-x shadow-none sm:shadow min-w-0 overflow-x-hidden">
+              <div className="px-0 sm:px-6 py-2 sm:py-8 relative z-10">
+                {team?._id ? (
+                  <TeamCalendar 
+                    teamId={team._id} 
+                    members={members}
+                    teamSettings={team?.settings ? { 
+                      minimumNoticePeriod: team.settings.minimumNoticePeriod || 1,
+                      maternityLeave: team.settings.maternityLeave,
+                      paternityLeave: team.settings.paternityLeave
+                    } : undefined}
+                    initialRequests={filteredRequests}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-gray-400 dark:border-t-gray-500 mx-auto mb-4"></div>
+                      <p className="text-gray-500 dark:text-gray-400 text-lg">Loading team data...</p>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>

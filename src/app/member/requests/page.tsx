@@ -11,6 +11,7 @@ import { parseDateSafe } from '@/lib/dateUtils';
 import { isBypassNoticePeriodActive } from '@/lib/noticePeriod';
 import { useTeamData } from '@/hooks/useTeamData';
 import { useRequests } from '@/hooks/useRequests';
+import { setStoredUser } from '@/lib/clientUserStorage';
 
 type LeaveDateConstraintDay = {
   selectable: boolean;
@@ -90,7 +91,7 @@ export default function MemberRequestsPage() {
         const id = (data?.user?.id as string | undefined) || null;
         setUserId(id);
         if (data?.user) {
-          localStorage.setItem('user', JSON.stringify(data.user));
+          setStoredUser(data.user);
         }
       } catch {
         setUserId(null);
@@ -337,48 +338,55 @@ export default function MemberRequestsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black">
-        <Navbar />
-        <div className="flex items-center justify-center h-64 pt-24">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-indigo-600 dark:border-t-indigo-400 mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">Loading requests...</p>
-          </div>
-        </div>
+      <div className="min-h-screen bg-white dark:bg-zinc-950 flex items-center justify-center">
+        <div className="w-5 h-5 border-2 border-zinc-200 dark:border-zinc-700 border-t-indigo-600 rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black">
+    <div className="min-h-screen bg-white dark:bg-zinc-950">
       <Navbar />
       
-      <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12">
-        {/* Header Section - Enhanced */}
-        <div className="mb-8 fade-in">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-            <div>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">My Leave Requests</h1>
-              <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400">Manage your leave requests and view their status</p>
-            </div>
-            <button
-              onClick={() => setShowForm(!showForm)}
-              className="btn-primary flex items-center justify-center gap-2 px-4 py-2.5"
-            >
-              {showForm ? 'Cancel' : 'New Request'}
-            </button>
+      <div className="w-full px-4 sm:px-6 pt-16 lg:pt-20 lg:pl-24 pb-6 lg:h-[calc(100vh-5rem)] app-page-shell">
+        {/* Page header */}
+        <div className="flex items-center justify-between py-5 border-b border-zinc-200 dark:border-zinc-800 mb-6">
+          <div>
+            <h1 className="app-page-heading text-base font-semibold text-zinc-900 dark:text-zinc-100">My Leave Requests</h1>
+            <p className="app-page-subheading text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Manage and track your leave</p>
           </div>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className={showForm ? 'btn-secondary' : 'btn-primary'}
+          >
+            {showForm ? 'Cancel' : 'New Request'}
+          </button>
         </div>
 
-        {/* Request Form - Enhanced */}
+        {/* Request drawer */}
         {showForm && (
-          <div className="card mb-8">
-            <div className="p-5 sm:p-6">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Submit Leave Request</h3>
-              <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="fixed inset-0 z-50">
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              className="absolute inset-0 bg-black/30 dark:bg-black/50"
+              aria-label="Close request drawer"
+            />
+            <div className="absolute inset-y-0 right-0 w-full max-w-md bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 shadow-xl">
+              <div className="p-5 sm:p-6 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">New leave request</h3>
+                  <p className="app-page-subheading text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Pick dates and add a short reason</p>
+                </div>
+                <button type="button" onClick={() => setShowForm(false)} className="btn-secondary text-xs py-1 px-2">
+                  Close
+                </button>
+              </div>
+              <div className="p-5 sm:p-6 overflow-y-auto max-h-[calc(100vh-80px)]">
+                <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div>
-                    <label htmlFor="startDate" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="startDate" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
                       Start Date
                     </label>
                     <input
@@ -404,7 +412,7 @@ export default function MemberRequestsPage() {
                     />
                   </div>
                   <div>
-                    <label htmlFor="endDate" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="endDate" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
                       End Date
                     </label>
                     <input
@@ -446,7 +454,7 @@ export default function MemberRequestsPage() {
                       }}
                       className="input-modern w-full"
                     />
-                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
                       For single-day leave, use the same date for both start and end
                       {teamSettings.minimumNoticePeriod > 0 && !bypassActive && (
                         <span className="flex items-center gap-2 mt-2 text-orange-600 dark:text-orange-400 font-medium">
@@ -467,7 +475,7 @@ export default function MemberRequestsPage() {
                   </div>
                 )}
                 <div>
-                  <label htmlFor="reason" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  <label htmlFor="reason" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
                     Reason for Leave
                   </label>
                   <select
@@ -487,7 +495,7 @@ export default function MemberRequestsPage() {
                   
                   {selectedReasonType === 'other' && (
                     <div className="mt-4">
-                      <label htmlFor="customReason" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      <label htmlFor="customReason" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
                         Please specify
                       </label>
                       <textarea
@@ -502,7 +510,7 @@ export default function MemberRequestsPage() {
                     </div>
                   )}
                 </div>
-                <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-gray-200 dark:border-gray-800">
+                <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-zinc-200 dark:border-zinc-800">
                   <button
                     type="button"
                     onClick={() => setShowForm(false)}
@@ -518,81 +526,84 @@ export default function MemberRequestsPage() {
                     {submitting ? 'Submitting...' : 'Submit Request'}
                   </button>
                 </div>
-              </form>
+                </form>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Requests List - Enhanced */}
-        <div className="card">
-          <div className="p-5 sm:p-6">
+        {/* Requests list */}
+        <div className="rounded-[32px] border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden lg:h-[calc(100vh-220px)] lg:overflow-hidden">
+          <div className="p-5 sm:p-6 border-b border-zinc-200/70 dark:border-zinc-800/70 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Requests</p>
+              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mt-1">History and status</p>
+            </div>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">{myRequests.length} total</span>
+          </div>
+          <div className="p-0 lg:h-[calc(100vh-280px)] lg:overflow-auto">
             {myRequests.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="flex flex-col items-center justify-center">
-                  <svg className="h-16 w-16 text-gray-400 dark:text-gray-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <p className="text-base font-medium text-gray-500 dark:text-gray-400 mb-1">No requests yet</p>
-                  <p className="text-sm text-gray-400 dark:text-gray-500">Create your first request above</p>
-                </div>
+              <div className="p-6 text-sm text-zinc-500 dark:text-zinc-400">
+                No requests yet. Use <span className="font-medium text-zinc-700 dark:text-zinc-200">New Request</span> to create one.
               </div>
             ) : (
-              <div className="space-y-4">
-                {myRequests.map((request) => (
-                  <div key={request._id} className="bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-900 dark:to-gray-800/50 rounded-xl p-5 sm:p-6 border border-gray-200 dark:border-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all duration-200 stagger-item">
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center flex-wrap gap-3 mb-3">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${getStatusColor(request.status)}`}>
-                            {request.status}
-                          </span>
+              <div className="divide-y divide-zinc-200/70 dark:divide-zinc-800/70">
+                {myRequests.map((request) => {
+                  const statusTone =
+                    request.status === 'approved'
+                      ? 'bg-emerald-500'
+                      : request.status === 'rejected'
+                        ? 'bg-red-500'
+                        : 'bg-amber-500';
+
+                  return (
+                    <div key={request._id} className="px-5 sm:px-6 py-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`h-2.5 w-2.5 rounded-full ${statusTone}`} aria-hidden="true" />
+                            <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate">
+                              {parseDateSafe(request.startDate).toLocaleDateString()} – {parseDateSafe(request.endDate).toLocaleDateString()}
+                            </p>
+                            <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${getStatusColor(request.status)}`}>
+                              {request.status}
+                            </span>
+                          </div>
+                          <p className="text-sm text-zinc-600 dark:text-zinc-300 mt-1 line-clamp-2">{request.reason}</p>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+                            <span>Requested {new Date(request.createdAt).toLocaleDateString()}</span>
+                            {request.decisionAt ? (
+                              <span>
+                                · Decided {new Date(request.decisionAt).toLocaleDateString()}
+                                {request.decisionByUsername ? ` by ${request.decisionByUsername}` : ''}
+                              </span>
+                            ) : null}
+                          </div>
+                          {request.decisionNote ? (
+                            <div className="mt-2 text-xs text-indigo-700 dark:text-indigo-300">
+                              Decision note: {request.decisionNote}
+                            </div>
+                          ) : null}
                         </div>
-                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
-                          {parseDateSafe(request.startDate).toLocaleDateString()} - {parseDateSafe(request.endDate).toLocaleDateString()}
-                        </p>
-                        <p className="text-base text-gray-700 dark:text-gray-300 mb-3">{request.reason}</p>
-                        {request.decisionNote && (
-                          <p className="text-sm text-indigo-700 dark:text-indigo-300 mb-2">
-                            Decision note: {request.decisionNote}
-                          </p>
-                        )}
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Requested on {new Date(request.createdAt).toLocaleDateString()}
-                        </p>
-                        {request.status === 'pending' && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            Pending for {Math.max(1, Math.ceil((Date.now() - new Date(request.createdAt).getTime()) / (1000 * 60 * 60 * 24)))} day(s)
-                          </p>
-                        )}
-                        {request.decisionAt && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            Decided on {new Date(request.decisionAt).toLocaleDateString()}
-                            {request.decisionByUsername ? ` by ${request.decisionByUsername}` : ''}
-                          </p>
-                        )}
+
+                        {request.status === 'pending' ? (
+                          <div className="shrink-0 flex items-center gap-2">
+                            <button onClick={() => handleEditPending(request)} className="btn-secondary text-xs py-1.5 px-2.5">
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDelete(request._id!)}
+                              disabled={deleting === request._id}
+                              className="btn-danger text-xs py-1.5 px-2.5 disabled:opacity-50"
+                            >
+                              {deleting === request._id ? 'Cancelling…' : 'Cancel'}
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
-                      {request.status === 'pending' && (
-                        <div className="sm:ml-4 sm:flex-shrink-0 flex gap-2">
-                          <button
-                            onClick={() => handleEditPending(request)}
-                            className="btn-secondary px-3 py-2 text-sm"
-                            title="Edit pending request"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDelete(request._id!)}
-                            disabled={deleting === request._id}
-                            className="btn-danger px-3 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Cancel request"
-                          >
-                            {deleting === request._id ? 'Cancelling...' : 'Cancel'}
-                          </button>
-                        </div>
-                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

@@ -1003,14 +1003,8 @@ export default function LeaderLeaveBalancePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black">
-        <Navbar />
-        <div className="flex items-center justify-center h-64 pt-24">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-indigo-600 dark:border-t-indigo-400 mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">Loading leave balances...</p>
-          </div>
-        </div>
+      <div className="min-h-screen bg-white dark:bg-zinc-950 flex items-center justify-center">
+        <div className="w-5 h-5 border-2 border-zinc-200 dark:border-zinc-700 border-t-indigo-600 rounded-full animate-spin" />
       </div>
     );
   }
@@ -1055,24 +1049,26 @@ export default function LeaderLeaveBalancePage() {
 
   return (
     <ProtectedRoute requiredRole="leader">
-      <div className="min-h-screen bg-gray-50 dark:bg-black">
+      <div className="min-h-screen bg-white dark:bg-zinc-950">
         <Navbar />
         
-        <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12">
-          {/* Header Section - Enhanced */}
-          <div className="mb-8 fade-in">
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">Detailed Leave Balance</h1>
-            <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400">View comprehensive leave balance information for all team members</p>
+        <div className="w-full px-4 sm:px-6 pt-16 lg:pt-20 lg:pl-24 pb-6 lg:h-[calc(100vh-5rem)] app-page-shell">
+          {/* Page header */}
+          <div className="flex items-center justify-between py-5 border-b border-zinc-200 dark:border-zinc-800 mb-6">
+            <div>
+              <h1 className="app-page-heading text-base font-semibold text-zinc-900 dark:text-zinc-100">Leave Balances</h1>
+              <p className="app-page-subheading text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Comprehensive view for all team members</p>
+            </div>
           </div>
 
-          {/* Summary Cards - Enhanced */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 mb-8">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
             <div className="stat-card group">
               <div className="p-5 sm:p-6">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Total Members</p>
-                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
+                    <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">Total Members</p>
+                    <p className="text-3xl sm:text-4xl font-bold text-zinc-900 dark:text-zinc-100 mb-1 fade-in">
                       {totalMembers}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Team members</p>
@@ -1090,8 +1086,8 @@ export default function LeaderLeaveBalancePage() {
               <div className="p-5 sm:p-6">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Total Remaining</p>
-                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
+                    <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">Total Remaining</p>
+                    <p className="text-3xl sm:text-4xl font-bold text-zinc-900 dark:text-zinc-100 mb-1 fade-in">
                       {Math.round(totalRemainingBalance)}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Days remaining</p>
@@ -1109,8 +1105,8 @@ export default function LeaderLeaveBalancePage() {
               <div className="p-5 sm:p-6">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Total Used</p>
-                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
+                    <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">Total Used</p>
+                    <p className="text-3xl sm:text-4xl font-bold text-zinc-900 dark:text-zinc-100 mb-1 fade-in">
                       {Math.round(totalUsed)}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Days used</p>
@@ -1128,8 +1124,8 @@ export default function LeaderLeaveBalancePage() {
               <div className="p-5 sm:p-6">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Avg Balance</p>
-                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
+                    <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">Avg Balance</p>
+                    <p className="text-3xl sm:text-4xl font-bold text-zinc-900 dark:text-zinc-100 mb-1 fade-in">
                       {Math.round(averageBalance)}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Average remaining</p>
@@ -1145,15 +1141,15 @@ export default function LeaderLeaveBalancePage() {
           </div>
 
           {/* Filters and Sort - Enhanced */}
-          <div className="card mb-8">
+          <div className="card mb-5">
             <div className="p-5 sm:p-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="flex items-center gap-4">
-                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">Filter:</label>
+                  <label className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 whitespace-nowrap">Filter:</label>
                   <select
                     value={filterBy}
                     onChange={(e) => setFilterBy(e.target.value as 'all' | 'low' | 'high')}
-                    className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:w-auto sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
+                    className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:w-auto sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-zinc-300 dark:border-zinc-700 rounded-md"
                   >
                     <option value="all">All Members</option>
                     <option value="low">Low Balance (&lt;30%)</option>
@@ -1162,11 +1158,11 @@ export default function LeaderLeaveBalancePage() {
                 </div>
 
                 <div className="flex items-center gap-4">
-                  <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">Sort by:</label>
+                  <label className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 whitespace-nowrap">Sort by:</label>
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as 'name' | 'balance' | 'used')}
-                    className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:w-auto sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
+                    className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:w-auto sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-zinc-300 dark:border-zinc-700 rounded-md"
                   >
                     <option value="name">Name</option>
                     <option value="balance">Remaining Balance</option>
@@ -1197,7 +1193,7 @@ export default function LeaderLeaveBalancePage() {
                 <div className="fixed inset-0 bg-black/50" onClick={() => setCarryoverReportOpen(false)} />
                 <div className="relative bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
                   <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Carryover report (database + calculated)</h3>
+                    <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Carryover report (database + calculated)</h3>
                     <button
                       type="button"
                       onClick={() => setCarryoverReportOpen(false)}
@@ -1207,27 +1203,27 @@ export default function LeaderLeaveBalancePage() {
                     </button>
                   </div>
                   <div className="p-4 overflow-auto max-h-[calc(90vh-8rem)]">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
                       Carried over = value in database. Used = carried − remaining. Use this to verify figures (e.g. Edward: 5 carried, 4 used, 1 remaining).
                     </p>
                     <table className="min-w-full text-sm">
                       <thead>
                         <tr className="border-b border-gray-200 dark:border-gray-700">
-                          <th className="text-left py-2 pr-4 font-semibold text-gray-700 dark:text-gray-300">Member</th>
-                          <th className="text-right py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">Carried</th>
-                          <th className="text-right py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">Used</th>
-                          <th className="text-right py-2 px-2 font-semibold text-gray-700 dark:text-gray-300">Remaining</th>
-                          <th className="text-left py-2 pl-2 font-semibold text-gray-700 dark:text-gray-300">Expiry</th>
+                          <th className="text-left py-2 pr-4 font-semibold text-zinc-700 dark:text-zinc-300">Member</th>
+                          <th className="text-right py-2 px-2 font-semibold text-zinc-700 dark:text-zinc-300">Carried</th>
+                          <th className="text-right py-2 px-2 font-semibold text-zinc-700 dark:text-zinc-300">Used</th>
+                          <th className="text-right py-2 px-2 font-semibold text-zinc-700 dark:text-zinc-300">Remaining</th>
+                          <th className="text-left py-2 pl-2 font-semibold text-zinc-700 dark:text-zinc-300">Expiry</th>
                         </tr>
                       </thead>
                       <tbody>
                         {carryoverReportData.members.map((m) => (
                           <tr key={m.userId} className="border-b border-gray-100 dark:border-gray-800">
-                            <td className="py-2 pr-4 text-gray-900 dark:text-white">{m.fullName || m.username}</td>
+                            <td className="py-2 pr-4 text-zinc-900 dark:text-zinc-100">{m.fullName || m.username}</td>
                             <td className="text-right py-2 px-2">{m.carryoverFromPreviousYear}</td>
                             <td className="text-right py-2 px-2">{m.usedFromCarryover}</td>
                             <td className="text-right py-2 px-2">{m.carryoverBalance}</td>
-                            <td className="py-2 pl-2 text-gray-500 dark:text-gray-400 text-xs">
+                            <td className="py-2 pl-2 text-zinc-500 dark:text-zinc-400 text-xs">
                               {m.carryoverExpiryDate ? new Date(m.carryoverExpiryDate).toLocaleDateString() : '—'}
                             </td>
                           </tr>
@@ -1247,7 +1243,7 @@ export default function LeaderLeaveBalancePage() {
             
             if (totalRemainderDays > 0) {
               return (
-                <div className="card mb-8 bg-blue-50/50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                <div className="card mb-5 bg-blue-50/50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
                   <div className="p-5 sm:p-6">
                     <div className="flex items-start gap-4">
                       <div className="flex-shrink-0">
@@ -1282,34 +1278,34 @@ export default function LeaderLeaveBalancePage() {
           <div className="card overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800 table-enhanced">
-                <thead className="bg-gray-50 dark:bg-gray-900">
+                <thead className="bg-zinc-50 dark:bg-zinc-900">
                   <tr>
-                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
                       Member
                     </th>
-                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
                       Remaining Balance
                     </th>
-                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
                       Total Used
                     </th>
-                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
                       Year-to-Date Used
                     </th>
-                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
                       Usage %
                     </th>
-                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
                       Requests
                     </th>
                     {/* Always show maternity/paternity headers - will show "No maternity/paternity" for members without type */}
-                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
                       Maternity/Paternity Balance
                     </th>
-                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
                       Maternity Used
                     </th>
-                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                    <th className="px-4 sm:px-6 py-4 text-left text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
                       Maternity Usage %
                     </th>
                   </tr>
@@ -1317,7 +1313,7 @@ export default function LeaderLeaveBalancePage() {
                 <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
                   {memberList.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                      <td colSpan={9} className="px-6 py-12 text-center text-zinc-500 dark:text-zinc-400">
                         <div className="flex flex-col items-center justify-center">
                           <UsersIcon className="h-12 w-12 text-gray-400 dark:text-gray-600 mb-3" />
                           <p className="text-base font-medium">No members found</p>
@@ -1354,11 +1350,11 @@ export default function LeaderLeaveBalancePage() {
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
                               <div>
-                                <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                                <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                                   {member.fullName || member.username}
                                 </div>
                                 {member.fullName && (
-                                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{member.username}</div>
+                                  <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{member.username}</div>
                                 )}
                               </div>
                             </div>
@@ -1374,7 +1370,7 @@ export default function LeaderLeaveBalancePage() {
                                     value={tempBalance}
                                     onChange={(e) => setTempBalance(e.target.value)}
                                     disabled={updating === member._id}
-                                    className="w-24 px-2 py-1 text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 disabled:opacity-50"
+                                    className="w-24 px-2 py-1 text-sm border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 disabled:opacity-50"
                                     onKeyDown={(e) => {
                                       if (e.key === 'Enter') {
                                         handleSaveBalance(member._id!);
@@ -1384,7 +1380,7 @@ export default function LeaderLeaveBalancePage() {
                                     }}
                                     autoFocus
                                   />
-                                  <span className="text-sm text-gray-500 dark:text-gray-400">/ {maxLeave}</span>
+                                  <span className="text-sm text-zinc-500 dark:text-zinc-400">/ {maxLeave}</span>
                                 </div>
                                 <div className="flex items-center space-x-2">
                                   <button
@@ -1423,7 +1419,7 @@ export default function LeaderLeaveBalancePage() {
                                 <div className="flex flex-col space-y-1">
                                   <div className="flex items-center space-x-2">
                                     <span
-                                      className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400"
+                                      className="text-sm font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400"
                                       onClick={() => handleEditBalance(member)}
                                       title="Click to edit balance"
                                     >
@@ -1444,7 +1440,7 @@ export default function LeaderLeaveBalancePage() {
                                           </span>
                                         );
                                       })()}
-                                      <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">(remaining)</span>
+                                      <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-400">(remaining)</span>
                                     </span>
                                   </div>
                                   {(() => {
@@ -1479,10 +1475,10 @@ export default function LeaderLeaveBalancePage() {
                                                   step="1"
                                                   value={tempCarryover}
                                                   onChange={(e) => setTempCarryover(e.target.value)}
-                                                  className="w-20 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                                                  className="w-20 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-zinc-900 dark:text-zinc-100"
                                                   autoFocus
                                                 />
-                                                <span className="text-xs text-gray-500 dark:text-gray-400">days</span>
+                                                <span className="text-xs text-zinc-500 dark:text-zinc-400">days</span>
                                               </div>
                                               <div className="flex items-center space-x-2">
                                                 <button
@@ -1583,7 +1579,7 @@ export default function LeaderLeaveBalancePage() {
                                           handleResetBalance(member._id!);
                                         }}
                                         disabled={updating === member._id}
-                                        className="text-xs text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
+                                        className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
                                         title="Reset to auto-calculated"
                                       >
                                         ↺
@@ -1591,7 +1587,7 @@ export default function LeaderLeaveBalancePage() {
                                     )}
                                   </div>
                                   {member.manualLeaveBalance !== undefined && Math.round(member.manualLeaveBalance) !== Math.round(leaveData.remainingBalance) && (
-                                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                                    <div className="text-xs text-zinc-600 dark:text-zinc-400">
                                       <span className="font-medium">Base balance:</span> {Math.round(member.manualLeaveBalance)} days
                                       {member.manualLeaveBalance < maxLeave && (
                                         <span className="ml-2 text-red-600 dark:text-red-400">
@@ -1603,7 +1599,7 @@ export default function LeaderLeaveBalancePage() {
                                           (+{Math.round(member.manualLeaveBalance - maxLeave)} surplus)
                                         </span>
                                       )}
-                                      <span className="ml-2 text-gray-500 dark:text-gray-400">
+                                      <span className="ml-2 text-zinc-500 dark:text-zinc-400">
                                         ({Math.round(member.manualLeaveBalance - leaveData.remainingBalance)} days used)
                                       </span>
                                     </div>
@@ -1656,7 +1652,7 @@ export default function LeaderLeaveBalancePage() {
                               </div>
                             )}
                           </td>
-                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-zinc-900 dark:text-zinc-100">
                             {leaveData.baseBalance > 0 ? Math.round(leaveData.totalUsed) : '-'}
                           </td>
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
@@ -1668,7 +1664,7 @@ export default function LeaderLeaveBalancePage() {
                                   step="1"
                                   value={tempDaysTaken}
                                   onChange={(e) => setTempDaysTaken(e.target.value)}
-                                  className="w-20 px-2 py-1 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
+                                  className="w-20 px-2 py-1 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
                                   autoFocus
                                 />
                                 <button
@@ -1681,7 +1677,7 @@ export default function LeaderLeaveBalancePage() {
                                 <button
                                   onClick={handleCancelEditDaysTaken}
                                   disabled={updating === member._id}
-                                  className="text-xs px-2 py-1 bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-400 dark:hover:bg-gray-600 disabled:opacity-50"
+                                  className="text-xs px-2 py-1 bg-gray-300 dark:bg-gray-700 text-zinc-700 dark:text-zinc-300 rounded hover:bg-gray-400 dark:hover:bg-gray-600 disabled:opacity-50"
                                 >
                                   Cancel
                                 </button>
@@ -1690,7 +1686,7 @@ export default function LeaderLeaveBalancePage() {
                               <div className="group">
                                 <div className="flex items-center space-x-2">
                                   <div 
-                                    className="text-sm text-gray-900 dark:text-white cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400"
+                                    className="text-sm text-zinc-900 dark:text-zinc-100 cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400"
                                     onClick={() => handleEditDaysTaken(member)}
                                     title="Click to edit days taken"
                                   >
@@ -1706,7 +1702,7 @@ export default function LeaderLeaveBalancePage() {
                                         handleResetDaysTaken(member._id!);
                                       }}
                                       disabled={updating === member._id}
-                                      className="text-xs text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
+                                      className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
                                       title="Reset to auto-calculated"
                                     >
                                       ↺
@@ -1802,7 +1798,7 @@ export default function LeaderLeaveBalancePage() {
                                           value={tempMaternityBalance}
                                           onChange={(e) => setTempMaternityBalance(e.target.value)}
                                           disabled={updating === member._id}
-                                          className="w-24 px-2 py-1 text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 disabled:opacity-50"
+                                          className="w-24 px-2 py-1 text-sm border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 disabled:opacity-50"
                                           onKeyDown={(e) => {
                                             if (e.key === 'Enter') {
                                               handleSaveMaternityBalance(member._id!);
@@ -1812,7 +1808,7 @@ export default function LeaderLeaveBalancePage() {
                                           }}
                                           autoFocus
                                         />
-                                        <span className="text-sm text-gray-500 dark:text-gray-400">/ {maxLeaveDays}</span>
+                                        <span className="text-sm text-zinc-500 dark:text-zinc-400">/ {maxLeaveDays}</span>
                                       </div>
                                       <div className="flex items-center space-x-2">
                                         <button
@@ -1834,12 +1830,12 @@ export default function LeaderLeaveBalancePage() {
                                   ) : (
                                     <div className="group">
                                       <div 
-                                        className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer hover:text-pink-600 dark:hover:text-pink-400"
+                                        className="text-sm font-medium text-zinc-900 dark:text-zinc-100 cursor-pointer hover:text-pink-600 dark:hover:text-pink-400"
                                         onClick={() => handleEditMaternityBalance(member)}
                                         title={`Click to edit ${userType === 'maternity' ? 'maternity' : 'paternity'} leave balance`}
                                       >
                                         <div className="flex items-center gap-1 mb-1">
-                                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                                          <span className="text-xs text-zinc-500 dark:text-zinc-400">
                                             {userType === 'maternity' ? '🤱' : '👨‍👩‍👧'}
                                           </span>
                                         </div>
@@ -1849,7 +1845,7 @@ export default function LeaderLeaveBalancePage() {
                                           }
                                           return <>{Math.round(maternityData.remainingBalance)} / {maxLeaveDays}</>;
                                         })()}
-                                        <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">(remaining)</span>
+                                        <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-400">(remaining)</span>
                                         {maternityData.surplusBalance > 0 && (
                                           <span className="ml-2 text-xs text-green-600 dark:text-green-400" title="Surplus balance">
                                             (+{Math.round(maternityData.surplusBalance)} surplus)
@@ -1875,7 +1871,7 @@ export default function LeaderLeaveBalancePage() {
                                           value={tempMaternityDaysTaken}
                                           onChange={(e) => setTempMaternityDaysTaken(e.target.value)}
                                           disabled={updating === member._id}
-                                          className="w-20 px-2 py-1 text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 disabled:opacity-50"
+                                          className="w-20 px-2 py-1 text-sm border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 disabled:opacity-50"
                                           onKeyDown={(e) => {
                                             if (e.key === 'Enter') {
                                               handleSaveMaternityDaysTaken(member._id!);
@@ -1902,7 +1898,7 @@ export default function LeaderLeaveBalancePage() {
                                       </div>
                                     ) : (
                                       <div 
-                                        className="text-sm text-gray-900 dark:text-white cursor-pointer hover:text-pink-600 dark:hover:text-pink-400"
+                                        className="text-sm text-zinc-900 dark:text-zinc-100 cursor-pointer hover:text-pink-600 dark:hover:text-pink-400"
                                         onClick={() => handleEditMaternityDaysTaken(member)}
                                         title={`Click to edit ${userType === 'maternity' ? 'maternity' : 'paternity'} days taken`}
                                       >
@@ -1917,7 +1913,7 @@ export default function LeaderLeaveBalancePage() {
                                     if (!hasTypeAssigned) {
                                       return <span className="text-sm text-gray-400 dark:text-gray-500 italic">-</span>;
                                     }
-                                    return <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                                    return <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                                       {maternityData.percentageUsed !== null ? `${Math.round(maternityData.percentageUsed)}%` : '-'}
                                     </span>;
                                   })()}

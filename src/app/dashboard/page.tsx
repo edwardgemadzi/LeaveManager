@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { clearStoredUser, setStoredUser } from '@/lib/clientUserStorage';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -11,19 +12,19 @@ export default function DashboardPage() {
       try {
         const response = await fetch('/api/users/profile', { credentials: 'include' });
         if (!response.ok) {
-          localStorage.removeItem('user');
+          clearStoredUser();
           router.push('/login');
           return;
         }
 
         const data = await response.json();
         if (!data?.user?.role) {
-          localStorage.removeItem('user');
+          clearStoredUser();
           router.push('/login');
           return;
         }
 
-        localStorage.setItem('user', JSON.stringify(data.user));
+        setStoredUser(data.user);
         if (data.user.role === 'leader') {
           router.push('/leader/dashboard');
         } else {

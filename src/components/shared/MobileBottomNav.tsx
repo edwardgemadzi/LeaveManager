@@ -26,6 +26,7 @@ import {
   UsersIcon as UsersIconSolid,
   InboxStackIcon as InboxStackIconSolid,
 } from '@heroicons/react/24/solid';
+import { clearStoredUser } from '@/lib/clientUserStorage';
 
 interface NavUser {
   id: string;
@@ -73,7 +74,7 @@ export default function MobileBottomNav() {
     try {
       await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
     } catch { /* best-effort */ }
-    localStorage.removeItem('user');
+    clearStoredUser();
     router.push('/login');
   }, [router]);
 

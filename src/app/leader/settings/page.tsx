@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import Navbar from '@/components/shared/Navbar';
 import { Team } from '@/types';
 import { useToast } from '@/contexts/ToastContext';
 import { MinusIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { formatDateSafe, parseDateSafe } from '@/lib/dateUtils';
+import { clearStoredUser } from '@/lib/clientUserStorage';
 
 export default function TeamSettingsPage() {
   const { showSuccess } = useToast();
@@ -54,7 +56,7 @@ export default function TeamSettingsPage() {
           // Handle 401 (Unauthorized) - token expired or invalid
           if (response.status === 401) {
             localStorage.removeItem('token');
-            localStorage.removeItem('user');
+            clearStoredUser();
             window.location.href = '/login';
             return;
           }
@@ -230,38 +232,36 @@ export default function TeamSettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black">
-        <Navbar />
-        <div className="flex items-center justify-center h-64 pt-24">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-indigo-600 dark:border-t-indigo-400 mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">Loading settings...</p>
-          </div>
-        </div>
+      <div className="min-h-screen bg-white dark:bg-zinc-950 flex items-center justify-center">
+        <div className="w-5 h-5 border-2 border-zinc-200 dark:border-zinc-700 border-t-indigo-600 rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black">
+    <div className="min-h-screen bg-white dark:bg-zinc-950">
       <Navbar />
       
-      <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12 max-w-4xl mx-auto">
-        {/* Header Section - Enhanced */}
-        <div className="mb-8 fade-in">
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">Team Settings</h1>
-          <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400">Configure your team&apos;s leave policies</p>
+      <div className="w-full px-4 sm:px-6 pt-16 lg:pt-20 lg:pl-24 pb-6 lg:h-[calc(100vh-5rem)] app-page-shell">
+        {/* Page header */}
+        <div className="flex items-center justify-between py-5 border-b border-zinc-200 dark:border-zinc-800 mb-6">
+          <div>
+            <h1 className="app-page-heading text-base font-semibold text-zinc-900 dark:text-zinc-100">Team Settings</h1>
+            <p className="app-page-subheading text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Configure your team&apos;s leave policies</p>
+          </div>
         </div>
 
-        <div className="card">
-          <form onSubmit={handleSave} className="p-5 sm:p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-8">
+            <div className="card">
+              <form onSubmit={handleSave} className="p-5 sm:p-6">
             <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Leave Policies</h3>
+                <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100 mb-4">Leave Policies</h3>
                 
                 <div className="grid grid-cols-1 gap-6">
                   <div>
-                    <label htmlFor="concurrentLeave" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="concurrentLeave" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
                       Maximum Concurrent Leave
                     </label>
                     <div className="flex items-center gap-2">
@@ -277,7 +277,7 @@ export default function TeamSettingsPage() {
                           }
                         }}
                         disabled={settings.concurrentLeave <= 1}
-                        className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="flex items-center justify-center w-10 h-10 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-gray-900 text-zinc-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         aria-label="Decrease"
                       >
                         <MinusIcon className="h-5 w-5" />
@@ -303,19 +303,19 @@ export default function TeamSettingsPage() {
                           }
                         }}
                         disabled={settings.concurrentLeave >= 10}
-                        className="flex items-center justify-center w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="flex items-center justify-center w-10 h-10 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-gray-900 text-zinc-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         aria-label="Increase"
                       >
                         <PlusIcon className="h-5 w-5" />
                       </button>
                     </div>
-                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                    <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
                       Maximum number of team members who can be on leave at the same time.
                     </p>
                   </div>
 
                   <div>
-                    <label htmlFor="maxLeavePerYear" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="maxLeavePerYear" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
                       Maximum Leave Days Per Year
                     </label>
                     <div>
@@ -374,13 +374,13 @@ export default function TeamSettingsPage() {
                         className="input-modern w-full"
                       />
                     </div>
-                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                    <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
                       Maximum number of leave days each team member can take per year.
                     </p>
                   </div>
 
                   <div>
-                    <label htmlFor="minimumNoticePeriod" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="minimumNoticePeriod" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
                       Minimum Notice Period (Days)
                     </label>
                     <div>
@@ -439,12 +439,12 @@ export default function TeamSettingsPage() {
                         className="input-modern w-full"
                       />
                     </div>
-                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                    <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
                       Minimum number of days in advance that leave requests must be submitted. Set to 0 to allow same-day requests.
                     </p>
                   </div>
 
-                  <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
+                  <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4">
                     <div className="flex items-center">
                       <input
                         type="checkbox"
@@ -459,20 +459,20 @@ export default function TeamSettingsPage() {
                             endDate: e.target.checked ? settings.bypassNoticePeriod?.endDate : undefined,
                           }
                         })}
-                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900"
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-gray-900"
                       />
-                      <label htmlFor="bypassNoticePeriodEnabled" className="ml-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <label htmlFor="bypassNoticePeriodEnabled" className="ml-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                         Bypass Notice Period
                       </label>
                     </div>
-                    <p className="mt-1 ml-6 text-sm text-gray-500 dark:text-gray-400">
+                    <p className="mt-1 ml-6 text-sm text-zinc-500 dark:text-zinc-400">
                       Temporarily allow members to bypass the minimum notice period requirement during a specified date range. This is useful for emergency situations or end-of-year rush periods.
                     </p>
                     
                     {settings.bypassNoticePeriod?.enabled && (
                       <div className="mt-4 ml-6 space-y-4">
                         <div>
-                          <label htmlFor="bypassStartDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          <label htmlFor="bypassStartDate" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                             Start Date
                           </label>
                           <div className="mt-1">
@@ -487,12 +487,12 @@ export default function TeamSettingsPage() {
                                   startDate: e.target.value,
                                 }
                               })}
-                              className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
+                              className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-zinc-300 dark:border-zinc-700 rounded-md"
                             />
                           </div>
                         </div>
                         <div>
-                          <label htmlFor="bypassEndDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          <label htmlFor="bypassEndDate" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                             End Date
                           </label>
                           <div className="mt-1">
@@ -508,7 +508,7 @@ export default function TeamSettingsPage() {
                                   endDate: e.target.value,
                                 }
                               })}
-                              className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
+                              className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-zinc-300 dark:border-zinc-700 rounded-md"
                             />
                           </div>
                         </div>
@@ -551,27 +551,27 @@ export default function TeamSettingsPage() {
                           expiryDate: undefined,
                         }
                       })}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900"
+                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-gray-900"
                     />
-                    <label htmlFor="allowCarryover" className="ml-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label htmlFor="allowCarryover" className="ml-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                       Allow Leave Carryover
                     </label>
                   </div>
-                  <p className="mt-1 ml-6 text-sm text-gray-500 dark:text-gray-400">
+                  <p className="mt-1 ml-6 text-sm text-zinc-500 dark:text-zinc-400">
                     If enabled, unused leave days will carry over to the next year. If disabled, unused days will be lost at year end.
                   </p>
                   
                   {/* Carryover Settings */}
                   {settings.allowCarryover && (
-                    <div className="mt-4 ml-6 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-800">
-                      <h5 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Carryover Customization</h5>
+                    <div className="mt-4 ml-6 p-4 bg-zinc-50 dark:bg-zinc-900/50 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                      <h5 className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-3">Carryover Customization</h5>
                       
                       {/* Limited to Months */}
                       <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
                           Limited to Months (optional)
                         </label>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
                           Select months when carryover days can be used (e.g., January only). Leave empty to allow use anytime.
                         </p>
                         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
@@ -593,9 +593,9 @@ export default function TeamSettingsPage() {
                                     }
                                   });
                                 }}
-                                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900"
+                                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-gray-900"
                               />
-                              <span className="text-xs text-gray-700 dark:text-gray-300">{month}</span>
+                              <span className="text-xs text-zinc-700 dark:text-zinc-300">{month}</span>
                             </label>
                           ))}
                         </div>
@@ -603,7 +603,7 @@ export default function TeamSettingsPage() {
                       
                       {/* Max Carryover Days */}
                       <div className="mb-4">
-                        <label htmlFor="maxCarryoverDays" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label htmlFor="maxCarryoverDays" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
                           Maximum Carryover Days (optional)
                         </label>
                         <input
@@ -619,16 +619,16 @@ export default function TeamSettingsPage() {
                             }
                           })}
                           placeholder="No limit"
-                          className="w-full sm:w-48 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-indigo-500 focus:border-indigo-500"
+                          className="w-full sm:w-48 px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md bg-white dark:bg-gray-900 text-zinc-900 dark:text-zinc-100 focus:ring-indigo-500 focus:border-indigo-500"
                         />
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                           Maximum number of days that can carry over. Leave empty for no limit.
                         </p>
                       </div>
                       
                       {/* Expiry Date */}
                       <div>
-                        <label htmlFor="carryoverExpiryDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label htmlFor="carryoverExpiryDate" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
                           Expiry Date (optional)
                         </label>
                         <input
@@ -642,9 +642,9 @@ export default function TeamSettingsPage() {
                               expiryDate: e.target.value || undefined
                             }
                           })}
-                          className="w-full sm:w-48 px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-indigo-500 focus:border-indigo-500"
+                          className="w-full sm:w-48 px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md bg-white dark:bg-gray-900 text-zinc-900 dark:text-zinc-100 focus:ring-indigo-500 focus:border-indigo-500"
                         />
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                           Date when carryover days expire. Leave empty for no expiry.
                         </p>
                       </div>
@@ -652,7 +652,7 @@ export default function TeamSettingsPage() {
                   )}
                   
                   {/* Maternity Leave Settings */}
-                  <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
+                  <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4">
                     <div className="flex items-center mb-4">
                       <input
                         type="checkbox"
@@ -667,20 +667,20 @@ export default function TeamSettingsPage() {
                             countingMethod: settings.maternityLeave?.countingMethod || 'working',
                           }
                         })}
-                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900"
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-gray-900"
                       />
-                      <label htmlFor="maternityLeaveEnabled" className="ml-2 block text-md font-medium text-gray-900 dark:text-white">
+                      <label htmlFor="maternityLeaveEnabled" className="ml-2 block text-md font-medium text-zinc-900 dark:text-zinc-100">
                         🤱 Enable Maternity Leave
                       </label>
                     </div>
-                    <p className="ml-6 mb-4 text-sm text-gray-500 dark:text-gray-400">
+                    <p className="ml-6 mb-4 text-sm text-zinc-500 dark:text-zinc-400">
                       Allow members to be assigned maternity leave and take maternity leave requests.
                     </p>
                     
                     {settings.maternityLeave?.enabled && (
                     <div className="space-y-4">
                       <div>
-                        <label htmlFor="maternityMaxDays" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        <label htmlFor="maternityMaxDays" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
                           Maximum Maternity Leave Days
                         </label>
                         <div>
@@ -753,13 +753,13 @@ export default function TeamSettingsPage() {
                             className="input-modern w-full"
                           />
                         </div>
-                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                        <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
                           Maximum number of maternity leave days members assigned maternity leave can take per year.
                         </p>
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
                           Counting Method
                         </label>
                         <div className="space-y-2">
@@ -778,9 +778,9 @@ export default function TeamSettingsPage() {
                                   countingMethod: 'working',
                                 }
                               })}
-                              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700"
+                              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-zinc-300 dark:border-zinc-700"
                             />
-                            <label htmlFor="maternityCountingWorking" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                            <label htmlFor="maternityCountingWorking" className="ml-2 block text-sm text-zinc-700 dark:text-zinc-300">
                               Working Days (count only working days based on shift schedule)
                             </label>
                           </div>
@@ -799,14 +799,14 @@ export default function TeamSettingsPage() {
                                   countingMethod: 'calendar',
                                 }
                               })}
-                              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700"
+                              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-zinc-300 dark:border-zinc-700"
                             />
-                            <label htmlFor="maternityCountingCalendar" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                            <label htmlFor="maternityCountingCalendar" className="ml-2 block text-sm text-zinc-700 dark:text-zinc-300">
                               Calendar Days (count all days, ignores working days)
                             </label>
                           </div>
                         </div>
-                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                        <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
                           Choose how maternity leave days are counted. Working days counts only days when the member is scheduled to work. Calendar days counts all days in the leave period, including weekends and holidays.
                         </p>
                       </div>
@@ -815,7 +815,7 @@ export default function TeamSettingsPage() {
                   </div>
 
                   {/* Paternity Leave Settings */}
-                  <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
+                  <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4">
                     <div className="flex items-center mb-4">
                       <input
                         type="checkbox"
@@ -830,20 +830,20 @@ export default function TeamSettingsPage() {
                             countingMethod: settings.paternityLeave?.countingMethod || 'working',
                           }
                         })}
-                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900"
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-gray-900"
                       />
-                      <label htmlFor="paternityLeaveEnabled" className="ml-2 block text-md font-medium text-gray-900 dark:text-white">
+                      <label htmlFor="paternityLeaveEnabled" className="ml-2 block text-md font-medium text-zinc-900 dark:text-zinc-100">
                         👨‍👩‍👧 Enable Paternity Leave
                       </label>
                     </div>
-                    <p className="ml-6 mb-4 text-sm text-gray-500 dark:text-gray-400">
+                    <p className="ml-6 mb-4 text-sm text-zinc-500 dark:text-zinc-400">
                       Allow members to be assigned paternity leave and take paternity leave requests.
                     </p>
                     
                     {settings.paternityLeave?.enabled && (
                     <div className="space-y-4">
                       <div>
-                        <label htmlFor="paternityMaxDays" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        <label htmlFor="paternityMaxDays" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
                           Maximum Paternity Leave Days
                         </label>
                         <div>
@@ -916,13 +916,13 @@ export default function TeamSettingsPage() {
                             className="input-modern w-full"
                           />
                         </div>
-                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                        <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
                           Maximum number of paternity leave days members assigned paternity leave can take per year.
                         </p>
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
                           Counting Method
                         </label>
                         <div className="space-y-2">
@@ -941,9 +941,9 @@ export default function TeamSettingsPage() {
                                   countingMethod: 'working',
                                 }
                               })}
-                              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700"
+                              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-zinc-300 dark:border-zinc-700"
                             />
-                            <label htmlFor="paternityCountingWorking" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                            <label htmlFor="paternityCountingWorking" className="ml-2 block text-sm text-zinc-700 dark:text-zinc-300">
                               Working Days (count only working days based on shift schedule)
                             </label>
                           </div>
@@ -962,14 +962,14 @@ export default function TeamSettingsPage() {
                                   countingMethod: 'calendar',
                                 }
                               })}
-                              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700"
+                              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-zinc-300 dark:border-zinc-700"
                             />
-                            <label htmlFor="paternityCountingCalendar" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                            <label htmlFor="paternityCountingCalendar" className="ml-2 block text-sm text-zinc-700 dark:text-zinc-300">
                               Calendar Days (count all days, ignores working days)
                             </label>
                           </div>
                         </div>
-                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                        <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
                           Choose how paternity leave days are counted. Working days counts only days when the member is scheduled to work. Calendar days counts all days in the leave period, including weekends and holidays.
                         </p>
                       </div>
@@ -993,20 +993,20 @@ export default function TeamSettingsPage() {
                             : (isEnabled ? settings.subgroups : [])
                         });
                       }}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-700 rounded bg-white dark:bg-gray-900"
+                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-gray-900"
                     />
-                    <label htmlFor="enableSubgrouping" className="ml-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label htmlFor="enableSubgrouping" className="ml-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                       Enable Subgrouping
                     </label>
                   </div>
-                  <p className="mt-1 ml-6 text-sm text-gray-500 dark:text-gray-400">
+                  <p className="mt-1 ml-6 text-sm text-zinc-500 dark:text-zinc-400">
                     If enabled, leaders can organize members into custom subgroups. Each subgroup operates independently with separate concurrent leave limits and analytics. Minimum 2 subgroups required.
                   </p>
                   
                   {/* Subgroup Naming Section */}
                   {settings.enableSubgrouping && (
                     <div className="mt-4 ml-6 space-y-3">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                         Subgroup Names (Minimum 2 required)
                       </label>
                       <div className="space-y-2">
@@ -1028,7 +1028,7 @@ export default function TeamSettingsPage() {
                                 });
                               }}
                               placeholder={`Subgroup ${index + 1} name`}
-                              className="flex-1 text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
+                              className="flex-1 text-sm border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md px-3 py-2 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600"
                             />
                             {index >= 2 && (
                               <button
@@ -1065,7 +1065,7 @@ export default function TeamSettingsPage() {
                           + Add Another Subgroup
                         </button>
                       </div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
                         Members without a subgroup assignment will be treated as &quot;Ungrouped&quot;
                       </p>
                     </div>
@@ -1073,17 +1073,17 @@ export default function TeamSettingsPage() {
                 </div>
               </div>
 
-              <div className="border-t border-gray-200 dark:border-gray-800 pt-6">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Team Information</h3>
+              <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6">
+                <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100 mb-4">Team Information</h3>
                 <div className="grid grid-cols-1 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Team Name</label>
-                    <p className="mt-1 text-sm text-gray-900 dark:text-white">{team?.name}</p>
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Team Name</label>
+                    <p className="mt-1 text-sm text-zinc-900 dark:text-zinc-100">{team?.name}</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Team Username</label>
-                    <p className="mt-1 text-sm text-gray-900 dark:text-white">{team?.teamUsername}</p>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Team Username</label>
+                    <p className="mt-1 text-sm text-zinc-900 dark:text-zinc-100">{team?.teamUsername}</p>
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                       Share this with team members so they can join your team.
                     </p>
                   </div>
@@ -1106,7 +1106,29 @@ export default function TeamSettingsPage() {
                 {saving ? 'Saving...' : 'Save Settings'}
               </button>
             </div>
-          </form>
+              </form>
+            </div>
+          </div>
+
+          <aside className="lg:col-span-4 hidden lg:block">
+            <div className="sticky top-14 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5">
+              <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Guide</p>
+              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mt-2">Make policies predictable</p>
+              <ul className="mt-3 space-y-2 text-sm text-zinc-500 dark:text-zinc-400">
+                <li>- Keep notice period aligned to staffing needs.</li>
+                <li>- Set concurrent leave so approvals are consistent.</li>
+                <li>- If you enable carryover limits, communicate early.</li>
+              </ul>
+              <div className="mt-4 pt-4 border-t border-zinc-200/70 dark:border-zinc-800/70 grid gap-2">
+                <Link href="/leader/requests" className="btn-secondary text-sm justify-center">
+                  Review requests
+                </Link>
+                <Link href="/leader/members" className="btn-secondary text-sm justify-center">
+                  Manage members
+                </Link>
+              </div>
+            </div>
+          </aside>
         </div>
       </div>
     </div>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { User } from '@/types';
+import { setStoredUser } from '@/lib/clientUserStorage';
 
 type Props = {
   botUsername: string;
@@ -43,7 +44,7 @@ export default function TelegramDeepLinkPanel({
       const u = data.user as User & { telegramUserId?: string | null };
       if (u?.telegramUserId) {
         onLinked(u);
-        localStorage.setItem('user', JSON.stringify(u));
+        setStoredUser(u);
         return true;
       }
     } catch {

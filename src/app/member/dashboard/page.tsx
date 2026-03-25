@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
@@ -11,9 +11,19 @@ import { MemberAnalytics } from '@/lib/analyticsCalculations';
 import { useBrowserNotification } from '@/hooks/useBrowserNotification';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
 import { useDashboardData } from '@/hooks/useDashboardData';
+import { useRequests } from '@/hooks/useRequests';
+import {
+  filterPlanningPeers,
+  countPeersWorkingOnDay,
+  countScheduledPeersOnDay,
+} from '@/lib/teamHeadcount';
 import { calculateTimeBasedLeaveScore, getWorkingDaysGroupDisplayName } from '@/lib/helpers';
 import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
 import { parseDateSafe } from '@/lib/dateUtils';
+import { Sparkline } from '@/components/shared/Sparkline';
+import { ProgressRing } from '@/components/shared/ProgressRing';
+import { Timeline } from '@/components/shared/Timeline';
+import { ActivityFeed } from '@/components/shared/ActivityFeed';
 import { 
   ClockIcon, 
   CalendarIcon, 
@@ -22,7 +32,8 @@ import {
   ArrowTrendingUpIcon, 
   UsersIcon, 
   ExclamationTriangleIcon,
-  DocumentTextIcon
+  DocumentTextIcon,
+  BuildingOffice2Icon,
 } from '@heroicons/react/24/outline';
 
 export default function MemberDashboard() {
@@ -32,6 +43,7 @@ export default function MemberDashboard() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState<MemberAnalytics | null>(null);
+  const [teamMembers, setTeamMembers] = useState<User[]>([]);
   
   // Refs to track notification state and prevent duplicates
   const previousRequestsRef = useRef<LeaveRequest[]>([]);
@@ -40,8 +52,13 @@ export default function MemberDashboard() {
   const leaveReminderNotifiedRef = useRef(false);
 
   const { data: dashboardData, mutate: mutateDashboard, isLoading: dashboardLoading } = useDashboardData({
-    include: ['team', 'requests', 'analytics', 'currentUser'],
+    include: ['team', 'requests', 'analytics', 'currentUser', 'members'],
     requestFields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'decisionNote', 'decisionAt', 'decisionByUsername', 'createdAt'],
+  });
+
+  const { data: teamLeaveRequests } = useRequests({
+    fields: ['_id', 'userId', 'startDate', 'endDate', 'status'],
+    enabled: !!team?._id && !!user?._id,
   });
 
   useEffect(() => {
@@ -79,6 +96,13 @@ export default function MemberDashboard() {
     const analyticsPayload = dashboardData.analytics as { analytics?: MemberAnalytics } | undefined;
     if (analyticsPayload?.analytics) {
       setAnalytics(analyticsPayload.analytics);
+    }
+
+    const dm = dashboardData as { members?: User[] };
+    if (Array.isArray(dm.members)) {
+      setTeamMembers(dm.members);
+    } else {
+      setTeamMembers([]);
     }
   }, [dashboardData, user]);
 
@@ -474,48 +498,40 @@ export default function MemberDashboard() {
     return { balance, surplus, daysUsed };
   };
 
-  const getTotalWorkingDaysTaken = () => {
-    // Use analytics data if available (includes manualYearToDateUsed handling)
-    if (analytics && analytics.workingDaysUsed !== undefined) {
-      return analytics.workingDaysUsed;
-    }
-    
-    // Fallback to local calculation if analytics not yet loaded
-    if (!user) return 0;
-    
-    const currentYear = new Date().getFullYear();
-    const approvedRequests = myRequests
-      .filter(req => req.status === 'approved' && parseDateSafe(req.startDate).getFullYear() === currentYear);
-
-    return approvedRequests.reduce((total, req) => {
-      const workingDays = countWorkingDays(
-        parseDateSafe(req.startDate),
-        parseDateSafe(req.endDate),
-        user.shiftSchedule || { pattern: [true, true, true, true, true, false, false], startDate: new Date(), type: 'rotating' }
-      );
-      return total + workingDays;
-    }, 0);
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'approved': return 'bg-green-100 text-green-800';
-      case 'rejected': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
+  const teamHeadcountPreview = useMemo(() => {
+    if (!user || !team || teamMembers.length === 0) return null;
+    const peers = filterPlanningPeers(teamMembers, user, team);
+    if (peers.length === 0) return null;
+    const approved =
+      teamLeaveRequests === undefined
+        ? null
+        : teamLeaveRequests.filter((r) => r.status === 'approved');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() + i);
+      const scheduled = countScheduledPeersOnDay(d, peers);
+      const working =
+        approved === null ? null : countPeersWorkingOnDay(d, peers, approved);
+      const onLeave =
+        working === null ? null : Math.max(0, scheduled - working);
+      return { date: d, scheduled, working, onLeave };
+    });
+    return {
+      peerCount: peers.length,
+      days,
+      loadingLeave: approved === null,
+      subgroupNote: team.settings.enableSubgrouping
+        ? `Your subgroup (${user.subgroupTag || 'Ungrouped'})`
+        : 'Whole team (members)',
+    };
+  }, [user, team, teamMembers, teamLeaveRequests]);
 
   if (loading) {
     return (
-      <div className="min-h-screen">
-        <Navbar />
-            <div className="flex items-center justify-center h-64 pt-24">
-          <div className="text-center">
-            <div className="spinner w-16 h-16 mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-400 text-lg">Loading your dashboard...</p>
-          </div>
-        </div>
+      <div className="min-h-screen bg-white dark:bg-zinc-950 flex items-center justify-center">
+        <div className="w-5 h-5 border-2 border-zinc-200 dark:border-zinc-700 border-t-indigo-600 rounded-full animate-spin" />
       </div>
     );
   }
@@ -534,1086 +550,600 @@ export default function MemberDashboard() {
 
   return (
     <ProtectedRoute requiredRole="member">
-      <div className="min-h-screen bg-gray-50 dark:bg-black">
+      <div className="min-h-screen bg-white dark:bg-zinc-950">
         <Navbar />
         
-        <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12">
-          {/* Header Section - Enhanced */}
-          <div className="mb-8 fade-in">
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">My Dashboard</h1>
-            <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400">Welcome back! Here&apos;s your leave information</p>
+        <div className="w-full px-4 sm:px-6 pt-16 lg:pt-20 lg:pl-24 pb-6 lg:h-[calc(100vh-5rem)] app-page-shell">
+          {/* Page header */}
+          <div className="flex items-center justify-between py-4 border-b border-zinc-200 dark:border-zinc-800 mb-4">
+            <div>
+              <h1 className="app-page-heading text-base font-semibold text-zinc-900 dark:text-zinc-100">My Dashboard</h1>
+              <p className="app-page-subheading text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Your leave overview</p>
+            </div>
           </div>
 
-          {/* Stats Cards - Enhanced */}
-          <div className={`grid grid-cols-1 sm:grid-cols-2 ${team?.settings.allowCarryover ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-6 sm:gap-8 mb-8`}>
-            {/* Pending Requests Card */}
-            <Link href="/member/requests" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
-              <div className="p-5 sm:p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Pending Requests</p>
-                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
-                      {Array.isArray(myRequests) ? myRequests.filter(req => req.status === 'pending').length : 0}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Awaiting approval</p>
-                  </div>
-                  <div className="flex-shrink-0 ml-4">
-                    <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/30 rounded-xl flex items-center justify-center">
-                      <ClockIcon className="h-6 w-6 text-yellow-700 dark:text-yellow-400" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Link>
+          {/* Stat cards — reference layout: label, value, sublines, themed icon */}
+          {analytics && user && team && (() => {
+            const pendingCount = myRequests.filter((r) => r.status === 'pending').length;
+            const carriedOver = Math.round(user.carryoverFromPreviousYear ?? 0);
+            const usedCarry = Math.round(analytics.carryoverDaysUsed ?? 0);
+            const carryRem = analytics.carryoverExpired
+              ? Math.round(analytics.carryoverRemainingDisplay ?? 0)
+              : Math.round(analytics.carryoverBalance ?? 0);
+            const matPat = getMaternityLeaveBalance();
+            const paternityEnabled = team.settings.paternityLeave?.enabled === true;
+            const isPaternityUser = user.maternityPaternityType === 'paternity';
 
-            {/* Leave Balance Card */}
-            {(() => {
-              const isNegative = analytics && leaveBalance.balance < 0;
-              const maternityBalance = getMaternityLeaveBalance();
-              const hasCompassionateLeave = isNegative && (
-                maternityBalance.daysUsed > 0 || 
-                myRequests.some(req => 
-                  req.status === 'approved' && 
-                  req.reason && 
-                  (isMaternityLeave(req.reason) || 
-                   req.reason.toLowerCase().includes('sick') ||
-                   req.reason.toLowerCase().includes('bereavement') ||
-                   req.reason.toLowerCase().includes('medical') ||
-                   req.reason.toLowerCase().includes('family emergency') ||
-                   req.reason.toLowerCase().includes('emergency'))
-                )
-              );
-              
-              return (
-                <Link href="/member/analytics" className={`stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200 ${isNegative ? (hasCompassionateLeave ? 'border-2 border-pink-300 dark:border-pink-700 bg-pink-50 dark:bg-pink-900/30' : 'border-2 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30') : ''}`}>
-              <div className="p-5 sm:p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Leave Balance</p>
-                    <p className={`text-3xl sm:text-4xl font-bold mb-1 fade-in ${
-                      analytics && leaveBalance.balance < 0
-                        ? (hasCompassionateLeave 
-                            ? 'text-pink-600 dark:text-pink-400' 
-                            : 'text-red-600 dark:text-red-400')
-                        : 'text-gray-900 dark:text-white'
-                    }`}>
-                      {analytics && leaveBalance.balance < 0 ? (
-                        <>-{Math.round(Math.abs(leaveBalance.balance))} / {team?.settings.maxLeavePerYear || 20}</>
-                      ) : (
-                        <>{Math.round(leaveBalance.balance)} / {team?.settings.maxLeavePerYear || 20}</>
-                      )}
-                    </p>
-                    {analytics && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                        {Math.round(annualRemainingBalance)} of {team?.settings.maxLeavePerYear || 20} days annual allocation remaining
-                      </p>
-                    )}
-                    <div className="mt-2 space-y-1">
-                      {analytics && leaveBalance.balance < 0 && (() => {
-                        const maternityBalance = getMaternityLeaveBalance();
-                        const hasTakenMaternityLeave = maternityBalance.daysUsed > 0;
-                        
-                        // Check for other compassionate leave reasons
-                        const compassionateRequests = myRequests.filter(req => 
-                          req.status === 'approved' && 
-                          req.reason && 
-                          (isMaternityLeave(req.reason) || 
-                           req.reason.toLowerCase().includes('sick') ||
-                           req.reason.toLowerCase().includes('bereavement') ||
-                           req.reason.toLowerCase().includes('medical') ||
-                           req.reason.toLowerCase().includes('family emergency') ||
-                           req.reason.toLowerCase().includes('emergency'))
-                        );
-                        const hasCompassionateLeave = hasTakenMaternityLeave || compassionateRequests.length > 0;
-                        
-                        // Determine compassionate reason for message
-                        let compassionateNote = '';
-                        if (hasCompassionateLeave) {
-                          if (hasTakenMaternityLeave) {
-                            compassionateNote = ' - maternity/paternity leave noted, will be adjusted next year';
-                          } else if (compassionateRequests.some(r => r.reason?.toLowerCase().includes('sick'))) {
-                            compassionateNote = ' - sick leave noted, will be adjusted next year';
-                          } else if (compassionateRequests.some(r => r.reason?.toLowerCase().includes('bereavement'))) {
-                            compassionateNote = ' - bereavement leave noted, will be adjusted next year';
-                          } else if (compassionateRequests.some(r => r.reason?.toLowerCase().includes('medical'))) {
-                            compassionateNote = ' - medical leave noted, will be adjusted next year';
-                          } else if (compassionateRequests.some(r => r.reason?.toLowerCase().includes('emergency'))) {
-                            compassionateNote = ' - emergency leave noted, will be adjusted next year';
-                          } else {
-                            compassionateNote = ' - necessary leave noted, will be adjusted next year';
-                          }
-                        } else {
-                          compassionateNote = ' - will be adjusted in next year\'s allocation';
-                        }
-                        
-                        const iconColor = hasCompassionateLeave 
-                          ? 'text-pink-600 dark:text-pink-400'
-                          : 'text-red-600 dark:text-red-400';
-                        const textColor = hasCompassionateLeave 
-                          ? 'text-pink-700 dark:text-pink-400'
-                          : 'text-red-700 dark:text-red-400';
-                        
-                        return (
-                          <div className="flex items-start gap-1.5">
-                            <ExclamationTriangleIcon className={`h-4 w-4 ${iconColor} flex-shrink-0 mt-0.5`} />
-                            <p className={`text-xs ${textColor} font-medium`}>
-                              {Math.round(Math.abs(analytics.remainingLeaveBalance))} day{Math.abs(analytics.remainingLeaveBalance) !== 1 ? 's' : ''} over allocated
-                              {compassionateNote}
-                            </p>
-                          </div>
-                        );
-                      })()}
-                      {leaveBalance.surplus > 0 && (
-                        <p className="text-xs text-green-600 dark:text-green-400 font-medium">
-                          +{Math.round(leaveBalance.surplus)} surplus
+            const workingDaysTagLine =
+              user.shiftSchedule
+                ? user.shiftSchedule.type === 'rotating'
+                  ? generateWorkingDaysTag(user.shiftSchedule)
+                  : user.workingDaysTag || generateWorkingDaysTag(user.shiftSchedule)
+                : '';
+            const groupName = workingDaysTagLine
+              ? getWorkingDaysGroupDisplayName(workingDaysTagLine, team.settings)
+              : '';
+
+            return (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mb-4 shrink-0">
+                  {/* Pending */}
+                  <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 p-4 shadow-sm relative overflow-hidden">
+                    <div className="flex justify-between items-start gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                          Pending requests
                         </p>
-                      )}
-                      {analytics && analytics.remainingLeaveBalance >= 0 && (() => {
-                        const realisticUsableDays = analytics.realisticUsableDays ?? 0;
-                        const remainingBalance = analytics.remainingLeaveBalance ?? leaveBalance.balance;
-                        const willLoseDays = analytics.willLose ?? (realisticUsableDays < remainingBalance ? remainingBalance - realisticUsableDays : 0);
-                        if (willLoseDays > 0) {
-                          return (
-                            <p className="text-xs text-red-600 dark:text-red-400 font-medium">
-                              {Math.round(willLoseDays)} days at risk
-                            </p>
-                          );
-                        }
-                        return null;
-                      })()}
+                        <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 mt-1 tabular-nums">{pendingCount}</p>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-1">Awaiting approval</p>
+                      </div>
+                      <div className="shrink-0 w-10 h-10 rounded-xl border border-amber-500/25 bg-amber-500/10 dark:bg-amber-500/15 flex items-center justify-center">
+                        <ClockIcon className="h-5 w-5 text-amber-500 dark:text-amber-400" />
+                      </div>
                     </div>
                   </div>
-                  <div className="flex-shrink-0 ml-4">
-                    {(() => {
-                      const realisticUsableDays = analytics?.realisticUsableDays ?? 0;
-                      const remainingBalance = analytics?.remainingLeaveBalance ?? leaveBalance.balance;
-                      const isNegative = analytics && leaveBalance.balance < 0;
-                      
-                      // Check for compassionate leave if negative
-                      let hasCompassionateLeave = false;
-                      if (isNegative) {
-                        const maternityBalance = getMaternityLeaveBalance();
-                        hasCompassionateLeave = maternityBalance.daysUsed > 0 || 
-                          myRequests.some(req => 
-                            req.status === 'approved' && 
-                            req.reason && 
-                            (isMaternityLeave(req.reason) || 
-                             req.reason.toLowerCase().includes('sick') ||
-                             req.reason.toLowerCase().includes('bereavement') ||
-                             req.reason.toLowerCase().includes('medical') ||
-                             req.reason.toLowerCase().includes('family emergency') ||
-                             req.reason.toLowerCase().includes('emergency'))
-                          );
-                      }
-                      
-                      const iconBg = isNegative
-                        ? (hasCompassionateLeave 
-                            ? 'bg-pink-100 dark:bg-pink-900/30'
-                            : 'bg-red-100 dark:bg-red-900/30')
-                        : realisticUsableDays >= remainingBalance
-                        ? 'bg-green-100 dark:bg-green-900/30'
-                        : 'bg-orange-100 dark:bg-orange-900/30';
-                      const iconColor = isNegative
-                        ? (hasCompassionateLeave 
-                            ? 'text-pink-700 dark:text-pink-400'
-                            : 'text-red-700 dark:text-red-400')
-                        : realisticUsableDays >= remainingBalance
-                        ? 'text-green-700 dark:text-green-400'
-                        : 'text-orange-700 dark:text-orange-400';
-                      return (
-                        <div className={`w-12 h-12 ${iconBg} rounded-xl flex items-center justify-center`}>
-                          {isNegative ? (
-                            <ExclamationTriangleIcon className={`h-6 w-6 ${iconColor}`} />
-                          ) : (
-                            <CalendarIcon className={`h-6 w-6 ${iconColor}`} />
+
+                  {/* Paternity (balance lives in Balance hero below) */}
+                  <div
+                    className={`rounded-2xl border p-4 shadow-sm ${
+                      !paternityEnabled
+                        ? 'border-zinc-200/90 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-900/50'
+                        : 'border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-zinc-900/90'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                          Paternity leave
+                        </p>
+                        {!paternityEnabled ? (
+                          <>
+                            <p className="text-lg font-medium text-zinc-500 dark:text-zinc-500 italic mt-1">Not available</p>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-1 leading-snug">
+                              Not enabled for your team
+                            </p>
+                          </>
+                        ) : isPaternityUser ? (
+                          <>
+                            <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 mt-1 tabular-nums">
+                              {Math.round(matPat.balance)}
+                            </p>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-1 leading-snug">
+                              Days remaining · {matPat.daysUsed} used this year
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-lg font-medium text-zinc-500 dark:text-zinc-500 mt-1">Not assigned</p>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-1 leading-snug">
+                              Your role is not set to paternity leave
+                            </p>
+                          </>
+                        )}
+                      </div>
+                      <div
+                        className={`shrink-0 w-10 h-10 rounded-xl border flex items-center justify-center ${
+                          !paternityEnabled
+                            ? 'border-zinc-500/20 bg-zinc-500/10'
+                            : 'border-violet-500/25 bg-violet-500/10 dark:bg-violet-500/15'
+                        }`}
+                      >
+                        <CalendarIcon
+                          className={`h-5 w-5 ${!paternityEnabled ? 'text-zinc-500' : 'text-violet-600 dark:text-violet-400'}`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Carryover */}
+                  <div
+                    className={`rounded-2xl border p-4 shadow-sm ${
+                      analytics.carryoverExpired
+                        ? 'border-red-300/80 dark:border-red-800/80 bg-red-50/50 dark:bg-red-950/20'
+                        : 'border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-zinc-900/90'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                          Carryover balance
+                        </p>
+                        <div className="flex flex-wrap items-baseline gap-2 mt-1">
+                          <span className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">
+                            {carriedOver > 0 ? `${carryRem}/${carriedOver}` : carryRem}
+                          </span>
+                          {analytics.carryoverExpired && (
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-red-600 dark:text-red-400 bg-red-500/15 px-1.5 py-0.5 rounded">
+                              Expired
+                            </span>
                           )}
                         </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-              </div>
-            </Link>
-              );
-            })()}
-
-            {/* Carryover Balance Card */}
-            {team?.settings.allowCarryover && (
-              <Link href="/member/analytics" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
-                <div className="p-5 sm:p-6 overflow-hidden">
-                  <div className="flex items-start justify-between gap-4 mb-3 min-w-0">
-                    <div className="flex-1 min-w-0 relative z-10">
-                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Carryover Balance</p>
-                      {(() => {
-                        const carried = user?.carryoverFromPreviousYear ?? 0;
-                        const expired = analytics?.carryoverExpired ?? false;
-                        const remainingDisplay = expired ? (analytics?.carryoverRemainingDisplay ?? 0) : (analytics?.carryoverBalance ?? 0);
-                        const hasCarryover = carried > 0 || remainingDisplay > 0;
-                        return (
-                          <>
-                            <p className={`text-3xl sm:text-4xl font-bold mb-1 fade-in ${
-                              hasCarryover && !expired
-                                ? 'text-indigo-600 dark:text-indigo-400'
-                                : hasCarryover && expired
-                                  ? 'text-gray-600 dark:text-gray-400'
-                                  : 'text-gray-900 dark:text-white'
-                            }`}>
-                              {hasCarryover
-                                ? `${Math.round(remainingDisplay)}/${Math.round(carried)}`
-                                : 0}
-                              {expired && hasCarryover && (
-                                <span className="ml-2 text-sm font-semibold text-red-600 dark:text-red-400 uppercase">Expired</span>
+                        {carriedOver > 0 && (
+                          <div className="mt-2 space-y-0.5 text-xs leading-relaxed">
+                            <p className="text-sky-600 dark:text-sky-400">Carried over: {carriedOver} days</p>
+                            <p className="text-zinc-500 dark:text-zinc-500">Used this year: {usedCarry}</p>
+                            <p className="text-zinc-600 dark:text-zinc-300">
+                              Remaining: {carryRem}
+                              {analytics.carryoverExpired && (
+                                <span className="ml-1.5 text-red-600 dark:text-red-400 font-medium">Expired</span>
                               )}
                             </p>
-                            <div className="mt-2 space-y-1">
-                              {hasCarryover ? (
-                                <>
-                                  <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">
-                                    Carried over: {Math.round(carried)} days
-                                  </p>
-                                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                                    Used this year: {Math.round(analytics?.carryoverDaysUsed ?? 0)} · Remaining: {Math.round(remainingDisplay)}
-                                    {expired && <span className="ml-1 text-red-600 dark:text-red-400 font-medium">Expired</span>}
-                                  </p>
-                                </>
-                              ) : (
-                                <>
-                                  <p className="text-xs text-gray-500 dark:text-gray-500">
-                                    Carryover on file: 0 days
-                                  </p>
-                                  {team?.settings.allowCarryover && (
-                                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">
-                                      No carryover on file. If you used days from last year (e.g. in January), your leader should set your carryover in Leave balance so annual leave is not deducted for those days.
-                                    </p>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          </>
-                        );
-                      })()}
+                          </div>
+                        )}
+                        {carriedOver <= 0 && (
+                          <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-1">
+                            {(analytics.carryoverBalance ?? 0) > 0
+                              ? 'Usable carryover this year'
+                              : 'No carryover on file'}
+                          </p>
+                        )}
+                      </div>
+                      <div
+                        className={`shrink-0 w-10 h-10 rounded-xl border flex items-center justify-center ${
+                          analytics.carryoverExpired
+                            ? 'border-red-500/30 bg-red-500/10'
+                            : 'border-emerald-500/25 bg-emerald-500/10 dark:bg-emerald-500/15'
+                        }`}
+                      >
+                        <ArrowTrendingUpIcon
+                          className={`h-5 w-5 ${
+                            analytics.carryoverExpired ? 'text-red-500 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'
+                          }`}
+                        />
+                      </div>
                     </div>
-                    <div className="flex-shrink-0 ml-4">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                        ((user?.carryoverFromPreviousYear ?? 0) > 0 || (analytics?.carryoverRemainingDisplay ?? analytics?.carryoverBalance ?? 0) > 0)
-                          ? analytics?.carryoverExpired
-                            ? 'bg-red-100 dark:bg-red-900/30'
-                            : (analytics?.carryoverBalance ?? 0) > 0
-                          ? (() => {
-                              const expiryDate = analytics?.carryoverExpiryDate ? new Date(analytics.carryoverExpiryDate) : null;
-                              const today = new Date();
-                              const daysUntilExpiry = expiryDate ? Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
-                              const isExpiringSoon = expiryDate && daysUntilExpiry !== null && daysUntilExpiry <= 30 && daysUntilExpiry > 0;
-                              const isExpired = expiryDate && daysUntilExpiry !== null && daysUntilExpiry <= 0;
-                              
-                              if (isExpired) {
-                                return 'bg-red-100 dark:bg-red-900/30';
-                              } else if (isExpiringSoon) {
-                                return 'bg-orange-100 dark:bg-orange-900/30';
-                              } else {
-                                return 'bg-indigo-100 dark:bg-indigo-900/30';
-                              }
-                            })()
-                          : 'bg-gray-100 dark:bg-gray-800'
-                          : 'bg-gray-100 dark:bg-gray-800'
-                      }`}>
-                        <ArrowTrendingUpIcon className={`h-6 w-6 ${
-                          ((user?.carryoverFromPreviousYear ?? 0) > 0 || (analytics?.carryoverRemainingDisplay ?? analytics?.carryoverBalance ?? 0) > 0)
-                            ? analytics?.carryoverExpired
-                              ? 'text-red-700 dark:text-red-400'
-                              : (analytics?.carryoverBalance ?? 0) > 0
-                            ? (() => {
-                                const expiryDate = analytics?.carryoverExpiryDate ? new Date(analytics.carryoverExpiryDate) : null;
-                                const today = new Date();
-                                const daysUntilExpiry = expiryDate ? Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
-                                const isExpiringSoon = expiryDate && daysUntilExpiry !== null && daysUntilExpiry <= 30 && daysUntilExpiry > 0;
-                                const isExpired = expiryDate && daysUntilExpiry !== null && daysUntilExpiry <= 0;
-                                
-                                if (isExpired) {
-                                  return 'text-red-700 dark:text-red-400';
-                                } else if (isExpiringSoon) {
-                                  return 'text-orange-700 dark:text-orange-400';
-                                } else {
-                                  return 'text-indigo-700 dark:text-indigo-400';
-                                }
-                              })()
-                            : 'text-gray-700 dark:text-gray-300'
-                            : 'text-gray-700 dark:text-gray-300'
-                        }`} />
+                  </div>
+
+                  {/* Days taken */}
+                  <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 p-4 shadow-sm">
+                    <div className="flex justify-between items-start gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                          Days taken
+                        </p>
+                        <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 mt-1 tabular-nums">
+                          {Math.round(analytics.workingDaysUsed ?? 0)}
+                        </p>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-1">This year</p>
+                      </div>
+                      <div className="shrink-0 w-10 h-10 rounded-xl border border-sky-500/25 bg-sky-500/10 dark:bg-sky-500/15 flex items-center justify-center">
+                        <CheckCircleIcon className="h-5 w-5 text-sky-600 dark:text-sky-400" />
                       </div>
                     </div>
                   </div>
                 </div>
-              </Link>
-            )}
 
-            {/* Working Days Taken Card */}
-            <Link href="/member/analytics" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
-              <div className="p-5 sm:p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Days Taken</p>
-                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
-                      {analytics?.workingDaysUsed !== undefined ? Math.round(analytics.workingDaysUsed) : getTotalWorkingDaysTaken()}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">This year</p>
-                    {user && getEffectiveManualYearToDateUsed(user) !== undefined && (
-                      <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Manual override</p>
-                    )}
-                  </div>
-                  <div className="flex-shrink-0 ml-4">
-                    <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
-                      <CheckCircleIcon className="h-6 w-6 text-blue-700 dark:text-blue-400" />
+                <div
+                  className={`grid gap-3 mb-3 shrink-0 ${
+                    teamHeadcountPreview ? 'grid-cols-1 lg:grid-cols-12' : 'grid-cols-1'
+                  }`}
+                >
+                  <div className={teamHeadcountPreview ? 'lg:col-span-8 space-y-3' : 'space-y-3'}>
+                {/* Competition context */}
+                <div className="rounded-2xl border-2 border-indigo-300/80 dark:border-indigo-700/80 bg-indigo-50/90 dark:bg-indigo-950/35 p-4 sm:p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-500/15 dark:bg-indigo-500/20 flex items-center justify-center shrink-0 border border-indigo-500/20">
+                      <UsersIcon className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-200">Competition context</p>
+                        {analytics.hasPartialCompetition && (
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                              analytics.partialOverlapMembersWithBalance > 0
+                                ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300 border border-orange-300/80 dark:border-orange-700'
+                                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
+                            }`}
+                          >
+                            {analytics.partialOverlapMembersWithBalance > 0 ? '⚠ ' : 'ℹ '}
+                            {analytics.partialOverlapMembersCount} partial overlap
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-indigo-800 dark:text-indigo-300/95 leading-relaxed">
+                        <strong>{analytics.membersSharingSameShift}</strong> team member
+                        {analytics.membersSharingSameShift !== 1 ? 's' : ''} with the{' '}
+                        <strong>same working days pattern</strong>
+                        {groupName ? ` (${groupName})` : ''} and <strong>shift type</strong> share roughly{' '}
+                        <strong>{Math.round(analytics.usableDays ?? 0)}</strong> available days.
+                      </p>
+                      {analytics.hasPartialCompetition && analytics.partialOverlapMembersWithBalance > 0 && (
+                        <p className="text-sm text-orange-700 dark:text-orange-400 mt-2 leading-relaxed font-medium">
+                          {analytics.partialOverlapMembersWithBalance} member
+                          {analytics.partialOverlapMembersWithBalance !== 1 ? 's' : ''} with different shift patterns but overlapping
+                          working days {analytics.partialOverlapMembersWithBalance > 1 ? 'have' : 'has'} balances and may compete for the
+                          same dates.
+                        </p>
+                      )}
+                      {analytics.hasPartialCompetition && analytics.partialOverlapMembersWithBalance === 0 && (
+                        <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-2">
+                          {analytics.partialOverlapMembersCount} member
+                          {analytics.partialOverlapMembersCount !== 1 ? 's' : ''} with overlapping days (no active leave balances).
+                        </p>
+                      )}
+                      <p className="text-sm text-indigo-800 dark:text-indigo-300/95 mt-2 leading-relaxed">
+                        Average <strong>{Math.round(analytics.averageDaysPerMember)}</strong> days per member available · you can realistically
+                        use <strong>{Math.round(analytics.realisticUsableDays ?? 0)}</strong> days.
+                      </p>
                     </div>
                   </div>
                 </div>
-              </div>
-            </Link>
 
-            {/* Maternity Leave Card */}
-            {(() => {
-              const userType = user?.maternityPaternityType;
-              const hasTypeAssigned = !!userType;
-              const isTypeEnabled = userType === 'paternity' 
-                ? team?.settings.paternityLeave?.enabled 
-                : userType === 'maternity' 
-                  ? team?.settings.maternityLeave?.enabled 
-                  : false;
-              
-              // Show card if type is assigned and enabled, or show "Not available" message
-              if (!hasTypeAssigned) {
-                return (
-                  <div className="stat-card group opacity-60">
-                    <div className="p-5 sm:p-6">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
-                            Maternity/Paternity Leave
-                          </p>
-                          <p className="text-lg font-medium text-gray-400 dark:text-gray-500 italic mb-1">
-                            Not allocated
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
-                            You have not been assigned maternity or paternity leave
-                          </p>
-                        </div>
-                        <div className="flex-shrink-0 ml-4">
-                          <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center">
-                            <CalendarIcon className="h-6 w-6 text-gray-400 dark:text-gray-600" />
-                          </div>
-                        </div>
-                      </div>
+                {/* Concurrent leave constraint */}
+                <div
+                  className={`rounded-2xl border-2 p-4 sm:p-5 ${
+                    analytics.usableDays < analytics.theoreticalWorkingDays
+                      ? 'border-orange-300/90 dark:border-orange-700/80 bg-orange-50/90 dark:bg-orange-950/30'
+                      : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50/80 dark:bg-zinc-900/40'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
+                        analytics.usableDays < analytics.theoreticalWorkingDays
+                          ? 'bg-orange-500/15 border-orange-500/25'
+                          : 'bg-emerald-500/10 border-emerald-500/20'
+                      }`}
+                    >
+                      {analytics.usableDays < analytics.theoreticalWorkingDays ? (
+                        <ExclamationTriangleIcon className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                      ) : (
+                        <CheckCircleIcon className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                      )}
                     </div>
-                  </div>
-                );
-              }
-              
-              if (!isTypeEnabled) {
-                return (
-                  <div className="stat-card group opacity-60">
-                    <div className="p-5 sm:p-6">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
-                            {userType === 'maternity' ? '🤱 Maternity Leave' : '👨‍👩‍👧 Paternity Leave'}
-                          </p>
-                          <p className="text-lg font-medium text-gray-400 dark:text-gray-500 italic mb-1">
-                            Not available
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
-                            {userType === 'maternity' ? 'Maternity' : 'Paternity'} leave is not enabled for your team
-                          </p>
-                        </div>
-                        <div className="flex-shrink-0 ml-4">
-                          <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center">
-                            <CalendarIcon className="h-6 w-6 text-gray-400 dark:text-gray-600" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              }
-              
-              // Type is assigned and enabled - show normal card
-              return (
-                <Link href="/member/analytics" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
-                  <div className="p-5 sm:p-6">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">
-                          {userType === 'maternity' ? '🤱 Maternity Leave' : '👨‍👩‍👧 Paternity Leave'}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Concurrent leave constraint</p>
+                      {analytics.usableDays < analytics.theoreticalWorkingDays ? (
+                        <p className="text-sm text-orange-800 dark:text-orange-300/95 leading-relaxed">
+                          Due to concurrent leave limits, you have <strong>{Math.round(analytics.usableDays ?? 0)}</strong> available days
+                          of <strong>{Math.round(analytics.theoreticalWorkingDays)}</strong> remaining working days. Some days are already
+                          booked by other team members.
                         </p>
-                        <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
-                          {(() => {
-                            const maternityBalance = getMaternityLeaveBalance();
-                            const maxDays = userType === 'paternity' 
-                              ? (team?.settings.paternityLeave?.maxDays || 90)
-                              : (team?.settings.maternityLeave?.maxDays || 90);
-                            
-                            // Show "Not available" if balance is 0/90 and no type assigned (shouldn't happen here, but safety check)
-                            if (maternityBalance.balance === 0 && maxDays === 90 && !user.manualMaternityLeaveBalance) {
-                              return 'Not available';
-                            }
-                            
-                            return `${Math.round(maternityBalance.balance)} / ${maxDays}`;
-                          })()}
+                      ) : (
+                        <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                          No concurrent cap is limiting you right now — your usable days match your remaining working days (
+                          <strong>{Math.round(analytics.usableDays ?? 0)}</strong> /{' '}
+                          <strong>{Math.round(analytics.theoreticalWorkingDays)}</strong>).
                         </p>
-                    <div className="mt-2 space-y-1">
-                      {(() => {
-                        const maternityBalance = getMaternityLeaveBalance();
-                        if (maternityBalance.daysUsed > 0) {
-                          return (
-                            <p className="text-xs text-gray-600 dark:text-gray-400">
-                              {Math.round(maternityBalance.daysUsed)} used
-                            </p>
-                          );
-                        }
-                        return null;
-                      })()}
-                      {(() => {
-                        const maternityBalance = getMaternityLeaveBalance();
-                        if (maternityBalance.surplus > 0) {
-                          return (
-                            <p className="text-xs text-green-600 dark:text-green-400 font-medium">
-                              +{Math.round(maternityBalance.surplus)} surplus
-                            </p>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </div>
-                  </div>
-                  <div className="flex-shrink-0 ml-4">
-                    <div className="w-12 h-12 bg-pink-100 dark:bg-pink-900/30 rounded-xl flex items-center justify-center">
-                      <CalendarIcon className="h-6 w-6 text-pink-700 dark:text-pink-400" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Link>
-              );
-            })()}
-          </div>
-
-          {/* Member Score Card - Hero Style */}
-          {(() => {
-            // Use analytics if available, otherwise use fallback values
-            const baseBalance = analytics?.baseLeaveBalance ?? (team?.settings.maxLeavePerYear || 20);
-            const used = baseBalance - (analytics?.remainingLeaveBalance ?? 0);
-            const usagePercentage = baseBalance > 0 ? (used / baseBalance) * 100 : 0;
-            const realisticUsableDays = analytics?.realisticUsableDays ?? 0;
-            const remainingBalance = analytics?.remainingLeaveBalance ?? 0;
-            const willLoseDays = analytics?.willLose ?? 0;
-            const willCarryoverDays = analytics?.willCarryover ?? 0;
-            const carryoverLimitedToMonths = analytics?.carryoverLimitedToMonths;
-            const carryoverMaxDays = analytics?.carryoverMaxDays;
-            const carryoverExpiryDate = analytics?.carryoverExpiryDate;
-            const isNegativeBalance = remainingBalance < 0;
-            const negativeBalanceAmount = isNegativeBalance ? Math.abs(remainingBalance) : 0;
-            
-            // Determine score and status - Negative balance takes highest priority
-            let score = 'excellent';
-            let gradientColors = 'from-green-500 via-emerald-500 to-teal-500';
-            let bgGradient = 'bg-gradient-to-br from-green-200 to-emerald-200 dark:from-green-900/50 dark:to-emerald-900/50';
-            let borderColor = 'border-green-500 dark:border-green-500';
-            let textColor = 'text-green-700 dark:text-green-300';
-            let badgeColor = 'bg-green-100 dark:bg-green-900 text-green-900 dark:text-white';
-            let quote = '';
-            let message = '';
-            let scoreLabel = 'Excellent';
-            
-            // If no analytics, show loading state
-            if (!analytics) {
-              gradientColors = 'from-gray-500 via-gray-500 to-gray-500';
-              bgGradient = 'bg-gradient-to-br from-gray-200 to-gray-200 dark:from-gray-900/50 dark:to-gray-900/50';
-              borderColor = 'border-gray-500 dark:border-gray-500';
-              textColor = 'text-gray-700 dark:text-gray-300';
-              badgeColor = 'bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white';
-              quote = 'Loading your leave health score...';
-              message = 'Please wait while we calculate your leave analytics.';
-              scoreLabel = 'Loading...';
-            }
-            // Handle negative balance first (over-allocation)
-            else if (isNegativeBalance) {
-              // Check if user has taken compassionate leave this year (maternity, sick, bereavement, medical, etc.)
-              const maternityBalance = getMaternityLeaveBalance();
-              const hasTakenMaternityLeave = maternityBalance.daysUsed > 0;
-              
-              // Check for other compassionate leave reasons
-              const compassionateRequests = myRequests.filter(req => 
-                req.status === 'approved' && 
-                req.reason && 
-                (isMaternityLeave(req.reason) || 
-                 req.reason.toLowerCase().includes('sick') ||
-                 req.reason.toLowerCase().includes('bereavement') ||
-                 req.reason.toLowerCase().includes('medical') ||
-                 req.reason.toLowerCase().includes('family emergency') ||
-                 req.reason.toLowerCase().includes('emergency'))
-              );
-              const hasCompassionateLeave = hasTakenMaternityLeave || compassionateRequests.length > 0;
-              
-              if (hasCompassionateLeave) {
-                // Softer colors (maternity/pink tones) for compassionate leave
-                score = 'critical';
-                gradientColors = 'from-pink-500 via-rose-500 to-pink-600';
-                bgGradient = 'bg-gradient-to-br from-pink-200 to-rose-200 dark:from-pink-900/50 dark:to-rose-900/50';
-                borderColor = 'border-pink-500 dark:border-pink-500';
-                textColor = 'text-pink-800 dark:text-pink-200';
-                badgeColor = 'bg-pink-200 dark:bg-pink-900 text-pink-900 dark:text-white';
-                
-                // Determine specific compassionate reason for message
-                let compassionateReason = '';
-                if (hasTakenMaternityLeave) {
-                  compassionateReason = 'maternity/paternity leave';
-                } else if (compassionateRequests.some(r => r.reason?.toLowerCase().includes('sick'))) {
-                  compassionateReason = 'sick leave';
-                } else if (compassionateRequests.some(r => r.reason?.toLowerCase().includes('bereavement'))) {
-                  compassionateReason = 'bereavement leave';
-                } else if (compassionateRequests.some(r => r.reason?.toLowerCase().includes('medical'))) {
-                  compassionateReason = 'medical leave';
-                } else if (compassionateRequests.some(r => r.reason?.toLowerCase().includes('emergency'))) {
-                  compassionateReason = 'emergency leave';
-                } else {
-                  compassionateReason = 'necessary leave';
-                }
-                
-                quote = 'Taking necessary leave is important.';
-                message = `You've used ${Math.round(negativeBalanceAmount)} more day${negativeBalanceAmount !== 1 ? 's' : ''} than your allocated regular leave this year. We understand that ${compassionateReason} is necessary and important. This will be adjusted in your next year's allocation. Please coordinate with your team leader to discuss how this will be handled.`;
-                scoreLabel = 'Over Allocated';
-              } else {
-                // Harsh red colors only when it's regular leave over-allocation
-                score = 'critical';
-                gradientColors = 'from-red-700 via-rose-700 to-pink-700';
-                bgGradient = 'bg-gradient-to-br from-red-200 to-rose-200 dark:from-red-900/50 dark:to-rose-900/50';
-                borderColor = 'border-red-500 dark:border-red-500';
-                textColor = 'text-red-800 dark:text-red-200';
-                badgeColor = 'bg-red-200 dark:bg-red-900 text-red-900 dark:text-white';
-                
-                quote = 'Taking time off when needed is important.';
-                message = `You've used ${Math.round(negativeBalanceAmount)} more day${negativeBalanceAmount !== 1 ? 's' : ''} than your allocated leave this year. This is understandable - sometimes leave is needed beyond what's allocated. This will be adjusted in your next year's leave allocation. Please coordinate with your team leader to discuss how this will be handled.`;
-                scoreLabel = 'Over Allocated';
-              }
-            } else if (analytics) {
-              // Use time-based scoring that accounts for time of year and usage patterns
-              // Check if manual leave balance is set
-              const hasManualBalance = user?.manualLeaveBalance !== undefined || (user ? getEffectiveManualYearToDateUsed(user) !== undefined : false);
-              const timeBasedScore = calculateTimeBasedLeaveScore(
-                baseBalance,
-                used,
-                remainingBalance,
-                realisticUsableDays,
-                willLoseDays,
-                willCarryoverDays,
-                hasManualBalance,
-                carryoverLimitedToMonths,
-                carryoverMaxDays,
-                carryoverExpiryDate
-              );
-              
-              // eslint-disable-next-line @typescript-eslint/no-unused-vars
-              score = timeBasedScore.score;
-              gradientColors = timeBasedScore.gradientColors;
-              bgGradient = timeBasedScore.bgGradient;
-              borderColor = timeBasedScore.borderColor;
-              textColor = timeBasedScore.textColor;
-              badgeColor = timeBasedScore.badgeColor;
-              quote = timeBasedScore.quote;
-              message = timeBasedScore.message;
-              scoreLabel = timeBasedScore.scoreLabel;
-            }
-            
-            return (
-              <div className={`relative overflow-hidden rounded-2xl ${bgGradient} border-2 ${borderColor} shadow-xl mb-12 fade-in`}>
-                {/* Decorative gradient background */}
-                <div className={`absolute inset-0 bg-gradient-to-br ${gradientColors} opacity-10 dark:opacity-5`}></div>
-                
-                {/* Content */}
-                <div className="relative p-8 sm:p-10 lg:p-12">
-                  <div className="flex flex-col lg:flex-row items-start lg:items-center gap-6 lg:gap-8">
-                    {/* Left side - Score badge and title */}
-                    <div className="flex-shrink-0">
-                      <div className="flex items-center gap-4 mb-4">
-                        <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${gradientColors} flex items-center justify-center shadow-lg relative overflow-hidden`}>
-                          {/* Dark overlay for better icon contrast */}
-                          <div className="absolute inset-0 bg-black/20 dark:bg-black/40"></div>
-                          <CheckCircleIcon className="h-10 w-10 text-white relative z-10 drop-shadow-lg" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Leave Health Score</p>
-                          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">{scoreLabel}</h2>
-                        </div>
-                      </div>
-                      <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold ${badgeColor} shadow-md`}>
-                        {!analytics 
-                          ? 'Loading...'
-                          : isNegativeBalance 
-                            ? `${Math.round(negativeBalanceAmount)} days over limit`
-                            : `${Math.round(realisticUsableDays)} / ${Math.round(remainingBalance)} days usable`
-                        }
-                      </span>
-                    </div>
-                    
-                    {/* Right side - Quote and message */}
-                    <div className="flex-1 min-w-0">
-                      <div className="mb-4">
-                        <p className={`text-xl sm:text-2xl font-medium ${textColor} italic mb-3 leading-relaxed`}>
-                          &ldquo;{quote}&rdquo;
-                        </p>
-                        <p className="text-base sm:text-lg text-gray-700 dark:text-gray-300 leading-relaxed">
-                          {message}
-                        </p>
-                      </div>
-                      
-                      {/* Quick stats */}
-                      {analytics && (
-                        <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-                            <span className="text-sm text-gray-600 dark:text-gray-400">
-                              {Math.round(usagePercentage)}% leave used
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-                            <span className="text-sm text-gray-600 dark:text-gray-400">
-                              {Math.round(remainingBalance)} days remaining
-                            </span>
-                          </div>
-                        </div>
                       )}
                     </div>
                   </div>
                 </div>
+                  </div>
+
+                  {teamHeadcountPreview && (
+                    <div className="lg:col-span-4 min-h-0">
+                      <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 p-4 shadow-sm h-full flex flex-col">
+                        <div className="flex justify-between items-start gap-3 flex-1 min-h-0">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                              People at work
+                            </p>
+                            <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 mt-1 tabular-nums">
+                              {teamHeadcountPreview.loadingLeave
+                                ? '—'
+                                : teamHeadcountPreview.days[0].working ?? 0}
+                            </p>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-1 leading-snug">
+                              {teamHeadcountPreview.loadingLeave
+                                ? 'Loading leave…'
+                                : `${teamHeadcountPreview.days[0].scheduled} scheduled today · ${teamHeadcountPreview.days[0].onLeave ?? 0} on leave`}
+                            </p>
+                            <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-2">{teamHeadcountPreview.subgroupNote}</p>
+                            <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1 -mx-0.5 sm:mx-0">
+                              {teamHeadcountPreview.days.map((day, i) => (
+                                <div
+                                  key={day.date.toISOString()}
+                                  className="relative flex-shrink-0 min-w-[3.5rem] rounded-lg border border-zinc-200/80 dark:border-zinc-700/80 bg-zinc-50/80 dark:bg-zinc-800/80 px-2 py-1.5 text-center"
+                                >
+                                  <p className="text-[9px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+                                    {i === 0 ? 'Today' : day.date.toLocaleDateString(undefined, { weekday: 'short' })}
+                                  </p>
+                                  <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">
+                                    {teamHeadcountPreview.loadingLeave ? '—' : day.working ?? 0}
+                                  </p>
+                                  {!teamHeadcountPreview.loadingLeave && (
+                                    <p className="text-[9px] text-zinc-500 dark:text-zinc-500 mt-0.5">
+                                      {day.date.getMonth() + 1}/{day.date.getDate()}
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                            {!teamHeadcountPreview.loadingLeave && (
+                              <div className="mt-2 w-full min-w-0 max-w-full overflow-hidden">
+                                <Sparkline
+                                  data={teamHeadcountPreview.days.map((d) => d.working ?? 0)}
+                                  width={200}
+                                  height={28}
+                                  className="text-teal-600 dark:text-teal-400 max-w-full"
+                                />
+                              </div>
+                            )}
+                          </div>
+                          <div className="shrink-0 w-10 h-10 rounded-xl border border-teal-500/25 bg-teal-500/10 dark:bg-teal-500/15 flex items-center justify-center">
+                            <BuildingOffice2Icon className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
+
+          {/* Dashboard — 2-column layout filling the viewport */}
+          {(() => {
+            const maxPerYear = team?.settings.maxLeavePerYear || 20;
+            const used = Math.max(0, Math.round(maxPerYear - annualRemainingBalance));
+            const pendingCount = myRequests.filter((r) => r.status === 'pending').length;
+            const remaining = Math.round(leaveBalance.balance);
+            const progress = maxPerYear > 0 ? Math.max(0, Math.min(1, used / maxPerYear)) : 0;
+            const currentYear = new Date().getFullYear();
+            const shiftSchedule =
+              user?.shiftSchedule || {
+                pattern: [true, true, true, true, true, false, false],
+                startDate: new Date(),
+                type: 'rotating' as const,
+              };
+            const monthlyUsage = Array.from({ length: 12 }, (_, month) => {
+              let sum = 0;
+              const monthStart = new Date(currentYear, month, 1);
+              const monthEnd = new Date(currentYear, month + 1, 0, 23, 59, 59, 999);
+              for (const r of myRequests) {
+                if (r.status !== 'approved') continue;
+                const start = parseDateSafe(r.startDate);
+                const end = parseDateSafe(r.endDate);
+                start.setHours(0, 0, 0, 0);
+                end.setHours(23, 59, 59, 999);
+                if (end < monthStart || start > monthEnd) continue;
+                const ms = start > monthStart ? start : monthStart;
+                const me = end < monthEnd ? end : monthEnd;
+                sum += countWorkingDays(ms, me, shiftSchedule);
+              }
+              return sum;
+            });
+
+            const leaveScore = analytics
+              ? calculateTimeBasedLeaveScore(
+                  maxPerYear,
+                  used,
+                  analytics.remainingLeaveBalance,
+                  analytics.realisticUsableDays ?? 0,
+                  analytics.willLose ?? 0,
+                  analytics.willCarryover ?? 0,
+                  user?.manualYearToDateUsed !== undefined,
+                  team?.settings.carryoverSettings?.limitedToMonths,
+                  team?.settings.carryoverSettings?.maxCarryoverDays,
+                  team?.settings.carryoverSettings?.expiryDate
+                    ? new Date(team.settings.carryoverSettings.expiryDate)
+                    : undefined
+                )
+              : null;
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const upcomingApproved = myRequests
+              .filter((r) => r.status === 'approved' && parseDateSafe(r.endDate).getTime() >= today.getTime())
+              .sort((a, b) => parseDateSafe(a.startDate).getTime() - parseDateSafe(b.startDate).getTime());
+            const nextApproved =
+              upcomingApproved.find((r) => parseDateSafe(r.startDate).getTime() >= today.getTime()) ?? upcomingApproved[0];
+
+            const upcomingItems = [
+              ...(pendingCount > 0
+                ? [{
+                    id: 'pending',
+                    title: `${pendingCount} pending request${pendingCount !== 1 ? 's' : ''}`,
+                    subtitle: 'Waiting for approval',
+                    tone: 'warning' as const,
+                    right: <Link href="/member/requests" className="btn-secondary text-xs py-1 px-2">View</Link>,
+                  }]
+                : []),
+              ...(nextApproved?._id
+                ? [{
+                    id: `next-${nextApproved._id}`,
+                    title: 'Next leave',
+                    subtitle: `${parseDateSafe(nextApproved.startDate).toLocaleDateString()} \u2013 ${parseDateSafe(nextApproved.endDate).toLocaleDateString()}`,
+                    meta: nextApproved.reason || undefined,
+                    tone: 'info' as const,
+                    right: <Link href="/member/calendar" className="btn-secondary text-xs py-1 px-2">Calendar</Link>,
+                  }]
+                : [{
+                    id: 'no-upcoming',
+                    title: 'No upcoming leave',
+                    subtitle: 'Plan something to recharge',
+                    tone: 'neutral' as const,
+                    right: <Link href="/member/requests" className="btn-primary text-xs py-1 px-2">Request</Link>,
+                  }]),
+            ];
+
+            const recentActivity = myRequests
+              .slice()
+              .sort((a, b) => parseDateSafe(b.updatedAt).getTime() - parseDateSafe(a.updatedAt).getTime())
+              .slice(0, 6)
+              .map((r) => {
+                const tone: 'success' | 'danger' | 'warning' =
+                  r.status === 'approved' ? 'success' : r.status === 'rejected' ? 'danger' : 'warning';
+                return {
+                  id: r._id || `${r.userId}-${r.status}`,
+                  title: `${r.status[0].toUpperCase()}${r.status.slice(1)} request`,
+                  description: `${parseDateSafe(r.startDate).toLocaleDateString()} \u2013 ${parseDateSafe(r.endDate).toLocaleDateString()}${r.reason ? ` \u00b7 ${r.reason}` : ''}`,
+                  time: parseDateSafe(r.updatedAt).toLocaleDateString(),
+                  tone,
+                };
+              });
+
+            return (
+              <div className="grid lg:grid-cols-12 gap-5 lg:min-h-[min(520px,calc(100vh-32rem))] lg:overflow-hidden">
+
+                {/* Left column: Health Score + Recent Activity */}
+                <div className="lg:col-span-7 flex flex-col gap-5 lg:h-full lg:min-h-0 lg:overflow-hidden">
+
+                  {/* Leave Health Score */}
+                  {leaveScore ? (
+                    <div className={`rounded-[32px] border-2 ${leaveScore.borderColor} ${leaveScore.bgGradient} p-5 sm:p-6`}>
+                      <div className="flex items-start gap-4 mb-4">
+                        <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${leaveScore.gradientColors} flex items-center justify-center shadow-md shrink-0`}>
+                          <ChartBarIcon className="h-7 w-7 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Leave Health Score</p>
+                          <h2 className={`text-2xl font-bold ${leaveScore.textColor} mt-0.5`}>{leaveScore.scoreLabel}</h2>
+                        </div>
+                        <span className={`text-xs font-semibold px-3 py-1.5 rounded-full shrink-0 ${leaveScore.badgeColor}`}>
+                          {used}/{maxPerYear} used
+                        </span>
+                      </div>
+                      <p className={`text-base italic ${leaveScore.textColor} mb-2 leading-relaxed`}>&ldquo;{leaveScore.quote}&rdquo;</p>
+                      <p className="text-sm text-zinc-600 dark:text-zinc-300 leading-relaxed mb-4">{leaveScore.message}</p>
+                      <div className="flex flex-wrap gap-2 pt-4 border-t border-zinc-200/50 dark:border-zinc-700/50">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white/60 dark:bg-zinc-900/40 text-zinc-700 dark:text-zinc-200">
+                          {Math.round(analytics?.realisticUsableDays ?? 0)} realistic days left
+                        </span>
+                        {(analytics?.willLose ?? 0) > 0 && (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-red-100/80 dark:bg-red-900/30 text-red-700 dark:text-red-300">
+                            <ExclamationTriangleIcon className="h-3.5 w-3.5" />
+                            {Math.round(analytics!.willLose ?? 0)} at risk
+                          </span>
+                        )}
+                        {(analytics?.willCarryover ?? 0) > 0 && (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-indigo-100/80 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
+                            {Math.round(analytics!.willCarryover ?? 0)} carry over
+                          </span>
+                        )}
+                        {(analytics?.membersSharingSameShift ?? 0) > 0 && (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white/60 dark:bg-zinc-900/40 text-zinc-700 dark:text-zinc-200">
+                            <UsersIcon className="h-3.5 w-3.5" />
+                            {analytics!.membersSharingSameShift} competing
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-[32px] border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 p-6 flex items-center justify-center min-h-[140px]">
+                      <p className="text-sm text-zinc-400 dark:text-zinc-500">Loading health score&hellip;</p>
+                    </div>
+                  )}
+
+                  {/* Recent Activity */}
+                  <div className="rounded-[32px] border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 sm:p-6 flex-1 flex flex-col min-h-0 lg:overflow-hidden">
+                    <div className="flex items-center justify-between mb-4 shrink-0">
+                      <div>
+                        <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Recent activity</p>
+                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mt-0.5">Your latest request updates</p>
+                      </div>
+                      <Link href="/member/requests" className="btn-secondary text-xs py-1 px-2">View all</Link>
+                    </div>
+                    <div className="app-scroll-list max-h-[min(320px,50vh)] lg:max-h-none">
+                      <ActivityFeed items={recentActivity} empty={<p className="text-sm text-zinc-500 dark:text-zinc-400">No activity yet.</p>} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right column: Balance today + Upcoming */}
+                <div className="lg:col-span-5 flex flex-col gap-5 lg:h-full lg:min-h-0 lg:overflow-hidden">
+
+                  {/* Balance today */}
+                  <div className="rounded-[32px] border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 sm:p-6">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                          Balance today
+                        </p>
+                        <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 mt-1 tabular-nums">
+                          {remaining} <span className="text-zinc-400 dark:text-zinc-500 font-semibold">/</span>{' '}
+                          {maxPerYear}
+                        </p>
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Days remaining this year</p>
+                      </div>
+                      <ProgressRing
+                        value={progress}
+                        size={52}
+                        stroke={6}
+                        label={
+                          <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">
+                            {Math.round(progress * 100)}%
+                          </span>
+                        }
+                      />
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-zinc-100/90 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-200">
+                        {used} used
+                      </span>
+                      {analytics && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-100/80 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200">
+                          Carryover {Math.round(analytics.carryoverBalance ?? 0)}
+                        </span>
+                      )}
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-100/80 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
+                        {pendingCount} pending
+                      </span>
+                    </div>
+                    <div className="mt-4 flex items-center justify-between gap-3">
+                      <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0">This year (by month)</span>
+                      <Sparkline
+                        data={monthlyUsage}
+                        width={160}
+                        height={32}
+                        className="text-indigo-600 dark:text-indigo-400 min-w-0 max-w-full"
+                      />
+                    </div>
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      <Link href="/member/requests" className="btn-primary">
+                        <DocumentTextIcon className="h-4 w-4" />
+                        Request leave
+                      </Link>
+                      <Link href="/member/calendar" className="btn-secondary">
+                        <CalendarIcon className="h-4 w-4" />
+                        Calendar
+                      </Link>
+                      <Link href="/member/analytics" className="btn-secondary">
+                        <ChartBarIcon className="h-4 w-4" />
+                        Insights
+                      </Link>
+                    </div>
+                  </div>
+
+                  {/* Upcoming */}
+                  <div className="rounded-[32px] border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 sm:p-6 flex-1 lg:overflow-auto">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Upcoming</p>
+                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mt-0.5">What&apos;s next</p>
+                      </div>
+                      <ClockIcon className="h-5 w-5 text-zinc-400 dark:text-zinc-500" />
+                    </div>
+                    <Timeline items={upcomingItems} empty={<p className="text-sm text-zinc-500 dark:text-zinc-400">Nothing queued yet.</p>} />
+                  </div>
+                </div>
+
               </div>
             );
           })()}
 
-          {/* Analytics Section - Enhanced */}
-          <div className="mb-8 space-y-8 fade-in">
-            <div className="mb-6">
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-3">Year-End Analytics</h2>
-              <p className="text-base text-gray-500 dark:text-gray-400">Your leave performance and outlook</p>
-            </div>
-            
-            {analytics ? (
-              <>
-              
-              {/* Analytics Cards - Enhanced */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 mb-8">
-                <Link href="/member/analytics" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
-                  <div className="p-5 sm:p-6">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-1">Realistic Days</p>
-                        <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
-                          {Math.round(analytics.realisticUsableDays ?? 0)}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-500">With constraints</p>
-                      </div>
-                      <div className="flex-shrink-0 ml-3">
-                        <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
-                          <ChartBarIcon className="h-6 w-6 text-blue-700 dark:text-blue-400" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-
-                <Link href="/member/analytics" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
-                  <div className="p-5 sm:p-6">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-1">Available Days</p>
-                        <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
-                          {Math.round(analytics.usableDays ?? 0)}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-500">Available</p>
-                      </div>
-                      <div className="flex-shrink-0 ml-3">
-                        <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-xl flex items-center justify-center">
-                          <CheckCircleIcon className="h-6 w-6 text-purple-700 dark:text-purple-400" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-
-                <Link href="/member/analytics" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
-                  <div className="p-5 sm:p-6">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-1">Theoretical Days</p>
-                        <p className="text-2xl sm:text-3xl font-bold text-gray-700 dark:text-gray-300 mb-1 fade-in">
-                          {Math.round(analytics.theoreticalWorkingDays ?? 0)}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-500">Without constraints</p>
-                      </div>
-                      <div className="flex-shrink-0 ml-3">
-                        <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center">
-                          <ArrowTrendingUpIcon className="h-6 w-6 text-gray-700 dark:text-gray-300" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-
-                <Link href="/member/analytics" className="stat-card group cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200">
-                  <div className="p-5 sm:p-6">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-1">Team Competition</p>
-                        <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
-                          {analytics.membersSharingSameShift ?? 0}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-500">Same shift members</p>
-                        {analytics.averageDaysPerMember !== undefined && analytics.averageDaysPerMember > 0 && (
-                          <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium mt-1">
-                            ~{Math.round(analytics.averageDaysPerMember)} days avg per member
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex-shrink-0 ml-3">
-                        <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center">
-                          <UsersIcon className="h-6 w-6 text-indigo-700 dark:text-indigo-400" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-
-              </div>
-
-              {/* Competition Context Card - Enhanced */}
-              <div className="card border-2 border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/30">
-                <div className="p-5">
-                  <div className="flex items-start space-x-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
-                      <UsersIcon className="h-6 w-6 text-blue-700 dark:text-blue-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <p className="font-semibold text-indigo-900 dark:text-indigo-300">Competition Context</p>
-                        {analytics.hasPartialCompetition && (
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                            analytics.partialOverlapMembersWithBalance > 0
-                              ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border border-orange-300 dark:border-orange-700'
-                              : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
-                          }`}>
-                            {analytics.partialOverlapMembersWithBalance > 0 ? '⚠️' : 'ℹ️'} {analytics.partialOverlapMembersCount} partial overlap
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-sm text-indigo-700 dark:text-indigo-400 mb-2 leading-relaxed">
-                        <strong>{analytics.membersSharingSameShift}</strong> team member{analytics.membersSharingSameShift !== 1 ? 's' : ''} 
-                        {' '}with the <strong>same working days pattern</strong>{(() => {
-                          if (!user || !user.shiftSchedule) return '';
-                          const workingDaysTag = user.shiftSchedule.type === 'rotating'
-                            ? generateWorkingDaysTag(user.shiftSchedule)
-                            : (user.workingDaysTag || generateWorkingDaysTag(user.shiftSchedule));
-                          const groupName = getWorkingDaysGroupDisplayName(workingDaysTag, team?.settings);
-                          return ` (${groupName})`;
-                        })()} and <strong>shift type</strong> need to coordinate use of 
-                        {' '}<strong>{Math.round(analytics.usableDays ?? 0)}</strong> available days.
-                      </p>
-                      {analytics.hasPartialCompetition && analytics.partialOverlapMembersWithBalance > 0 && (
-                        <p className="text-sm text-orange-700 dark:text-orange-400 mb-2 leading-relaxed font-medium">
-                          ⚠️ <strong>{analytics.partialOverlapMembersWithBalance}</strong> member{analytics.partialOverlapMembersWithBalance !== 1 ? 's' : ''} with <strong>different shift patterns</strong> but <strong>overlapping working days</strong> {analytics.partialOverlapMembersWithBalance > 1 ? 'have' : 'has'} leave balances and may compete for the same dates.
-                        </p>
-                      )}
-                      {analytics.hasPartialCompetition && analytics.partialOverlapMembersWithBalance === 0 && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 leading-relaxed">
-                          ℹ️ {analytics.partialOverlapMembersCount} member{analytics.partialOverlapMembersCount !== 1 ? 's' : ''} with different shift patterns but overlapping working days (no active leave balances).
-                        </p>
-                      )}
-                      <p className="text-sm text-indigo-700 dark:text-indigo-400 leading-relaxed">
-                        Average of <strong>{Math.round(analytics.averageDaysPerMember)}</strong> days per member available.
-                        You can realistically use <strong>{Math.round(analytics.realisticUsableDays ?? 0)}</strong> days.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Warning Cards - Side by Side */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                {/* High Competition Warning */}
-                {analytics.averageDaysPerMember < analytics.remainingLeaveBalance * 0.5 && (
-                  <div className="card border-2 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30">
-                    <div className="p-5">
-                      <div className="flex items-start space-x-3">
-                        <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
-                          <ExclamationTriangleIcon className="h-6 w-6 text-red-700 dark:text-red-400" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-red-900 dark:text-red-300 mb-2">High Demand Alert</p>
-                          <p className="text-sm text-red-700 dark:text-red-400 leading-relaxed">
-                            You have <strong>{Math.round(analytics.remainingLeaveBalance)}</strong> leave days remaining, but on average only <strong>{Math.round(analytics.averageDaysPerMember)}</strong> days per member are available.
-                            Consider coordinating with your team members to avoid conflicts.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Availability Warning */}
-                {analytics.usableDays < analytics.theoreticalWorkingDays && (
-                  <div className="card border-2 border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/30">
-                    <div className="p-5">
-                      <div className="flex items-start space-x-3">
-                        <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0">
-                          <ExclamationTriangleIcon className="h-6 w-6 text-orange-700 dark:text-orange-400" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-orange-900 dark:text-orange-300 mb-2">Concurrent Leave Constraint</p>
-                          <p className="text-sm text-orange-700 dark:text-orange-400 leading-relaxed">
-                            Due to concurrent leave limits, you have <strong>{Math.round(analytics.usableDays ?? 0)}</strong> available days of <strong>{Math.round(analytics.theoreticalWorkingDays)}</strong> remaining working days.
-                            Some days are already booked by other team members.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Year-End Outlook Card - Enhanced */}
-              <Link href="/member/analytics" className="block">
-                <div className={`card ${analytics.willLose > 0 ? 'border-2 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30' : analytics.willCarryover > 0 ? 'border-2 border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/30' : 'border-2 border-gray-300 dark:border-gray-700'} hover:shadow-lg transition-shadow cursor-pointer`}>
-                  <div className="p-5 sm:p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-xl font-bold text-gray-900 dark:text-white">Year-End Outlook</h3>
-                      <svg className="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  
-                  {analytics.allowCarryover ? (
-                    <div>
-                      {/* Current Carryover from Last Year */}
-                      {analytics.carryoverBalance > 0 && (
-                        <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
-                          <div className="flex items-center space-x-3 mb-2">
-                            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
-                              <CalendarIcon className="h-6 w-6 text-blue-700 dark:text-blue-400" />
-                            </div>
-                            <div>
-                              <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">{Math.round(analytics.carryoverBalance)} days</p>
-                              <p className="text-sm text-blue-600 dark:text-blue-400">available from last year</p>
-                            </div>
-                          </div>
-                          {analytics.carryoverExpiryDate && (
-                            <div className="ml-16 mt-2">
-                              <p className="text-xs text-blue-600 dark:text-blue-400">
-                                {(() => {
-                                  const expiryDate = new Date(analytics.carryoverExpiryDate);
-                                  const today = new Date();
-                                  today.setHours(0, 0, 0, 0);
-                                  expiryDate.setHours(0, 0, 0, 0);
-                                  
-                                  if (expiryDate < today) {
-                                    return `Expired on ${expiryDate.toLocaleDateString()}`;
-                                  } else {
-                                    return `Expires on ${expiryDate.toLocaleDateString()}`;
-                                  }
-                                })()}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      
-                      {/* Future Carryover - Will Carry Over to Next Year */}
-                      {analytics.willCarryover > 0 ? (
-                        <div className="flex items-center space-x-3 mb-2">
-                          <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center">
-                            <CheckCircleIcon className="h-6 w-6 text-green-700 dark:text-green-400" />
-                          </div>
-                          <div>
-                            <p className="text-2xl font-bold text-green-700 dark:text-green-400">{Math.round(analytics.willCarryover)} days</p>
-                            <p className="text-sm text-green-600 dark:text-green-400">will carry over to next year</p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center space-x-3 mb-2">
-                          <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center">
-                            <CheckCircleIcon className="h-6 w-6 text-gray-700 dark:text-gray-300" />
-                          </div>
-                          <div>
-                            <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">No days to carry over</p>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">All leave will be used or retained</p>
-                          </div>
-                        </div>
-                      )}
-                      {analytics.willCarryover > 0 ? (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
-                        Your team allows leave carryover. Unused days will be available next year.
-                      </p>
-                      ) : analytics.allowCarryover ? (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
-                          Your team allows leave carryover, but you don&apos;t have any days that will carry over.
-                        </p>
-                      ) : (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
-                          Your team does not allow leave carryover. Unused days will be lost at year end.
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <div>
-                      {analytics.willLose > 0 ? (
-                        <div className="flex items-center space-x-3 mb-2">
-                          <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-xl flex items-center justify-center">
-                            <ExclamationTriangleIcon className="h-6 w-6 text-red-700 dark:text-red-400" />
-                          </div>
-                          <div>
-                            <p className="text-2xl font-bold text-red-700 dark:text-red-400">{Math.round(analytics.willLose)} days</p>
-                            <p className="text-sm text-red-600 dark:text-red-400">will be lost at year end</p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center space-x-3 mb-2">
-                          <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center">
-                            <CheckCircleIcon className="h-6 w-6 text-green-700 dark:text-green-400" />
-                          </div>
-                          <div>
-                            <p className="text-lg font-semibold text-green-700 dark:text-green-400">No days will be lost</p>
-                            <p className="text-sm text-green-600 dark:text-green-400">All remaining leave can be used</p>
-                          </div>
-                        </div>
-                      )}
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
-                        Your team does not allow leave carryover. Unused days will be lost at year end.
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Progress Bar */}
-                  <div className="mt-6">
-                    <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mb-2">
-                      <span>Leave Balance Usage</span>
-                      {(() => {
-                        const baseBalance = analytics.baseLeaveBalance ?? (team?.settings.maxLeavePerYear || 20);
-                        const used = baseBalance - (analytics.remainingLeaveBalance ?? 0);
-                        return (
-                          <span>{Math.round(used)} / {Math.round(baseBalance)} leave days</span>
-                        );
-                      })()}
-                    </div>
-                    <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-3">
-                      {(() => {
-                        const baseBalance = analytics.baseLeaveBalance ?? (team?.settings.maxLeavePerYear || 20);
-                        const used = baseBalance - (analytics.remainingLeaveBalance ?? 0);
-                        const percentage = baseBalance > 0 ? Math.min(100, (used / baseBalance) * 100) : 0;
-                        return (
-                          <div
-                            className="bg-blue-600 dark:bg-blue-500 h-3 rounded-full transition-all duration-300"
-                            style={{ width: `${percentage}%` }}
-                          ></div>
-                        );
-                      })()}
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                      {(() => {
-                        const baseBalance = analytics.baseLeaveBalance ?? (team?.settings.maxLeavePerYear || 20);
-                        const used = baseBalance - (analytics.remainingLeaveBalance ?? 0);
-                        const percentage = baseBalance > 0 ? Math.round((used / baseBalance) * 100) : 0;
-                        return `${percentage}% of leave balance used this year`;
-                      })()}
-                    </p>
-                  </div>
-                  </div>
-                </div>
-              </Link>
-            </>
-            ) : (
-              <div className="card">
-                <div className="p-8 text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-indigo-600 dark:border-t-indigo-400 mx-auto mb-4"></div>
-                  <p className="text-gray-600 dark:text-gray-400">Loading analytics data...</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Recent Requests - Enhanced */}
-          <div className="card">
-            <div className="p-5 sm:p-6">
-              <div className="flex justify-between items-center mb-6">
-                <div>
-                  <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                    My Recent Requests
-                  </h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {myRequests.length} total request{myRequests.length !== 1 ? 's' : ''}
-                  </p>
-                </div>
-                <a
-                  href="/member/requests"
-                  className="btn-primary text-sm py-2 px-4"
-                >
-                  View All →
-                </a>
-              </div>
-              {myRequests.length === 0 ? (
-                <div className="text-center py-12 fade-in">
-                  <div className="flex justify-center mb-4">
-                    <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-                      <DocumentTextIcon className="h-8 w-8 text-gray-600 dark:text-gray-400" />
-                    </div>
-                  </div>
-                  <p className="text-gray-700 dark:text-gray-300 text-lg font-semibold mb-1">No requests yet</p>
-                  <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">Create your first leave request to get started</p>
-                  <a href="/member/requests" className="btn-primary">
-                    Create Your First Request
-                  </a>
-                </div>
-              ) : (
-                <div className="space-y-3 max-h-96 overflow-y-auto pr-2 scrollbar-thin">
-                  {myRequests.slice(0, 5).map((request, index) => (
-                    <div 
-                      key={request._id} 
-                      className="bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-900 dark:to-gray-800/50 rounded-xl p-4 sm:p-5 border border-gray-200 dark:border-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all duration-200 stagger-item"
-                      style={{ animationDelay: `${index * 0.05}s` }}
-                    >
-                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
-                              {request.status}
-                            </span>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-400 mb-2">
-                            <div className="flex items-center gap-1.5">
-                              <CalendarIcon className="h-4 w-4 text-gray-500 dark:text-gray-500" />
-                              <span className="font-medium">
-                                {parseDateSafe(request.startDate).toLocaleDateString()} - {parseDateSafe(request.endDate).toLocaleDateString()}
-                              </span>
-                            </div>
-                          </div>
-                          <p className="text-sm text-gray-700 dark:text-gray-300 font-medium bg-white/50 dark:bg-gray-800/50 px-3 py-1.5 rounded-lg inline-block">
-                            {request.reason}
-                          </p>
-                          {request.decisionNote && (
-                            <p className="text-xs text-indigo-700 dark:text-indigo-300 mt-2">
-                              Decision note: {request.decisionNote}
-                            </p>
-                          )}
-                          {request.decisionAt && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                              Decided on {new Date(request.decisionAt).toLocaleDateString()}
-                              {request.decisionByUsername ? ` by ${request.decisionByUsername}` : ''}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
         </div>
       </div>
     </ProtectedRoute>

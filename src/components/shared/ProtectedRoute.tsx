@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import NotificationPromptBanner from '@/components/shared/NotificationPromptBanner';
+import { clearStoredUser, setStoredUser } from '@/lib/clientUserStorage';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -33,7 +34,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
           if (!userData || !userData.role || !userData.id) {
             // Invalid user data structure, clear it
             console.error('Invalid user data structure:', userData);
-            localStorage.removeItem('user');
+            clearStoredUser();
             router.push('/login');
             setIsLoading(false);
             return;
@@ -57,7 +58,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
           // Validate active session with backend cookie auth.
           const profileResponse = await fetch('/api/users/profile', { credentials: 'include' });
           if (!profileResponse.ok) {
-            localStorage.removeItem('user');
+            clearStoredUser();
             router.push('/login');
             setIsLoading(false);
             return;
@@ -65,7 +66,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
 
           const profileData = await profileResponse.json();
           if (!profileData?.user?.id || !profileData?.user?.role) {
-            localStorage.removeItem('user');
+            clearStoredUser();
             router.push('/login');
             setIsLoading(false);
             return;
@@ -83,17 +84,20 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
             const target = u.role === 'leader' ? '/leader/profile' : '/member/profile';
             if (pathname !== target) {
               router.push(target);
+              setIsLoading(false);
+              return;
             }
+            // On the profile route: allow the page to render so the user can complete their name.
+            setIsAuthenticated(true);
             setIsLoading(false);
-            // Do not set authenticated; we hard-block until profile is updated.
             return;
           }
 
-          localStorage.setItem('user', JSON.stringify(profileData.user));
+          setStoredUser(profileData.user);
           setIsAuthenticated(true);
         } catch (parseError) {
           console.error('Error parsing user data:', parseError);
-          localStorage.removeItem('user');
+          clearStoredUser();
           router.push('/login');
         }
       } catch (error) {

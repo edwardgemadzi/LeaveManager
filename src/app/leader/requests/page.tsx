@@ -496,52 +496,62 @@ export default function LeaderRequestsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black">
-        <Navbar />
-        <div className="flex items-center justify-center h-64 pt-24">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-indigo-600 dark:border-t-indigo-400 mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">Loading requests...</p>
-          </div>
-        </div>
+      <div className="min-h-screen bg-white dark:bg-zinc-950 flex items-center justify-center">
+        <div className="w-5 h-5 border-2 border-zinc-200 dark:border-zinc-700 border-t-indigo-600 rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black">
+    <div className="min-h-screen bg-white dark:bg-zinc-950">
       <Navbar />
       
-      <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12">
-        {/* Header Section - Enhanced */}
-        <div className="mb-8 fade-in">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-            <div>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">Team Requests</h1>
-              <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400">Manage leave requests from your team members</p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <button
-                onClick={() => setShowMigrationForm(!showMigrationForm)}
-                className="btn-primary flex items-center justify-center gap-2 px-4 py-2.5"
-              >
-                Historical Entry
-              </button>
-              <button
-                onClick={() => setShowEmergencyForm(!showEmergencyForm)}
-                className="btn-danger flex items-center justify-center gap-2 px-4 py-2.5"
-              >
-                <ExclamationTriangleIcon className="h-5 w-5" />
-                Emergency Request
-              </button>
-            </div>
+      <div className="w-full px-4 sm:px-6 pt-16 lg:pt-20 lg:pl-24 pb-6 lg:h-[calc(100vh-5rem)] app-page-shell">
+        {/* Page header */}
+        <div className="flex items-center justify-between py-5 border-b border-zinc-200 dark:border-zinc-800 mb-6">
+          <div>
+            <h1 className="app-page-heading text-base font-semibold text-zinc-900 dark:text-zinc-100">Team Requests</h1>
+            <p className="app-page-subheading text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Manage your team&apos;s leave requests</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowMigrationForm(!showMigrationForm)}
+              className="btn-secondary text-sm"
+            >
+              Historical Entry
+            </button>
+            <button
+              onClick={() => setShowEmergencyForm(!showEmergencyForm)}
+              className="btn-danger text-sm flex items-center gap-1.5"
+            >
+              <ExclamationTriangleIcon className="h-4 w-4" />
+              Emergency
+            </button>
           </div>
         </div>
 
-        {/* Historical/Migration Entry Form - Enhanced */}
+        {/* Historical/Migration Entry drawer */}
         {showMigrationForm && (
-          <div className="card mb-8 bg-blue-50/50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-            <div className="p-5 sm:p-6">
+          <div className="fixed inset-0 z-50">
+            <button
+              type="button"
+              onClick={() => setShowMigrationForm(false)}
+              className="absolute inset-0 bg-black/30 dark:bg-black/50"
+              aria-label="Close historical entry drawer"
+            />
+            <div className="absolute inset-y-0 right-0 w-full max-w-2xl bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 shadow-xl">
+              <div className="p-5 sm:p-6 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Historical entry</h2>
+                  <p className="app-page-subheading text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Record leave already taken (migration)</p>
+                </div>
+                <button type="button" onClick={() => setShowMigrationForm(false)} className="btn-secondary text-xs py-1 px-2">
+                  Close
+                </button>
+              </div>
+              <div className="p-5 sm:p-6 overflow-y-auto max-h-[calc(100vh-80px)]">
+                <div className="card bg-blue-50/50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                  <div className="p-5 sm:p-6">
               <div className="flex items-start gap-4 mb-6">
                 <div className="flex-shrink-0">
                   <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/40 rounded-lg flex items-center justify-center">
@@ -563,7 +573,7 @@ export default function LeaderRequestsPage() {
               <form onSubmit={handleMigrationRequest} className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div>
-                    <label htmlFor="migrationMemberId" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="migrationMemberId" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
                       Select Member
                     </label>
                     <select
@@ -583,7 +593,7 @@ export default function LeaderRequestsPage() {
                 </div>
 
                   <div>
-                    <label htmlFor="migrationReason" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="migrationReason" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
                       Reason (applies to all selected periods)
                     </label>
                     <select
@@ -603,7 +613,7 @@ export default function LeaderRequestsPage() {
                   
                     {selectedReasonType === 'other' && (
                       <div className="mt-4">
-                        <label htmlFor="migrationCustomReason" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        <label htmlFor="migrationCustomReason" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
                           Please specify
                         </label>
                         <textarea
@@ -629,7 +639,7 @@ export default function LeaderRequestsPage() {
                   />
                 </div>
 
-                <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6 pt-6 border-t border-gray-200 dark:border-gray-800">
+                <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6 pt-6 border-t border-zinc-200 dark:border-zinc-800">
                   <button
                     type="button"
                     onClick={() => {
@@ -655,14 +665,35 @@ export default function LeaderRequestsPage() {
                   </button>
                 </div>
               </form>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Emergency Request Form - Enhanced */}
+        {/* Emergency request drawer */}
         {showEmergencyForm && (
-          <div className="card mb-8 bg-red-50/50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
-            <div className="p-5 sm:p-6">
+          <div className="fixed inset-0 z-50">
+            <button
+              type="button"
+              onClick={() => setShowEmergencyForm(false)}
+              className="absolute inset-0 bg-black/30 dark:bg-black/50"
+              aria-label="Close emergency request drawer"
+            />
+            <div className="absolute inset-y-0 right-0 w-full max-w-2xl bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 shadow-xl">
+              <div className="p-5 sm:p-6 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Emergency request</h2>
+                  <p className="app-page-subheading text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Bypasses notice and restrictions</p>
+                </div>
+                <button type="button" onClick={() => setShowEmergencyForm(false)} className="btn-secondary text-xs py-1 px-2">
+                  Close
+                </button>
+              </div>
+              <div className="p-5 sm:p-6 overflow-y-auto max-h-[calc(100vh-80px)]">
+                <div className="card bg-red-50/50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
+                  <div className="p-5 sm:p-6">
               <div className="flex items-start gap-4 mb-6">
                 <div className="flex-shrink-0">
                   <div className="w-10 h-10 bg-red-100 dark:bg-red-900/40 rounded-lg flex items-center justify-center">
@@ -682,7 +713,7 @@ export default function LeaderRequestsPage() {
               <form onSubmit={handleEmergencyRequest} className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div>
-                    <label htmlFor="memberId" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="memberId" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
                       Select Member
                     </label>
                     <select
@@ -702,7 +733,7 @@ export default function LeaderRequestsPage() {
                 </div>
 
                   <div>
-                    <label htmlFor="reason" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="reason" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
                       Reason
                     </label>
                     <select
@@ -722,7 +753,7 @@ export default function LeaderRequestsPage() {
                 </div>
 
                   <div>
-                    <label htmlFor="startDate" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="startDate" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
                       Start Date
                     </label>
                     <input
@@ -736,7 +767,7 @@ export default function LeaderRequestsPage() {
                   </div>
 
                   <div>
-                    <label htmlFor="endDate" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="endDate" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
                       End Date
                     </label>
                     <input
@@ -751,7 +782,7 @@ export default function LeaderRequestsPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="password" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  <label htmlFor="password" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
                     Your Password (for authentication)
                   </label>
                   <input
@@ -765,7 +796,7 @@ export default function LeaderRequestsPage() {
                   />
                 </div>
 
-                <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-gray-200 dark:border-gray-800">
+                <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-zinc-200 dark:border-zinc-800">
                   <button
                     type="button"
                     onClick={() => setShowEmergencyForm(false)}
@@ -782,14 +813,17 @@ export default function LeaderRequestsPage() {
                   </button>
                 </div>
               </form>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
         {/* Filter Tabs - Enhanced */}
-        <div className="card mb-8">
+        <div className="card mb-5">
           <div className="p-5 sm:p-6">
-            <div className="border-b border-gray-200 dark:border-gray-800 mb-4">
+            <div className="border-b border-zinc-200 dark:border-zinc-800 mb-4">
               <nav className="-mb-px flex flex-wrap gap-4 sm:gap-8">
                 {[
                   { key: 'all', label: 'All Requests' },
@@ -834,7 +868,7 @@ export default function LeaderRequestsPage() {
               <button type="button" onClick={() => runBulkAction('reject')} className="btn-danger px-3 py-2 text-sm">
                 Bulk Reject
               </button>
-              <span className="text-sm text-gray-600 dark:text-gray-400">
+              <span className="text-sm text-zinc-600 dark:text-zinc-400">
                 {selectedRequestIds.length} selected
               </span>
             </div>
@@ -850,7 +884,7 @@ export default function LeaderRequestsPage() {
                   <svg className="h-16 w-16 text-gray-400 dark:text-gray-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  <p className="text-base font-medium text-gray-500 dark:text-gray-400">No requests found</p>
+                  <p className="text-base font-medium text-zinc-500 dark:text-zinc-400">No requests found</p>
                 </div>
               </div>
             ) : (
@@ -858,7 +892,7 @@ export default function LeaderRequestsPage() {
                 {pagedRequests.map((request) => {
                   const member = members.find(m => m._id === request.userId);
                   return (
-                    <div key={request._id} className="bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-900 dark:to-gray-800/50 rounded-xl p-5 sm:p-6 border border-gray-200 dark:border-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all duration-200 stagger-item">
+                    <div key={request._id} className="bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-900 dark:to-gray-800/50 rounded-xl p-5 sm:p-6 border border-zinc-200 dark:border-zinc-800 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all duration-200 stagger-item">
                       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center flex-wrap gap-3 mb-3">
@@ -870,22 +904,22 @@ export default function LeaderRequestsPage() {
                                 className="h-4 w-4"
                               />
                             )}
-                            <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+                            <h4 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
                               {member?.fullName || member?.username || 'Unknown User'}
                             </h4>
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${getStatusColor(request.status)}`}>
                               {request.status}
                             </span>
                             {request.deletedAt && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-200 dark:bg-gray-700 text-zinc-700 dark:text-zinc-300">
                                 deleted
                               </span>
                             )}
                           </div>
-                          <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
+                          <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400 mb-2">
                             {parseDateSafe(request.startDate).toLocaleDateString()} - {parseDateSafe(request.endDate).toLocaleDateString()}
                           </p>
-                          <p className="text-base text-gray-700 dark:text-gray-300 mb-3">{request.reason}</p>
+                          <p className="text-base text-zinc-700 dark:text-zinc-300 mb-3">{request.reason}</p>
                           {request.status === 'pending' && (
                             <div className="flex flex-wrap items-center gap-2 mb-2">
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300">
@@ -902,11 +936,11 @@ export default function LeaderRequestsPage() {
                             </p>
                           )}
                           <div className="flex items-center flex-wrap gap-2">
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400">
                               Requested on {new Date(request.createdAt).toLocaleDateString()}
                             </p>
                             {request.decisionAt && (
-                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                              <p className="text-xs text-zinc-500 dark:text-zinc-400">
                                 Decided on {new Date(request.decisionAt).toLocaleDateString()}
                                 {request.decisionByUsername ? ` by ${request.decisionByUsername}` : ''}
                               </p>
@@ -989,7 +1023,7 @@ export default function LeaderRequestsPage() {
                     <button
                       type="button"
                       onClick={() => setVisibleCount(prev => prev + 50)}
-                      className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-900"
+                      className="px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-900"
                     >
                       Load more
                     </button>

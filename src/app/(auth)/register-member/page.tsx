@@ -7,6 +7,7 @@ import { SunIcon, MoonIcon } from '@heroicons/react/24/outline';
 import { useTheme } from '@/contexts/ThemeContext';
 import ShiftScheduleBuilder from '@/components/ShiftScheduleBuilder';
 import { ShiftSchedule } from '@/types';
+import { setStoredUser } from '@/lib/clientUserStorage';
 
 export default function RegisterMemberPage() {
   const [formData, setFormData] = useState({
@@ -61,7 +62,7 @@ export default function RegisterMemberPage() {
       const data = await response.json();
 
       if (response.ok) {
-        localStorage.setItem('user', JSON.stringify(data.user));
+        setStoredUser(data.user);
         router.push('/member/dashboard');
       } else {
         setError(data.error || 'Registration failed');
@@ -74,189 +75,102 @@ export default function RegisterMemberPage() {
     }
   };
 
+  const inputCls = 'input-modern';
+  const labelCls = 'block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1.5';
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-black py-12 px-4 sm:px-6 lg:px-8">
-      <div className="absolute top-4 right-4">
-        <button
-          onClick={toggleTheme}
-          className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors duration-200"
-          aria-label="Toggle dark mode"
-          title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-        >
-          {theme === 'light' ? (
-            <MoonIcon className="h-5 w-5" />
-          ) : (
-            <SunIcon className="h-5 w-5" />
-          )}
-        </button>
-      </div>
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
-            Join a team
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center px-4 py-12">
+      <button
+        onClick={toggleTheme}
+        className="fixed top-4 right-4 p-2 rounded-lg text-zinc-400 dark:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors z-10"
+        aria-label="Toggle dark mode"
+      >
+        {theme === 'light' ? <MoonIcon className="h-4 w-4" /> : <SunIcon className="h-4 w-4" />}
+      </button>
+
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Join a team</h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
             Already have an account?{' '}
-            <Link href="/login" className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300">
-              Sign in
-            </Link>
+            <Link href="/login" className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">Sign in</Link>
           </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="space-y-4">
+
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm">
+          <form className="space-y-4" onSubmit={handleSubmit}>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Name
-              </label>
-              <div className="mt-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <input
-                  name="firstName"
-                  type="text"
-                  required
-                  className="appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
-                  placeholder="First"
+              <label className={labelCls}>Full Name</label>
+              <div className="grid grid-cols-3 gap-2">
+                <input name="firstName" type="text" required className={inputCls} placeholder="First"
                   value={formData.firstName}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    const capitalizedValue = value.replace(/\b\w/g, (l) => l.toUpperCase());
-                    setFormData({ ...formData, firstName: capitalizedValue });
-                  }}
-                />
-                <input
-                  name="middleName"
-                  type="text"
-                  className="appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
-                  placeholder="Middle (optional)"
+                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value.replace(/\b\w/g, l => l.toUpperCase()) })} />
+                <input name="middleName" type="text" className={inputCls} placeholder="Middle"
                   value={formData.middleName}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    const capitalizedValue = value.replace(/\b\w/g, (l) => l.toUpperCase());
-                    setFormData({ ...formData, middleName: capitalizedValue });
-                  }}
-                />
-                <input
-                  name="lastName"
-                  type="text"
-                  required
-                  className="appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
-                  placeholder="Last"
+                  onChange={(e) => setFormData({ ...formData, middleName: e.target.value.replace(/\b\w/g, l => l.toUpperCase()) })} />
+                <input name="lastName" type="text" required className={inputCls} placeholder="Last"
                   value={formData.lastName}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    const capitalizedValue = value.replace(/\b\w/g, (l) => l.toUpperCase());
-                    setFormData({ ...formData, lastName: capitalizedValue });
-                  }}
-                />
+                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value.replace(/\b\w/g, l => l.toUpperCase()) })} />
               </div>
             </div>
 
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Username
-              </label>
-              <input
-                id="username"
-                name="username"
-                type="text"
-                required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
-                placeholder="Your username"
+              <label htmlFor="username" className={labelCls}>Username</label>
+              <input id="username" name="username" type="text" required className={inputCls} placeholder="your username"
                 value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase() })}
-              />
+                onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase() })} />
             </div>
 
             <div>
-              <label htmlFor="teamUsername" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Team Username
-              </label>
-              <input
-                id="teamUsername"
-                name="teamUsername"
-                type="text"
-                required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
-                placeholder="Team identifier"
+              <label htmlFor="teamUsername" className={labelCls}>Team Username</label>
+              <input id="teamUsername" name="teamUsername" type="text" required className={inputCls} placeholder="your-team-id"
                 value={formData.teamUsername}
-                onChange={(e) => setFormData({ ...formData, teamUsername: e.target.value })}
-              />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Get this from your team leader
-              </p>
+                onChange={(e) => setFormData({ ...formData, teamUsername: e.target.value })} />
+              <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">Get this from your team leader</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="password" className={labelCls}>Password</label>
+                <input id="password" name="password" type="password" required className={inputCls} placeholder="••••••••"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
+              </div>
+              <div>
+                <label htmlFor="confirmPassword" className={labelCls}>Confirm</label>
+                <input id="confirmPassword" name="confirmPassword" type="password" required className={inputCls} placeholder="••••••••"
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })} />
+              </div>
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
-                placeholder="Password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Confirm Password
-              </label>
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
-                placeholder="Confirm password"
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="maternityPaternityType" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Maternity/Paternity Leave (Optional)
-              </label>
-              <select
-                id="maternityPaternityType"
-                name="maternityPaternityType"
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
+              <label htmlFor="maternityPaternityType" className={labelCls}>Maternity / Paternity Leave</label>
+              <select id="maternityPaternityType" name="maternityPaternityType" className={inputCls}
                 value={formData.maternityPaternityType}
-                onChange={(e) => setFormData({ ...formData, maternityPaternityType: e.target.value as '' | 'maternity' | 'paternity' })}
-              >
-                <option value="">None</option>
-                <option value="maternity">🤱 Maternity Leave</option>
-                <option value="paternity">👨‍👩‍👧 Paternity Leave</option>
+                onChange={(e) => setFormData({ ...formData, maternityPaternityType: e.target.value as '' | 'maternity' | 'paternity' })}>
+                <option value="">Not applicable</option>
+                <option value="maternity">Maternity Leave</option>
+                <option value="paternity">Paternity Leave</option>
               </select>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Select if you are eligible for maternity or paternity leave
-              </p>
             </div>
 
-            <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Shift Schedule</h3>
+            <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4">
+              <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-3">Shift Schedule</p>
               <ShiftScheduleBuilder onScheduleChange={setShiftSchedule} />
             </div>
-          </div>
 
-          {error && (
-            <div className="text-red-600 dark:text-red-400 text-sm text-center bg-red-50 dark:bg-red-900/30 p-3 rounded-md border border-red-200 dark:border-red-800">{error}</div>
-          )}
+            {error && (
+              <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">{error}</p>
+            )}
 
-          <div>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-900 disabled:opacity-50"
-            >
-              {isLoading ? 'Joining team...' : 'Join team'}
+            <button type="submit" disabled={isLoading} className="btn-primary w-full justify-center py-2.5 mt-2">
+              {isLoading ? (
+                <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Joining team…</>
+              ) : 'Join team'}
             </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
     </div>
   );

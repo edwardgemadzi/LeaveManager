@@ -3,13 +3,15 @@
  * Automatically redirects to login on 401 responses
  */
 
+import { clearStoredUser } from '@/lib/clientUserStorage';
+
 /**
  * Handle API response - redirects to login on 401
  * Call this after checking response.ok or response.status
  */
 export function handleApiResponse(response: Response): void {
   if (response.status === 401) {
-    localStorage.removeItem('user');
+    clearStoredUser();
     
     // Redirect to login
     if (typeof window !== 'undefined') {
@@ -24,7 +26,7 @@ export function handleApiResponse(response: Response): void {
  */
 export function handleUnauthorized(response: Response): boolean {
   if (response.status === 401) {
-    localStorage.removeItem('user');
+    clearStoredUser();
     if (typeof window !== 'undefined') {
       window.location.href = '/login';
     }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import Link from 'next/link';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { Team, LeaveRequest, User } from '@/types';
@@ -213,31 +214,25 @@ export default function LeaderAnalyticsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black">
-        <Navbar />
-        <div className="flex items-center justify-center h-64 pt-24">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-indigo-600 dark:border-t-indigo-400 mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">Loading analytics...</p>
-          </div>
-        </div>
+      <div className="min-h-screen bg-white dark:bg-zinc-950 flex items-center justify-center">
+        <div className="w-5 h-5 border-2 border-zinc-200 dark:border-zinc-700 border-t-indigo-600 rounded-full animate-spin" />
       </div>
     );
   }
 
   if (!analytics || !team) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black">
+      <div className="min-h-screen bg-white dark:bg-zinc-950">
         <Navbar />
         <div className="flex items-center justify-center h-64 pt-24">
           <div className="text-center">
-            <p className="text-gray-600 dark:text-gray-400 text-lg mb-2">No analytics data available</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-zinc-600 dark:text-zinc-400 text-lg mb-2">No analytics data available</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
               {!analytics ? 'Analytics data not loaded' : ''}
               {!team ? 'Team data not loaded' : ''}
             </p>
             {analytics && analytics.groups && analytics.groups.length === 0 && (
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2">
                 No members found. Add team members to see analytics.
               </p>
             )}
@@ -273,12 +268,12 @@ export default function LeaderAnalyticsPage() {
   // Check if analytics has required data
   if (!analytics.aggregate || !analytics.groups) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black">
+      <div className="min-h-screen bg-white dark:bg-zinc-950">
         <Navbar />
         <div className="flex items-center justify-center h-64 pt-24">
           <div className="text-center">
-            <p className="text-gray-600 dark:text-gray-400 text-lg mb-2">Analytics data structure is invalid</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Please check the console for details</p>
+            <p className="text-zinc-600 dark:text-zinc-400 text-lg mb-2">Analytics data structure is invalid</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Please check the console for details</p>
           </div>
         </div>
       </div>
@@ -317,56 +312,95 @@ export default function LeaderAnalyticsPage() {
 
   return (
     <ProtectedRoute requiredRole="leader">
-      <div className="min-h-screen bg-gray-50 dark:bg-black">
+      <div className="min-h-screen bg-white dark:bg-zinc-950">
         <Navbar />
         
-        <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12">
-          {/* Header Section - Enhanced */}
-          <div className="mb-8 fade-in">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-              <div>
-                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">Team Analytics</h1>
-            <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400 mb-2">
-                  Comprehensive analytics and projections for {selectedYear}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <label htmlFor="year-select-leader" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Year:
-                </label>
-                <select
-                  id="year-select-leader"
-                  value={selectedYear}
-                  onChange={(e) => {
-                    const year = parseInt(e.target.value);
-                    setSelectedYear(year);
-                  }}
-                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  {Array.from({ length: 5 }, (_, i) => {
-                    const year = new Date().getFullYear() - i;
-                    return (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
+        <div className="w-full px-4 sm:px-6 pt-16 lg:pt-20 lg:pl-24 pb-6 lg:h-[calc(100vh-5rem)] app-page-shell">
+          {/* Page header */}
+          <div className="flex items-center justify-between py-5 border-b border-zinc-200 dark:border-zinc-800 mb-6">
+            <div>
+              <h1 className="app-page-heading text-base font-semibold text-zinc-900 dark:text-zinc-100">Team Analytics</h1>
+              <p className="app-page-subheading text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
+                {daysElapsed} days elapsed &middot; {daysRemaining} remaining in {selectedYear}
+              </p>
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-500">
-              {daysElapsed} days elapsed, {daysRemaining} days remaining in the year
-            </p>
+            <select
+              id="year-select-leader"
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              className="input-modern py-1.5 text-sm w-auto"
+            >
+              {Array.from({ length: 5 }, (_, i) => {
+                const year = new Date().getFullYear() - i;
+                return <option key={year} value={year}>{year}</option>;
+              })}
+            </select>
           </div>
 
-          {/* Year Summary Cards - Enhanced */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 mb-8">
+          {/* Editorial summary */}
+          {(() => {
+            const data = leaveFrequencyData.slice(0, 12);
+            const max = Math.max(1, ...data.map((d) => d.workingDaysUsed || 0));
+            const label = periodType === 'month' ? 'Monthly usage' : periodType === 'week' ? 'Weekly usage' : 'Usage';
+            return (
+              <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden mb-6">
+                <div className="p-5 sm:p-6 border-b border-zinc-200/70 dark:border-zinc-800/70 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Usage over time</p>
+                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mt-1">{label}</p>
+                  </div>
+                  <Link href="/leader/requests" className="btn-secondary text-xs py-1 px-2">
+                    Review requests
+                  </Link>
+                </div>
+                <div className="p-5 sm:p-6">
+                  {data.length === 0 ? (
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">No approved leave found for this year.</p>
+                  ) : (
+                    <div className="grid grid-cols-12 gap-2 items-end h-32">
+                      {data.map((d) => {
+                        const v = d.workingDaysUsed || 0;
+                        const h = Math.round((v / max) * 96);
+                        const short = (() => {
+                          if (periodType === 'month') {
+                            // periodKey: YYYY-MM
+                            const mm = Number(d.periodKey.split('-')[1]);
+                            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                            return months[(mm || 1) - 1] || d.period;
+                          }
+                          if (periodType === 'week') {
+                            // periodKey: YYYY-W## (or similar)
+                            const parts = d.periodKey.split('-');
+                            const wk = parts.find((p) => p.startsWith('W'));
+                            return wk || d.period;
+                          }
+                          return d.period;
+                        })();
+                        return (
+                          <div key={d.periodKey} className="col-span-1 flex flex-col items-center justify-end gap-2">
+                            <div className="w-full rounded-md bg-zinc-100 dark:bg-zinc-800 overflow-hidden h-24 flex items-end">
+                              <div className="w-full bg-indigo-600/80 dark:bg-indigo-500/70" style={{ height: `${h}px` }} />
+                            </div>
+                            <div className="text-[10px] text-zinc-500 dark:text-zinc-400">{short}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Detailed team analytics — scrollable below the chart */}
+          <div className="lg:overflow-auto lg:max-h-[calc(100vh-496px)] mt-4">
+              <div className="grid grid-cols-1 gap-5">
             <div className="stat-card group">
               <div className="p-5 sm:p-6">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Total Members</p>
-                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
+                    <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">Total Members</p>
+                    <p className="text-3xl sm:text-4xl font-bold text-zinc-900 dark:text-zinc-100 mb-1 fade-in">
                       {totalMembers}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Team members</p>
@@ -384,8 +418,8 @@ export default function LeaderAnalyticsPage() {
               <div className="p-5 sm:p-6">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Total Remaining</p>
-                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
+                    <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">Total Remaining</p>
+                    <p className="text-3xl sm:text-4xl font-bold text-zinc-900 dark:text-zinc-100 mb-1 fade-in">
                       {Math.round(totalRemainingBalance)}
                       {totalSurplus > 0 && (
                         <span className="ml-2 text-lg sm:text-xl text-green-600 dark:text-green-400">
@@ -415,8 +449,8 @@ export default function LeaderAnalyticsPage() {
               <div className="p-5 sm:p-6">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Realistic Days</p>
-                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
+                    <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">Realistic Days</p>
+                    <p className="text-3xl sm:text-4xl font-bold text-zinc-900 dark:text-zinc-100 mb-1 fade-in">
                       {Math.round(totalRealisticUsableDays)}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
@@ -441,8 +475,8 @@ export default function LeaderAnalyticsPage() {
               <div className="p-5 sm:p-6">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
-                    <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Avg Balance</p>
-                    <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-1 fade-in">
+                    <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">Avg Balance</p>
+                    <p className="text-3xl sm:text-4xl font-bold text-zinc-900 dark:text-zinc-100 mb-1 fade-in">
                       {Math.round(avgRemainingBalance)}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Average remaining</p>
@@ -455,12 +489,12 @@ export default function LeaderAnalyticsPage() {
                 </div>
               </div>
             </div>
-          </div>
+              </div>
 
           {/* End of Year Projections - Enhanced */}
-          <div className="card mb-8">
+          <div className="card mb-5">
             <div className="p-5 sm:p-6">
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-6">End of Year Projections</h2>
+              <h2 className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-6">End of Year Projections</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                 <div className="bg-blue-50/50 dark:bg-blue-900/20 rounded-xl p-5 border border-blue-200 dark:border-blue-800">
                   <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wider mb-2">Projected Usage</p>
@@ -501,14 +535,14 @@ export default function LeaderAnalyticsPage() {
                   </div>
                 )}
 
-                <div className="bg-gray-50/50 dark:bg-gray-900/50 rounded-xl p-5 border border-gray-200 dark:border-gray-800">
-                  <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-2">Utilization Rate</p>
-                  <p className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white mb-2">
+                <div className="bg-gray-50/50 dark:bg-gray-900/50 rounded-xl p-5 border border-zinc-200 dark:border-zinc-800">
+                  <p className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2">Utilization Rate</p>
+                  <p className="text-3xl sm:text-4xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">
                     {totalRemainingBalance > 0 
                       ? Math.round((projectionUsage / totalRemainingBalance) * 100)
                       : 0}%
                   </p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                  <p className="text-xs text-zinc-600 dark:text-zinc-400">
                     % of remaining balance that will be used
                   </p>
                 </div>
@@ -517,12 +551,12 @@ export default function LeaderAnalyticsPage() {
           </div>
 
           {/* Leave Frequency Chart */}
-          <div className="card mb-8">
+          <div className="card mb-5">
             <div className="p-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">Leave Frequency by Period</h2>
+                    <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Leave Frequency by Period</h2>
                     <button
                       type="button"
                       onClick={() => setShowFrequencyInfo(!showFrequencyInfo)}
@@ -532,7 +566,7 @@ export default function LeaderAnalyticsPage() {
                       <InformationCircleIcon className="h-5 w-5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 cursor-pointer" />
                     </button>
                   </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                  <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-1">
                     See which periods are mostly free for planning
                   </p>
                   {showFrequencyInfo && (
@@ -544,11 +578,11 @@ export default function LeaderAnalyticsPage() {
                 <div className="flex flex-wrap items-center gap-3">
                   {team?.settings.enableSubgrouping && subgroups.length > 0 && (
                     <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Filter by Subgroup:</label>
+                      <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 whitespace-nowrap">Filter by Subgroup:</label>
                       <select
                         value={frequencySubgroup}
                         onChange={(e) => setFrequencySubgroup(e.target.value)}
-                        className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
+                        className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-zinc-300 dark:border-zinc-700 rounded-md"
                       >
                         <option value="all">All Subgroups</option>
                         {subgroups.map(subgroup => (
@@ -560,11 +594,11 @@ export default function LeaderAnalyticsPage() {
                   )}
                   {workingDaysPatterns.length > 0 && (
                     <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Filter by Working Days:</label>
+                      <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 whitespace-nowrap">Filter by Working Days:</label>
                       <select
                         value={frequencyWorkingDays}
                         onChange={(e) => setFrequencyWorkingDays(e.target.value)}
-                        className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
+                        className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-zinc-300 dark:border-zinc-700 rounded-md"
                       >
                         <option value="all">All Patterns</option>
                         {workingDaysPatterns.map(([tag, displayName]) => (
@@ -574,11 +608,11 @@ export default function LeaderAnalyticsPage() {
                     </div>
                   )}
                   <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Year:</label>
+                    <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 whitespace-nowrap">Year:</label>
                     <select
                       value={frequencyYear}
                       onChange={(e) => setFrequencyYear(parseInt(e.target.value))}
-                      className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
+                      className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-zinc-300 dark:border-zinc-700 rounded-md"
                     >
                       {availableYears.map(year => (
                         <option key={year} value={year}>{year}</option>
@@ -591,7 +625,7 @@ export default function LeaderAnalyticsPage() {
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                         periodType === 'month'
                           ? 'bg-indigo-600 text-white'
-                          : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                          : 'bg-gray-200 dark:bg-gray-700 text-zinc-700 dark:text-zinc-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                       }`}
                     >
                       Month
@@ -601,7 +635,7 @@ export default function LeaderAnalyticsPage() {
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                         periodType === 'week'
                           ? 'bg-indigo-600 text-white'
-                          : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                          : 'bg-gray-200 dark:bg-gray-700 text-zinc-700 dark:text-zinc-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                       }`}
                     >
                       Week
@@ -614,7 +648,7 @@ export default function LeaderAnalyticsPage() {
                 if (loading) {
                   return (
                     <div className="text-center py-12">
-                      <p className="text-gray-500 dark:text-gray-400">Loading data...</p>
+                      <p className="text-zinc-500 dark:text-zinc-400">Loading data...</p>
                     </div>
                   );
                 }
@@ -622,7 +656,7 @@ export default function LeaderAnalyticsPage() {
                 if (members.length === 0) {
                   return (
                     <div className="text-center py-12">
-                      <p className="text-gray-500 dark:text-gray-400">No member data available</p>
+                      <p className="text-zinc-500 dark:text-zinc-400">No member data available</p>
                     </div>
                   );
                 }
@@ -630,7 +664,7 @@ export default function LeaderAnalyticsPage() {
                 if (allRequests.length === 0) {
                   return (
                     <div className="text-center py-12">
-                      <p className="text-gray-500 dark:text-gray-400">No leave requests to display</p>
+                      <p className="text-zinc-500 dark:text-zinc-400">No leave requests to display</p>
                     </div>
                   );
                 }
@@ -639,7 +673,7 @@ export default function LeaderAnalyticsPage() {
                   return (
                     <div className="text-center py-12">
                       <ChartBarIcon className="h-12 w-12 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
-                      <p className="text-gray-500 dark:text-gray-400">
+                      <p className="text-zinc-500 dark:text-zinc-400">
                         {frequencySubgroup !== 'all' || frequencyWorkingDays !== 'all'
                           ? 'No members found matching the selected filters'
                           : 'No members found'}
@@ -652,7 +686,7 @@ export default function LeaderAnalyticsPage() {
                   return (
                     <div className="text-center py-12">
                       <ChartBarIcon className="h-12 w-12 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
-                      <p className="text-gray-500 dark:text-gray-400">
+                      <p className="text-zinc-500 dark:text-zinc-400">
                         {frequencySubgroup !== 'all' || frequencyWorkingDays !== 'all'
                           ? 'No approved leave requests to display for selected filters'
                           : 'No approved leave requests to display'}
@@ -665,7 +699,7 @@ export default function LeaderAnalyticsPage() {
                   return (
                     <div className="text-center py-12">
                       <ChartBarIcon className="h-12 w-12 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
-                      <p className="text-gray-500 dark:text-gray-400">No leave frequency data available</p>
+                      <p className="text-zinc-500 dark:text-zinc-400">No leave frequency data available</p>
                       <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
                         Members: {members.length}, Approved requests: {approvedRequestsForFrequency.length}
                       </p>
@@ -687,14 +721,14 @@ export default function LeaderAnalyticsPage() {
                         <div key={data.periodKey} className="flex items-center gap-4">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
-                              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
                                 {data.period}
                               </p>
                               <div className="flex items-center gap-3 ml-2">
-                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                <span className="text-xs text-zinc-500 dark:text-zinc-400">
                                   {data.requestCount} request{data.requestCount !== 1 ? 's' : ''}
                                 </span>
-                                <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
                                   {data.workingDaysUsed} days
                                 </span>
                               </div>
@@ -722,17 +756,17 @@ export default function LeaderAnalyticsPage() {
           </div>
 
           {/* Filters - Enhanced */}
-          <div className="card mb-8">
+          <div className="card mb-5">
             <div className="p-5 sm:p-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               {/* Subgroup Filter */}
                 {team.settings.enableSubgrouping && subgroups.length > 0 && (
                   <div className="flex items-center gap-4">
-                    <label className="text-sm font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">Filter by Subgroup:</label>
+                    <label className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 whitespace-nowrap">Filter by Subgroup:</label>
                     <select
                       value={selectedSubgroup}
                       onChange={(e) => setSelectedSubgroup(e.target.value)}
-                      className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:w-auto sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md"
+                      className="px-3 py-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 block w-full sm:w-auto sm:text-sm text-gray-900 dark:text-gray-200 bg-white dark:bg-gray-900 border border-zinc-300 dark:border-zinc-700 rounded-md"
                     >
                       <option value="all">All Subgroups</option>
                       {subgroups.map(subgroup => (
@@ -748,14 +782,14 @@ export default function LeaderAnalyticsPage() {
 
           {/* Grouped Analytics - Enhanced */}
           <div className="space-y-8 mb-8">
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white">Grouped Analytics</h2>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-zinc-900 dark:text-zinc-100">Grouped Analytics</h2>
             
             {!analytics.groups || filteredGroups.length === 0 ? (
               <div className="card">
                 <div className="p-12 text-center">
                   <div className="flex flex-col items-center justify-center">
                     <ChartBarIcon className="h-16 w-16 text-gray-400 dark:text-gray-600 mb-4" />
-                    <p className="text-base font-medium text-gray-500 dark:text-gray-400 mb-2">No analytics data available</p>
+                    <p className="text-base font-medium text-zinc-500 dark:text-zinc-400 mb-2">No analytics data available</p>
                     {analytics.groups && analytics.groups.length === 0 && (
                       <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
                         No members found. Add team members to see analytics.
@@ -778,12 +812,12 @@ export default function LeaderAnalyticsPage() {
                   <div key={group.groupKey || index} className="card stagger-item">
                     <div className="p-5 sm:p-6">
                       <div className="mb-6">
-                        <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                        <h3 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">
                         {team.settings.enableSubgrouping && group.subgroupTag ? (
                           <>
                             Subgroup: <span className="text-indigo-600 dark:text-indigo-400">{group.subgroupTag}</span>
                             {group.shiftTag && (
-                              <> • <span className="text-gray-600 dark:text-gray-400">{group.shiftTag} Shift</span></>
+                              <> • <span className="text-zinc-600 dark:text-zinc-400">{group.shiftTag} Shift</span></>
                             )}
                           </>
                         ) : (
@@ -792,7 +826,7 @@ export default function LeaderAnalyticsPage() {
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 ml-2">
                               {getWorkingDaysGroupDisplayName(group.workingDaysTag, team?.settings)}
                               {team?.settings?.workingDaysGroupNames?.[group.workingDaysTag] && (
-                                <span className="ml-1 text-gray-500 dark:text-gray-400 font-mono text-[10px]">
+                                <span className="ml-1 text-zinc-500 dark:text-zinc-400 font-mono text-[10px]">
                                   ({group.workingDaysTag})
                                 </span>
                               )}
@@ -800,7 +834,7 @@ export default function LeaderAnalyticsPage() {
                           </>
                         )}
                       </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
                           {groupMembers.length} member{groupMembers.length !== 1 ? 's' : ''} in this group
                         </p>
                       </div>
@@ -811,18 +845,18 @@ export default function LeaderAnalyticsPage() {
                         const groupMembersWithSurplus = groupMembers.filter(m => m.analytics.surplusBalance > 0).length;
                         return (
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6">
-                            <div className="bg-gray-50/50 dark:bg-gray-900/50 rounded-xl p-4 border border-gray-200 dark:border-gray-800">
-                              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Remaining Balance</p>
-                            <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">
+                            <div className="bg-gray-50/50 dark:bg-gray-900/50 rounded-xl p-4 border border-zinc-200 dark:border-zinc-800">
+                              <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">Remaining Balance</p>
+                            <p className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
                               {Math.round(group.aggregate.groupTotalLeaveBalance)}
-                              <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">(remaining)</span>
+                              <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-400">(remaining)</span>
                               {groupSurplus > 0 && (
                                 <span className="ml-2 text-sm text-green-600 dark:text-green-400">
                                   (+{Math.round(groupSurplus)})
                                 </span>
                               )}
                             </p>
-                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                            <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
                               Avg: {Math.round(group.aggregate.groupAverageLeaveBalance)} (remaining)
                             </p>
                             {groupSurplus > 0 && (
@@ -832,12 +866,12 @@ export default function LeaderAnalyticsPage() {
                             )}
                       </div>
 
-                            <div className="bg-gray-50/50 dark:bg-gray-900/50 rounded-xl p-4 border border-gray-200 dark:border-gray-800">
-                              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Realistic Days</p>
-                        <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">
+                            <div className="bg-gray-50/50 dark:bg-gray-900/50 rounded-xl p-4 border border-zinc-200 dark:border-zinc-800">
+                              <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">Realistic Days</p>
+                        <p className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
                           {Math.round(group.aggregate.groupTotalRealisticUsableDays)}
                         </p>
-                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                            <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
                               Avg: {Math.round(group.aggregate.groupAverageRealisticUsableDays)}
                             </p>
                             {group.aggregate.groupTotalRemainderDays > 0 && (
@@ -847,19 +881,19 @@ export default function LeaderAnalyticsPage() {
                             )}
                       </div>
 
-                            <div className="bg-gray-50/50 dark:bg-gray-900/50 rounded-xl p-4 border border-gray-200 dark:border-gray-800">
-                              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1">Available Days</p>
-                        <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">
+                            <div className="bg-gray-50/50 dark:bg-gray-900/50 rounded-xl p-4 border border-zinc-200 dark:border-zinc-800">
+                              <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1">Available Days</p>
+                        <p className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
                           {Math.round(group.aggregate.groupTotalUsableDays)}
                         </p>
-                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                            <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
                               Avg: {Math.round(group.aggregate.groupAverageUsableDays)}
                         </p>
                       </div>
 
-                            <div className="bg-gray-50/50 dark:bg-gray-900/50 rounded-xl p-4 border border-gray-200 dark:border-gray-800">
+                            <div className="bg-gray-50/50 dark:bg-gray-900/50 rounded-xl p-4 border border-zinc-200 dark:border-zinc-800">
                               <div className="flex items-center gap-2 mb-1">
-                                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Competition Level</p>
+                                <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Competition Level</p>
                                 {(() => {
                                   const hasPartialCompetition = groupMembers.some(m => m.analytics.hasPartialCompetition);
                                   const partialOverlapWithBalance = groupMembers.reduce((sum, m) => 
@@ -871,7 +905,7 @@ export default function LeaderAnalyticsPage() {
                                       <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
                                         partialOverlapWithBalance > 0
                                           ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
-                                          : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                                          : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
                                       }`}>
                                         {partialOverlapWithBalance > 0 ? '⚠️' : 'ℹ️'} {groupMembers.reduce((sum, m) => sum + (m.analytics.partialOverlapMembersCount || 0), 0)}
                                       </span>
@@ -880,10 +914,10 @@ export default function LeaderAnalyticsPage() {
                                   return null;
                                 })()}
                               </div>
-                            <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">
+                            <p className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mt-1">
                           {groupMembers.length} members
                         </p>
-                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                            <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
                           {group.aggregate.groupAverageRealisticUsableDays} days/member
                         </p>
                       </div>
@@ -892,33 +926,33 @@ export default function LeaderAnalyticsPage() {
                       })()}
 
                       {/* Group Members Detail */}
-                      <div className="border-t border-gray-200 dark:border-gray-800 pt-6 mt-6">
-                        <h4 className="text-base font-semibold text-gray-700 dark:text-gray-300 mb-4">Member Details</h4>
+                      <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6 mt-6">
+                        <h4 className="text-base font-semibold text-zinc-700 dark:text-zinc-300 mb-4">Member Details</h4>
                         <div className="space-y-3">
                           {groupMembers.map((member) => (
-                            <div key={member.userId} className="flex items-center justify-between bg-gray-50/50 dark:bg-gray-900/50 rounded-xl p-4 border border-gray-200 dark:border-gray-800">
+                            <div key={member.userId} className="flex items-center justify-between bg-gray-50/50 dark:bg-gray-900/50 rounded-xl p-4 border border-zinc-200 dark:border-zinc-800">
                               <div className="flex-1">
                                 <div className="flex items-center gap-2">
-                                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                                     {member.fullName || member.username}
                                   </p>
                                   {member.analytics.hasPartialCompetition && (
                                     <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
                                       (member.analytics.partialOverlapMembersWithBalance || 0) > 0
                                         ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
-                                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
                                     }`}>
                                       {(member.analytics.partialOverlapMembersWithBalance || 0) > 0 ? '⚠️' : 'ℹ️'} {member.analytics.partialOverlapMembersCount || 0}
                                     </span>
                                   )}
                                 </div>
                                 {member.fullName && (
-                                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{member.username}</p>
+                                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{member.username}</p>
                                 )}
                               </div>
                             <div className="flex items-center space-x-4 text-sm">
                               <div className="text-right">
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Balance</p>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400">Balance</p>
                                 {(() => {
                                   // Color balance text based on realistic usable days vs remaining balance
                                   const realisticUsableDays = member.analytics.realisticUsableDays ?? 0;
@@ -963,7 +997,7 @@ export default function LeaderAnalyticsPage() {
                                           ? `-${Math.round(Math.abs(member.analytics.remainingLeaveBalance))}`
                                           : Math.round(member.analytics.remainingLeaveBalance)
                                         }
-                                        <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">(remaining)</span>
+                                        <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-400">(remaining)</span>
                                         {isNegative && (() => {
                                           // Check if member has taken compassionate leave (maternity, sick, bereavement, medical, etc.)
                                           const memberCompassionateRequests = allRequests.filter(req => 
@@ -1068,23 +1102,23 @@ export default function LeaderAnalyticsPage() {
                                 )}
                                 {/* Show base balance if different from remaining balance */}
                                 {Math.round(member.analytics.baseLeaveBalance) !== Math.round(member.analytics.remainingLeaveBalance) && (
-                                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                                  <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">
                                     <span className="font-medium">Base:</span> {Math.round(member.analytics.baseLeaveBalance)}
-                                    <span className="ml-1 text-gray-500 dark:text-gray-400">
+                                    <span className="ml-1 text-zinc-500 dark:text-zinc-400">
                                       ({Math.round(member.analytics.baseLeaveBalance - member.analytics.remainingLeaveBalance)} used)
                                     </span>
                                   </p>
                                 )}
                               </div>
                               <div className="text-right">
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Realistic</p>
-                                <p className="font-medium text-gray-900 dark:text-white">
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400">Realistic</p>
+                                <p className="font-medium text-zinc-900 dark:text-zinc-100">
                                   {Math.round(member.analytics.realisticUsableDays)}
                                 </p>
                               </div>
                               <div className="text-right">
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Usable</p>
-                                <p className="font-medium text-gray-900 dark:text-white">
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400">Usable</p>
+                                <p className="font-medium text-zinc-900 dark:text-zinc-100">
                                   {Math.round(member.analytics.usableDays)}
                                 </p>
                               </div>
@@ -1099,6 +1133,7 @@ export default function LeaderAnalyticsPage() {
               })
             )}
           </div>
+          </div>{/* end scrollable analytics */}
         </div>
       </div>
     </ProtectedRoute>

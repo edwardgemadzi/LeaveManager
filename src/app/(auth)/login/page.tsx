@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { CalendarIcon, SunIcon, MoonIcon } from '@heroicons/react/24/outline';
 import { useTheme } from '@/contexts/ThemeContext';
+import { setStoredUser } from '@/lib/clientUserStorage';
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -33,7 +34,7 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (response.ok) {
-        localStorage.setItem('user', JSON.stringify(data.user));
+        setStoredUser(data.user);
         if (data.user.role === 'leader') {
           router.push('/leader/dashboard');
         } else {
@@ -52,106 +53,94 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gray-50 dark:bg-black">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center px-4">
+      {/* Theme toggle */}
       <button
         onClick={toggleTheme}
-        className="fixed top-4 right-4 p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors duration-200 z-10"
+        className="fixed top-4 right-4 p-2 rounded-lg text-zinc-400 dark:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors z-10"
         aria-label="Toggle dark mode"
-        title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
       >
-        {theme === 'light' ? (
-          <MoonIcon className="h-5 w-5" />
-        ) : (
-          <SunIcon className="h-5 w-5" />
-        )}
+        {theme === 'light' ? <MoonIcon className="h-4 w-4" /> : <SunIcon className="h-4 w-4" />}
       </button>
-      <div className="max-w-md w-full space-y-8 fade-in">
-        <div className="card p-8">
-          <div className="text-center mb-8">
-            <div className="flex justify-center mb-4">
-              <div className="w-16 h-16 bg-blue-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-                <CalendarIcon className="h-8 w-8 text-blue-700 dark:text-blue-400" />
-              </div>
-            </div>
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              Welcome Back
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400">
-              Sign in to your Leave Manager account
-            </p>
+
+      <div className="w-full max-w-sm fade-in">
+        {/* Brand */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-indigo-600 mb-4">
+            <CalendarIcon className="h-5 w-5 text-white" />
           </div>
-          
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Username
-                </label>
-                <input
-                  id="username"
-                  name="username"
-                  type="text"
-                  required
-                  className="input-modern"
-                  placeholder="Enter your username"
-                  value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                />
-              </div>
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Password
-                </label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  className="input-modern"
-                  placeholder="Enter your password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                />
-              </div>
+          <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Leave Manager</h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Sign in to your account</p>
+        </div>
+
+        {/* Form card */}
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm">
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            <div>
+              <label htmlFor="username" className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1.5">
+                Username
+              </label>
+              <input
+                id="username"
+                name="username"
+                type="text"
+                required
+                autoComplete="username"
+                className="input-modern"
+                placeholder="your username"
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              />
+            </div>
+            <div>
+              <label htmlFor="password" className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1.5">
+                Password
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                required
+                autoComplete="current-password"
+                className="input-modern"
+                placeholder="••••••••"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              />
             </div>
 
             {error && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
-                <div className="flex">
-                  <div className="text-red-600 dark:text-red-400 text-sm">{error}</div>
-                </div>
-              </div>
+              <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
+                {error}
+              </p>
             )}
 
             <button
               type="submit"
               disabled={isLoading}
-              className="btn-primary w-full"
+              className="btn-primary w-full justify-center py-2.5 mt-2"
             >
               {isLoading ? (
-                <div className="flex items-center justify-center">
-                  <div className="spinner w-5 h-5 mr-2"></div>
-                  Signing in...
-                </div>
-              ) : (
-                'Sign In'
-              )}
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Signing in…
+                </>
+              ) : 'Sign in'}
             </button>
           </form>
-
-          <div className="mt-8 text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Don&apos;t have an account?{' '}
-              <Link href="/register-leader" className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 transition-colors">
-                Create a team
-              </Link>
-              {' '}or{' '}
-              <Link href="/register-member" className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 transition-colors">
-                Join a team
-              </Link>
-            </p>
-          </div>
         </div>
+
+        {/* Footer links */}
+        <p className="text-center text-xs text-zinc-500 dark:text-zinc-400 mt-6">
+          No account?{' '}
+          <Link href="/register-leader" className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">
+            Create a team
+          </Link>
+          {' '}or{' '}
+          <Link href="/register-member" className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">
+            Join a team
+          </Link>
+        </p>
       </div>
     </div>
   );
