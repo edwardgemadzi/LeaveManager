@@ -26,9 +26,15 @@ export async function POST(request: NextRequest) {
 
     const username = validation.data.username.toLowerCase();
     const teamUsername = validation.data.teamUsername.toLowerCase();
-    const { fullName, password, teamName } = validation.data;
+    const { firstName, middleName, lastName, password, teamName } = validation.data as unknown as {
+      firstName: string;
+      middleName?: string | null;
+      lastName: string;
+      password: string;
+      teamName: string;
+    };
 
-    if (!username || !fullName || !password || !teamName || !teamUsername) {
+    if (!username || !firstName || !lastName || !password || !teamName || !teamUsername) {
       return badRequestError('All fields are required');
     }
 
@@ -74,7 +80,9 @@ export async function POST(request: NextRequest) {
         const user = await UserModel.create(
           {
             username,
-            fullName,
+            firstName,
+            ...(middleName !== undefined ? { middleName: middleName === '' ? null : middleName } : {}),
+            lastName,
             password: hashedPassword,
             role: 'leader',
             teamId: team._id,

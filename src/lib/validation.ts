@@ -15,16 +15,36 @@ export const schemas = {
         'string.max': 'Username must be no more than 30 characters long',
         'any.required': 'Username is required'
       }),
-    fullName: Joi.string()
-      .min(2)
-      .max(100)
+    firstName: Joi.string()
+      .min(1)
+      .max(50)
       .pattern(/^[a-zA-Z\s'-]+$/)
       .required()
       .messages({
-        'string.min': 'Full name must be at least 2 characters long',
-        'string.max': 'Full name must be no more than 100 characters long',
-        'string.pattern.base': 'Full name can only contain letters, spaces, hyphens, and apostrophes',
-        'any.required': 'Full name is required'
+        'string.min': 'First name is required',
+        'string.max': 'First name must be no more than 50 characters long',
+        'string.pattern.base': 'First name can only contain letters, spaces, hyphens, and apostrophes',
+        'any.required': 'First name is required',
+      }),
+    middleName: Joi.string()
+      .max(50)
+      .pattern(/^[a-zA-Z\s'-]+$/)
+      .allow('', null)
+      .optional()
+      .messages({
+        'string.max': 'Middle name must be no more than 50 characters long',
+        'string.pattern.base': 'Middle name can only contain letters, spaces, hyphens, and apostrophes',
+      }),
+    lastName: Joi.string()
+      .min(1)
+      .max(50)
+      .pattern(/^[a-zA-Z\s'-]+$/)
+      .required()
+      .messages({
+        'string.min': 'Last name is required',
+        'string.max': 'Last name must be no more than 50 characters long',
+        'string.pattern.base': 'Last name can only contain letters, spaces, hyphens, and apostrophes',
+        'any.required': 'Last name is required',
       }),
     password: Joi.string()
       .min(8)
@@ -73,16 +93,36 @@ export const schemas = {
         'string.max': 'Username must be no more than 30 characters long',
         'any.required': 'Username is required'
       }),
-    fullName: Joi.string()
-      .min(2)
-      .max(100)
+    firstName: Joi.string()
+      .min(1)
+      .max(50)
       .pattern(/^[a-zA-Z\s'-]+$/)
       .required()
       .messages({
-        'string.min': 'Full name must be at least 2 characters long',
-        'string.max': 'Full name must be no more than 100 characters long',
-        'string.pattern.base': 'Full name can only contain letters, spaces, hyphens, and apostrophes',
-        'any.required': 'Full name is required'
+        'string.min': 'First name is required',
+        'string.max': 'First name must be no more than 50 characters long',
+        'string.pattern.base': 'First name can only contain letters, spaces, hyphens, and apostrophes',
+        'any.required': 'First name is required',
+      }),
+    middleName: Joi.string()
+      .max(50)
+      .pattern(/^[a-zA-Z\s'-]+$/)
+      .allow('', null)
+      .optional()
+      .messages({
+        'string.max': 'Middle name must be no more than 50 characters long',
+        'string.pattern.base': 'Middle name can only contain letters, spaces, hyphens, and apostrophes',
+      }),
+    lastName: Joi.string()
+      .min(1)
+      .max(50)
+      .pattern(/^[a-zA-Z\s'-]+$/)
+      .required()
+      .messages({
+        'string.min': 'Last name is required',
+        'string.max': 'Last name must be no more than 50 characters long',
+        'string.pattern.base': 'Last name can only contain letters, spaces, hyphens, and apostrophes',
+        'any.required': 'Last name is required',
       }),
     password: Joi.string()
       .min(8)
@@ -260,15 +300,34 @@ export const schemas = {
 
   // Profile update — at least one field required
   updateProfile: Joi.object({
-    fullName: Joi.string()
-      .min(2)
-      .max(100)
+    firstName: Joi.string()
+      .min(1)
+      .max(50)
       .pattern(/^[a-zA-Z\s'-]+$/)
       .optional()
       .messages({
-        'string.min': 'Full name must be at least 2 characters long',
-        'string.max': 'Full name must be no more than 100 characters long',
-        'string.pattern.base': 'Full name can only contain letters, spaces, hyphens, and apostrophes',
+        'string.min': 'First name is required',
+        'string.max': 'First name must be no more than 50 characters long',
+        'string.pattern.base': 'First name can only contain letters, spaces, hyphens, and apostrophes',
+      }),
+    middleName: Joi.string()
+      .max(50)
+      .pattern(/^[a-zA-Z\s'-]+$/)
+      .allow('', null)
+      .optional()
+      .messages({
+        'string.max': 'Middle name must be no more than 50 characters long',
+        'string.pattern.base': 'Middle name can only contain letters, spaces, hyphens, and apostrophes',
+      }),
+    lastName: Joi.string()
+      .min(1)
+      .max(50)
+      .pattern(/^[a-zA-Z\s'-]+$/)
+      .optional()
+      .messages({
+        'string.min': 'Last name is required',
+        'string.max': 'Last name must be no more than 50 characters long',
+        'string.pattern.base': 'Last name can only contain letters, spaces, hyphens, and apostrophes',
       }),
     email: Joi.string().email().max(320).allow('', null).optional(),
     timezone: Joi.string()

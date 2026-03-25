@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import NotificationPromptBanner from '@/components/shared/NotificationPromptBanner';
 
 interface ProtectedRouteProps {
@@ -13,6 +13,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -70,6 +71,18 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
             return;
           }
 
+          const u = profileData.user as { firstName?: string; lastName?: string; role?: 'leader' | 'member' };
+          const hasName = Boolean(u?.firstName?.trim?.() && u?.lastName?.trim?.());
+          if (!hasName) {
+            const target = u.role === 'leader' ? '/leader/profile' : '/member/profile';
+            if (pathname !== target) {
+              router.push(target);
+            }
+            setIsLoading(false);
+            // Do not set authenticated; we hard-block until profile is updated.
+            return;
+          }
+
           localStorage.setItem('user', JSON.stringify(profileData.user));
           setIsAuthenticated(true);
         } catch (parseError) {
@@ -87,7 +100,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
     };
 
     checkAuth();
-  }, [router, requiredRole]);
+  }, [router, requiredRole, pathname]);
 
   if (isLoading) {
     return (

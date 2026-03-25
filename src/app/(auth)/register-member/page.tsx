@@ -11,7 +11,9 @@ import { ShiftSchedule } from '@/types';
 export default function RegisterMemberPage() {
   const [formData, setFormData] = useState({
     username: '',
-    fullName: '',
+    firstName: '',
+    middleName: '',
+    lastName: '',
     password: '',
     confirmPassword: '',
     teamUsername: '',
@@ -46,7 +48,9 @@ export default function RegisterMemberPage() {
         },
         body: JSON.stringify({
           username: formData.username,
-          fullName: formData.fullName,
+          firstName: formData.firstName,
+          middleName: formData.middleName || null,
+          lastName: formData.lastName,
           password: formData.password,
           teamUsername: formData.teamUsername,
           shiftSchedule,
@@ -101,24 +105,49 @@ export default function RegisterMemberPage() {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Full Name
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Name
               </label>
-              <input
-                id="fullName"
-                name="fullName"
-                type="text"
-                required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
-                placeholder="Your full name"
-                value={formData.fullName}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // Capitalize first letter of each word
-                  const capitalizedValue = value.replace(/\b\w/g, l => l.toUpperCase());
-                  setFormData({ ...formData, fullName: capitalizedValue });
-                }}
-              />
+              <div className="mt-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <input
+                  name="firstName"
+                  type="text"
+                  required
+                  className="appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
+                  placeholder="First"
+                  value={formData.firstName}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const capitalizedValue = value.replace(/\b\w/g, (l) => l.toUpperCase());
+                    setFormData({ ...formData, firstName: capitalizedValue });
+                  }}
+                />
+                <input
+                  name="middleName"
+                  type="text"
+                  className="appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
+                  placeholder="Middle (optional)"
+                  value={formData.middleName}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const capitalizedValue = value.replace(/\b\w/g, (l) => l.toUpperCase());
+                    setFormData({ ...formData, middleName: capitalizedValue });
+                  }}
+                />
+                <input
+                  name="lastName"
+                  type="text"
+                  required
+                  className="appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 placeholder-gray-500 dark:placeholder-gray-400 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
+                  placeholder="Last"
+                  value={formData.lastName}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const capitalizedValue = value.replace(/\b\w/g, (l) => l.toUpperCase());
+                    setFormData({ ...formData, lastName: capitalizedValue });
+                  }}
+                />
+              </div>
             </div>
 
             <div>

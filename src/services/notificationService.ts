@@ -4,6 +4,25 @@ import { sendTelegramMessage } from '@/lib/telegram';
 import { UserModel } from '@/models/User';
 import { TeamModel } from '@/models/Team';
 
+function displayName(u: Pick<User, 'firstName' | 'middleName' | 'lastName' | 'fullName' | 'username'>): string {
+  const first = (u.firstName || '').trim();
+  const middle = (u.middleName || '').trim();
+  const last = (u.lastName || '').trim();
+  const parts = [first, middle, last].filter(Boolean);
+  if (parts.length > 0) return parts.join(' ');
+  const legacy = (u.fullName || '').trim();
+  if (legacy) return legacy;
+  return u.username;
+}
+
+function greetingName(u: Pick<User, 'firstName' | 'fullName' | 'username'>): string {
+  const first = (u.firstName || '').trim();
+  if (first) return first;
+  const legacy = (u.fullName || '').trim();
+  if (legacy) return legacy;
+  return u.username;
+}
+
 function appBaseUrl(): string {
   const explicit = process.env.APP_URL?.trim();
   if (explicit) {
@@ -51,7 +70,7 @@ export async function notifyLeaveSubmitted(params: {
 
   if (wantsEmail(member)) {
     const inner = `
-      <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Hi ${escapeForHtml(member.username)},</p>
+      <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Hi ${escapeForHtml(greetingName(member))},</p>
       <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Your leave request was submitted and is <strong>pending approval</strong>.</p>
       <table role="presentation" style="margin:16px 0;border-collapse:collapse;width:100%;">
         <tr><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;color:${'#64748b'};font-size:13px;">Team</td><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;font-size:14px;">${escapeForHtml(teamName)}</td></tr>
@@ -93,7 +112,7 @@ export async function notifyLeaveSubmitted(params: {
     const leader = await UserModel.findById(String(team.leaderId));
     if (leader && leader._id && String(leader._id) !== String(member._id)) {
       const leaderLink = `${base}/leader/requests`;
-      const memberLabel = member.fullName?.trim() || member.username;
+      const memberLabel = displayName(member);
 
       if (wantsEmail(leader)) {
         const inner = `
@@ -171,7 +190,7 @@ export async function notifyLeaveDecision(params: {
 
   if (wantsEmail(member)) {
     const inner = `
-      <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Hi ${escapeForHtml(member.username)},</p>
+      <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Hi ${escapeForHtml(greetingName(member))},</p>
       <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Your leave request (${escapeForHtml(range)}) was <strong>${escapeForHtml(statusWord)}</strong> by ${escapeForHtml(leaderUsername)}.</p>
       ${noteHtml}
       <table role="presentation" style="margin:16px 0;border-collapse:collapse;width:100%;">
@@ -247,7 +266,7 @@ export async function notifyLeaveApproachingReminder(params: {
 
   if (wantsEmail(member)) {
     const inner = `
-      <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Hi ${escapeForHtml(member.username)},</p>
+      <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Hi ${escapeForHtml(greetingName(member))},</p>
       <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;"><strong>${escapeForHtml(when)}</strong></p>
       <table role="presentation" style="margin:16px 0;border-collapse:collapse;width:100%;">
         <tr><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:13px;">Team</td><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;font-size:14px;">${escapeForHtml(teamName)}</td></tr>
@@ -299,7 +318,7 @@ export async function notifyLeaderTeamLeaveApproaching(params: {
   const range = leaveDateRange(leaveRequest);
   const base = appBaseUrl();
   const leaderLink = `${base}/leader/calendar`;
-  const memberLabel = member.fullName?.trim() || member.username;
+  const memberLabel = displayName(member);
   const when =
     daysUntil === 1
       ? `${escapeForHtml(memberLabel)}'s leave starts tomorrow.`
@@ -362,8 +381,8 @@ export async function notifyLeaveRemoved(params: {
 }): Promise<void> {
   const { leaveRequest, member, leader, actor, teamName, kind } = params;
   const range = leaveDateRange(leaveRequest);
-  const memberLabel = member.fullName?.trim() || member.username;
-  const actorLabel = actor.fullName?.trim() || actor.username;
+  const memberLabel = displayName(member);
+  const actorLabel = displayName(actor);
   const base = appBaseUrl();
   const memberLink = `${base}/member/requests`;
   const leaderLink = `${base}/leader/requests`;
@@ -373,7 +392,7 @@ export async function notifyLeaveRemoved(params: {
   if (kind === 'member_withdrew_pending') {
     const memberSubject = `Leave request withdrawn — ${range}`;
     const memberBody = `
-      <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Hi ${escapeForHtml(member.username)},</p>
+      <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Hi ${escapeForHtml(greetingName(member))},</p>
       <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Your <strong>pending</strong> leave request (${escapeForHtml(range)}) was removed.</p>
       <p style="margin:0;font-size:14px;line-height:1.5;color:#64748b;">Team: ${escapeForHtml(teamName)}</p>
       <p style="margin:20px 0 0;">
@@ -429,7 +448,7 @@ export async function notifyLeaveRemoved(params: {
   } else {
     const subj = `Approved leave removed — ${range}`;
     const inner = `
-      <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Hi ${escapeForHtml(member.username)},</p>
+      <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Hi ${escapeForHtml(greetingName(member))},</p>
       <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Your <strong>approved</strong> leave (${escapeForHtml(range)}) was removed by ${escapeForHtml(actorLabel)}.</p>
       <p style="margin:0;font-size:14px;line-height:1.5;color:#64748b;">Team: ${escapeForHtml(teamName)}</p>
       <p style="margin:20px 0 0;">

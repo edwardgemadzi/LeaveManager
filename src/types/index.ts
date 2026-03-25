@@ -1,7 +1,11 @@
 export interface User {
   _id?: string;
   username: string;
+  /** Legacy free-text name (migration only). */
   fullName?: string;
+  firstName?: string;
+  middleName?: string | null;
+  lastName?: string;
   password: string;
   role: 'leader' | 'member';
   teamId?: string;

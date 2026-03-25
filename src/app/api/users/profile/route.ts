@@ -10,6 +10,7 @@ import {
   getNotificationPromptVersion,
 } from '@/lib/notificationPrompt';
 import { shell, sendHtmlEmailWithOutcome } from '@/lib/mailer';
+import { bestEffortSplitFullName } from '@/lib/nameParsing';
 
 const PROMPT_VERSION = getNotificationPromptVersion();
 
@@ -20,6 +21,33 @@ export async function GET(request: NextRequest) {
       return authResult;
     }
     const user = authResult;
+
+    const db = await getDatabase();
+    const users = db.collection('users');
+
+    // Best-effort migration: derive first/middle/last from legacy fullName once.
+    const existing = await users.findOne(
+      { _id: new ObjectId(user.id) },
+      { projection: { firstName: 1, middleName: 1, lastName: 1, fullName: 1 } }
+    );
+    const needsName =
+      !existing?.firstName || !String(existing.firstName).trim() || !existing?.lastName || !String(existing.lastName).trim();
+    const legacyFull = typeof existing?.fullName === 'string' ? existing.fullName.trim() : '';
+    if (needsName && legacyFull) {
+      const parsed = bestEffortSplitFullName(legacyFull);
+      if (parsed) {
+        await users.updateOne(
+          { _id: new ObjectId(user.id) },
+          {
+            $set: {
+              firstName: parsed.firstName,
+              middleName: parsed.middleName,
+              lastName: parsed.lastName,
+            },
+          }
+        );
+      }
+    }
 
     const userDataResult = await requireSafeUserData(user.id, 'User not found');
     if (userDataResult instanceof NextResponse) {
@@ -55,7 +83,9 @@ export async function PATCH(request: NextRequest) {
     }
 
     const data = validation.data as {
-      fullName?: string;
+      firstName?: string;
+      middleName?: string | null;
+      lastName?: string;
       email?: string | null;
       timezone?: string | null;
       notifyEmail?: boolean;
@@ -82,8 +112,20 @@ export async function PATCH(request: NextRequest) {
 
     const $set: Record<string, unknown> = {};
 
-    if (data.fullName !== undefined) {
-      $set.fullName = data.fullName.trim();
+    if (data.firstName !== undefined) {
+      $set.firstName = data.firstName.trim();
+    }
+
+    if (data.middleName !== undefined) {
+      const raw =
+        data.middleName === null || data.middleName === ''
+          ? ''
+          : String(data.middleName).trim();
+      $set.middleName = raw === '' ? null : raw;
+    }
+
+    if (data.lastName !== undefined) {
+      $set.lastName = data.lastName.trim();
     }
 
     if (data.timezone !== undefined) {

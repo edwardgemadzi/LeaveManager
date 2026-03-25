@@ -34,7 +34,9 @@ export default function LeaderProfilePage() {
     confirmPassword: '',
   });
   const [profileForm, setProfileForm] = useState({
-    fullName: '',
+    firstName: '',
+    middleName: '',
+    lastName: '',
     email: '',
     timezone: 'UTC',
     notifyEmail: true,
@@ -61,12 +63,17 @@ export default function LeaderProfilePage() {
           const userData = await userResponse.json();
           setUser(userData.user);
           const u = userData.user as {
+            firstName?: string;
+            middleName?: string | null;
+            lastName?: string;
             leaveReminderDaysBefore?: number[];
             leaderTeamLeaveReminderDays?: number[];
             leaveReminderTimeLocal?: string;
           };
           setProfileForm({
-            fullName: userData.user.fullName || '',
+            firstName: u.firstName || '',
+            middleName: u.middleName || '',
+            lastName: u.lastName || '',
             email: (userData.user as { email?: string }).email || '',
             timezone: (userData.user as { timezone?: string | null }).timezone || 'UTC',
             notifyEmail: (userData.user as { notifyEmail?: boolean }).notifyEmail !== false,
@@ -257,8 +264,8 @@ export default function LeaderProfilePage() {
     setError('');
     setMessage('');
 
-    if (!profileForm.fullName.trim()) {
-      setError('Full name is required');
+    if (!profileForm.firstName.trim() || !profileForm.lastName.trim()) {
+      setError('First and last name are required');
       return;
     }
 
@@ -272,7 +279,9 @@ export default function LeaderProfilePage() {
         },
         credentials: 'include',
         body: JSON.stringify({
-          fullName: profileForm.fullName.trim(),
+          firstName: profileForm.firstName.trim(),
+          middleName: profileForm.middleName.trim(),
+          lastName: profileForm.lastName.trim(),
           email: profileForm.email.trim(),
           timezone: profileForm.timezone,
           notifyEmail: profileForm.notifyEmail,
@@ -288,12 +297,19 @@ export default function LeaderProfilePage() {
       if (response.ok) {
         setUser(data.user);
         const u = data.user as {
+            firstName?: string;
+            middleName?: string | null;
+            lastName?: string;
           leaveReminderDaysBefore?: number[];
           leaderTeamLeaveReminderDays?: number[];
           leaveReminderTimeLocal?: string;
         };
         setProfileForm((prev) => ({
           ...prev,
+            firstName: typeof u.firstName === 'string' ? u.firstName : prev.firstName,
+            middleName:
+              typeof u.middleName === 'string' ? u.middleName : (u.middleName === null ? '' : prev.middleName),
+            lastName: typeof u.lastName === 'string' ? u.lastName : prev.lastName,
           leaveReminderDaysBefore: Array.isArray(u.leaveReminderDaysBefore)
             ? [...u.leaveReminderDaysBefore]
             : prev.leaveReminderDaysBefore,
@@ -380,25 +396,49 @@ export default function LeaderProfilePage() {
                   </div>
                   
                   <div>
-                    <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Full Name
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Name
                     </label>
-                    <input
-                      type="text"
-                      id="fullName"
-                      required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
-                      value={profileForm.fullName}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Capitalize first letter of each word
-                        const capitalizedValue = value.replace(/\b\w/g, l => l.toUpperCase());
-                        setProfileForm({
-                          ...profileForm,
-                          fullName: capitalizedValue
-                        });
-                      }}
-                    />
+                    <div className="mt-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <input
+                        type="text"
+                        required
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
+                        placeholder="First"
+                        value={profileForm.firstName}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          const capitalizedValue = value.replace(/\b\w/g, (l) => l.toUpperCase());
+                          setProfileForm({ ...profileForm, firstName: capitalizedValue });
+                        }}
+                      />
+                      <input
+                        type="text"
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
+                        placeholder="Middle (optional)"
+                        value={profileForm.middleName}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          const capitalizedValue = value.replace(/\b\w/g, (l) => l.toUpperCase());
+                          setProfileForm({ ...profileForm, middleName: capitalizedValue });
+                        }}
+                      />
+                      <input
+                        type="text"
+                        required
+                        className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:focus:ring-indigo-600 dark:focus:border-indigo-600 sm:text-sm"
+                        placeholder="Last"
+                        value={profileForm.lastName}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          const capitalizedValue = value.replace(/\b\w/g, (l) => l.toUpperCase());
+                          setProfileForm({ ...profileForm, lastName: capitalizedValue });
+                        }}
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Required to use the app.
+                    </p>
                   </div>
                   
                   <div>

@@ -25,10 +25,16 @@ export async function POST(request: NextRequest) {
 
     const username = validation.data.username.toLowerCase();
     const teamUsername = validation.data.teamUsername.toLowerCase();
-    const { fullName, password, shiftSchedule } = validation.data;
+    const { firstName, middleName, lastName, password, shiftSchedule } = validation.data as unknown as {
+      firstName: string;
+      middleName?: string | null;
+      lastName: string;
+      password: string;
+      shiftSchedule: ShiftSchedule;
+    };
     const { maternityPaternityType } = body;
 
-    if (!username || !fullName || !password || !teamUsername || !shiftSchedule) {
+    if (!username || !firstName || !lastName || !password || !teamUsername || !shiftSchedule) {
       return badRequestError('All fields are required');
     }
 
@@ -80,7 +86,9 @@ export async function POST(request: NextRequest) {
 
     const userData: {
       username: string;
-      fullName: string;
+      firstName: string;
+      middleName?: string | null;
+      lastName: string;
       password: string;
       role: 'member';
       teamId: string;
@@ -89,7 +97,9 @@ export async function POST(request: NextRequest) {
       maternityPaternityType?: 'maternity' | 'paternity' | null;
     } = {
       username,
-      fullName,
+      firstName,
+      ...(middleName !== undefined ? { middleName: middleName === '' ? null : middleName } : {}),
+      lastName,
       password: hashedPassword,
       role: 'member',
       teamId: team._id,
