@@ -7,6 +7,7 @@ import { apiRateLimit } from '@/lib/rateLimit';
 import { internalServerError, notFoundError } from '@/lib/errors';
 import { error as logError } from '@/lib/logger';
 import { computeNeedsNotificationSetup } from '@/lib/notificationPrompt';
+import { TelegramLinkTokenModel } from '@/models/TelegramLinkToken';
 
 /**
  * POST /api/users/telegram/unlink
@@ -45,6 +46,8 @@ export async function POST(request: NextRequest) {
     if (result.matchedCount === 0) {
       return notFoundError('User not found');
     }
+
+    await TelegramLinkTokenModel.deleteManyForUser(new ObjectId(user.id));
 
     const updated = await requireSafeUserData(user.id, 'User not found');
     if (updated instanceof NextResponse) {

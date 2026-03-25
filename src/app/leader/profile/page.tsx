@@ -6,6 +6,7 @@ import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { User, Team } from '@/types';
 import TimezoneSelect from '@/components/profile/TimezoneSelect';
 import TelegramStartHint from '@/components/profile/TelegramStartHint';
+import TelegramDeepLinkPanel from '@/components/profile/TelegramDeepLinkPanel';
 import TelegramLocalDevHint from '@/components/profile/TelegramLocalDevHint';
 import ProfilePageFeedback from '@/components/profile/ProfilePageFeedback';
 import { isTelegramLinked } from '@/lib/telegramLinked';
@@ -543,6 +544,16 @@ export default function LeaderProfilePage() {
                           </div>
                         ) : (
                           <>
+                            <TelegramDeepLinkPanel
+                              botUsername={process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME}
+                              onLinked={(u) => setUser(u)}
+                              onFeedback={() => window.setTimeout(() => scrollToProfileFeedback(), 80)}
+                              setError={setError}
+                              setMessage={setMessage}
+                            />
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 font-medium">
+                              Or use the website button (may ask for phone verification in Telegram):
+                            </p>
                             <TelegramStartHint
                               botUsername={process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME}
                             />
