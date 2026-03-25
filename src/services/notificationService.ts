@@ -3,6 +3,7 @@ import { shell, formatDateRange, escapeForHtml, sendHtmlEmail } from '@/lib/mail
 import { sendTelegramMessage } from '@/lib/telegram';
 import { UserModel } from '@/models/User';
 import { TeamModel } from '@/models/Team';
+import { createSingleUseMagicLinkToken } from '@/lib/magicLink';
 
 function displayName(u: Pick<User, 'firstName' | 'middleName' | 'lastName' | 'fullName' | 'username'>): string {
   const first = (u.firstName || '').trim();
@@ -64,7 +65,11 @@ export async function notifyLeaveSubmitted(params: {
     : String(leaveRequest.endDate);
   const range = formatDateRange(start, end);
   const base = appBaseUrl();
-  const requestsLink = `${base}/member/requests`;
+  const requestsMagic = await createSingleUseMagicLinkToken({
+    userId: String(member._id),
+    nextPath: '/member/requests',
+  });
+  const requestsLink = `${base}/api/auth/magic?token=${encodeURIComponent(requestsMagic)}`;
 
   const tasks: Promise<unknown>[] = [];
 
@@ -111,7 +116,11 @@ export async function notifyLeaveSubmitted(params: {
   if (team?.leaderId) {
     const leader = await UserModel.findById(String(team.leaderId));
     if (leader && leader._id && String(leader._id) !== String(member._id)) {
-      const leaderLink = `${base}/leader/requests`;
+      const leaderMagic = await createSingleUseMagicLinkToken({
+        userId: String(leader._id),
+        nextPath: '/leader/requests',
+      });
+      const leaderLink = `${base}/api/auth/magic?token=${encodeURIComponent(leaderMagic)}`;
       const memberLabel = displayName(member);
 
       if (wantsEmail(leader)) {
@@ -171,7 +180,11 @@ export async function notifyLeaveDecision(params: {
     : String(leaveRequest.endDate);
   const range = formatDateRange(start, end);
   const base = appBaseUrl();
-  const link = `${base}/member/requests`;
+  const magic = await createSingleUseMagicLinkToken({
+    userId: String(member._id),
+    nextPath: '/member/requests',
+  });
+  const link = `${base}/api/auth/magic?token=${encodeURIComponent(magic)}`;
 
   const subject =
     status === 'approved'
@@ -253,10 +266,11 @@ export async function notifyLeaveApproachingReminder(params: {
   const { leaveRequest, member, teamName, daysUntil } = params;
   const range = leaveDateRange(leaveRequest);
   const base = appBaseUrl();
-  const link =
-    member.role === 'leader'
-      ? `${base}/leader/calendar`
-      : `${base}/member/requests`;
+  const magic = await createSingleUseMagicLinkToken({
+    userId: String(member._id),
+    nextPath: member.role === 'leader' ? '/leader/calendar' : '/member/requests',
+  });
+  const link = `${base}/api/auth/magic?token=${encodeURIComponent(magic)}`;
   const when =
     daysUntil === 1
       ? 'Your approved leave starts tomorrow.'
@@ -317,7 +331,11 @@ export async function notifyLeaderTeamLeaveApproaching(params: {
   const { leaveRequest, leader, member, teamName, daysUntil } = params;
   const range = leaveDateRange(leaveRequest);
   const base = appBaseUrl();
-  const leaderLink = `${base}/leader/calendar`;
+  const leaderMagic = await createSingleUseMagicLinkToken({
+    userId: String(leader._id),
+    nextPath: '/leader/calendar',
+  });
+  const leaderLink = `${base}/api/auth/magic?token=${encodeURIComponent(leaderMagic)}`;
   const memberLabel = displayName(member);
   const when =
     daysUntil === 1
@@ -384,8 +402,20 @@ export async function notifyLeaveRemoved(params: {
   const memberLabel = displayName(member);
   const actorLabel = displayName(actor);
   const base = appBaseUrl();
-  const memberLink = `${base}/member/requests`;
-  const leaderLink = `${base}/leader/requests`;
+  const memberMagic = await createSingleUseMagicLinkToken({
+    userId: String(member._id),
+    nextPath: '/member/requests',
+  });
+  const memberLink = `${base}/api/auth/magic?token=${encodeURIComponent(memberMagic)}`;
+  const leaderLink =
+    leader?._id
+      ? `${base}/api/auth/magic?token=${encodeURIComponent(
+          await createSingleUseMagicLinkToken({
+            userId: String(leader._id),
+            nextPath: '/leader/requests',
+          })
+        )}`
+      : `${base}/leader/requests`;
 
   const tasks: Promise<unknown>[] = [];
 

@@ -3,6 +3,7 @@ import { UserModel } from '@/models/User';
 import { TeamModel } from '@/models/Team';
 import { AuditLogModel } from '@/models/AuditLog';
 import { TelegramLinkTokenModel } from '@/models/TelegramLinkToken';
+import { MagicLinkModel } from '@/models/MagicLink';
 
 /**
  * Initialize all database indexes for optimal query performance.
@@ -19,6 +20,7 @@ export async function initializeDatabaseIndexes(): Promise<void> {
       TeamModel.createIndexes(),
       AuditLogModel.createIndexes(),
       TelegramLinkTokenModel.createIndexes(),
+      MagicLinkModel.createIndexes(),
     ]);
     
     console.log('Database indexes initialized successfully');
