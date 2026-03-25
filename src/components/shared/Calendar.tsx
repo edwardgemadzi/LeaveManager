@@ -737,6 +737,20 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
     setRequestAsRange(false);
   }, []);
 
+  const selectedSummary = useMemo(() => {
+    if (!isMember || selectedDates.length === 0) return null;
+    const sorted = [...selectedDates].sort((a, b) => a.getTime() - b.getTime());
+    const start = sorted[0]!;
+    const end = sorted[sorted.length - 1]!;
+    const same = start.toDateString() === end.toDateString();
+    return {
+      count: sorted.length,
+      startLabel: start.toLocaleDateString(),
+      endLabel: end.toLocaleDateString(),
+      rangeLabel: same ? start.toLocaleDateString() : `${start.toLocaleDateString()} – ${end.toLocaleDateString()}`,
+    };
+  }, [isMember, selectedDates]);
+
   return (
     <div className="min-h-[600px] relative">
       {/* Selection mode indicator */}
@@ -762,15 +776,48 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
         </div>
       )}
 
-      {/* Request Leave button */}
-      {isMember && selectionMode && selectedDates.length > 0 && (
-        <div className="mb-4 flex justify-center">
-          <button
-            onClick={handleRequestLeave}
-            className="bg-indigo-600 dark:bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 dark:hover:bg-indigo-700 transition-colors shadow-lg"
-          >
-            Request Leave ({selectedDates.length} date{selectedDates.length !== 1 ? 's' : ''})
-          </button>
+      {/* Floating “mini cart” for leave request (members only) */}
+      {isMember && selectionMode && selectedSummary && (
+        <div className="fixed bottom-6 right-6 z-50 w-[min(420px,calc(100vw-3rem))]">
+          <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-900/95 backdrop-blur shadow-2xl">
+            <div className="p-4 flex items-start gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                  Leave selection
+                </p>
+                <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                  {selectedSummary.rangeLabel}
+                </p>
+                <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">
+                  {selectedSummary.count} day{selectedSummary.count === 1 ? '' : 's'} selected
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={clearSelectionMode}
+                className="text-xs font-medium text-gray-600 dark:text-gray-300 hover:underline"
+              >
+                Clear
+              </button>
+            </div>
+            <div className="px-4 pb-4 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleRequestLeave}
+                className="flex-1 rounded-xl bg-indigo-600 text-white px-4 py-2.5 text-sm font-semibold hover:bg-indigo-700 transition-colors shadow"
+              >
+                Request leave
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowRequestModal(true)}
+                className="rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2.5 text-sm font-semibold text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                title="Open details"
+              >
+                Details
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
