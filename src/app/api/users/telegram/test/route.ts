@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
           delivered: false,
           reason: 'BOT_MISMATCH',
           message:
-            'TELEGRAM_BOT_TOKEN is for a different bot than NEXT_PUBLIC_TELEGRAM_BOT_USERNAME. The Login Widget and sends must use the same bot.',
+            'TELEGRAM_BOT_TOKEN is for a different bot than NEXT_PUBLIC_TELEGRAM_BOT_USERNAME. Deep links and sends must use the same bot.',
           tokenBotUsername: match.actual,
           expectedPublicUsername: match.expected,
         },

@@ -22,7 +22,7 @@ export interface User {
   email?: string | null;
   /** Lowercase email for lookups (set server-side) */
   emailNormalized?: string | null;
-  /** Telegram user id from Login Widget (string for bigint safety) */
+  /** Telegram user id from deep-link linking (string for bigint safety) */
   telegramUserId?: string | null;
   telegramUsername?: string | null;
   /** When false, skip email channel (default true if email set) */

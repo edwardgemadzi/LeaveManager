@@ -139,12 +139,12 @@ export default function TelegramDeepLinkPanel({
   return (
     <div className="rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50/80 dark:bg-indigo-950/30 px-3 py-3 mt-3 space-y-2">
       <p className="text-sm font-medium text-indigo-900 dark:text-indigo-100">
-        Link in Telegram app (no website login)
+        Link Telegram
       </p>
       <p className="text-xs text-indigo-800/90 dark:text-indigo-200/90">
-        If “Log in with Telegram” asks for a phone code you never receive, use this instead: we open @{handle}{' '}
-        in the app with a private link. <strong>Do not share the link</strong> — anyone who opens it can attach
-        their Telegram to your Leave Manager account.
+        Generate a private link, open it in the Telegram app, and tap <strong>Start</strong> so @{handle} can link
+        to this account. <strong>Do not share the link</strong> — anyone who opens it can attach their Telegram to
+        your Leave Manager profile.
       </p>
       <button
         type="button"

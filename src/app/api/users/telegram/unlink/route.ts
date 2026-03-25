@@ -11,7 +11,7 @@ import { TelegramLinkTokenModel } from '@/models/TelegramLinkToken';
 
 /**
  * POST /api/users/telegram/unlink
- * Clear linked Telegram account so the user can use the Login Widget again.
+ * Clear linked Telegram account so the user can generate a new deep link.
  */
 export async function POST(request: NextRequest) {
   try {

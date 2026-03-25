@@ -5,8 +5,8 @@ import { Long } from 'mongodb';
  * Requires TELEGRAM_BOT_TOKEN. Never throws from public helpers.
  *
  * Note: Telegram only delivers private DMs after the user has opened the bot
- * in Telegram and tapped **Start** (or messaged the bot). The website Login Widget
- * alone does not open that chat — see profile hint + .env.example.
+ * in Telegram and tapped **Start** (or messaged the bot). Linking from the profile alone
+ * does not open that chat until they start the bot — see profile hint + .env.example.
  */
 
 export type TelegramSendOutcome =

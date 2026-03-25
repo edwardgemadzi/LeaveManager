@@ -13,7 +13,7 @@ import {
 
 /**
  * POST /api/users/telegram/deep-link
- * Create a one-time t.me deep link so the user can link Telegram in the app (no Login Widget).
+ * Create a one-time t.me deep link so the user can link Telegram in the app.
  */
 export async function POST(request: NextRequest) {
   try {

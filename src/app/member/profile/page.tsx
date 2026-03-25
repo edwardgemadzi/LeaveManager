@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { User, Team } from '@/types';
@@ -41,12 +41,10 @@ export default function MemberProfilePage() {
     notifyEmail: true,
     notifyTelegram: true,
   });
-  const telegramMountRef = useRef<HTMLDivElement>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [testTelegramLoading, setTestTelegramLoading] = useState(false);
   const [testEmailLoading, setTestEmailLoading] = useState(false);
-  const [telegramLinking, setTelegramLinking] = useState(false);
   const [telegramUnlinking, setTelegramUnlinking] = useState(false);
 
   useEffect(() => {
@@ -87,69 +85,6 @@ export default function MemberProfilePage() {
 
     fetchUserData();
   }, []);
-
-  useEffect(() => {
-    const bot = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
-    if (!bot || !telegramMountRef.current) return;
-    const el = telegramMountRef.current;
-    if (isTelegramLinked(user)) return;
-
-    type TelegramUser = Record<string, string | number | undefined>;
-    const w = window as unknown as { onTelegramAuth?: (u: TelegramUser) => void };
-    w.onTelegramAuth = async (telegramUser: TelegramUser) => {
-      setError('');
-      setMessage('');
-      setTelegramLinking(true);
-      try {
-        const res = await fetch('/api/users/telegram', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(telegramUser),
-        });
-        const data = await res.json();
-        if (res.ok) {
-          setUser(data.user);
-          setError('');
-          if (data.telegramWelcomeError) {
-            setError(String(data.telegramWelcomeError));
-          }
-          if (data.telegramWelcomeDelivered === false) {
-            setMessage(
-              'Telegram linked on the website. Open your bot in the Telegram app, tap Start, then use “Send test Telegram message” below.'
-            );
-          } else if (data.telegramWelcomeDelivered === true) {
-            setMessage('Telegram linked successfully. Check the bot chat for a confirmation message.');
-          } else {
-            setMessage('Telegram linked successfully.');
-          }
-          localStorage.setItem('user', JSON.stringify(data.user));
-        } else {
-          setError(data.error || 'Failed to link Telegram');
-        }
-      } catch {
-        setError('Network error linking Telegram');
-      } finally {
-        setTelegramLinking(false);
-        window.setTimeout(() => scrollToProfileFeedback(), 80);
-      }
-    };
-
-    el.innerHTML = '';
-    const script = document.createElement('script');
-    script.src = 'https://telegram.org/js/telegram-widget.js?22';
-    script.async = true;
-    script.setAttribute('data-telegram-login', bot);
-    script.setAttribute('data-size', 'large');
-    script.setAttribute('data-onauth', 'onTelegramAuth');
-    script.setAttribute('data-request-access', 'write');
-    el.appendChild(script);
-
-    return () => {
-      el.innerHTML = '';
-      delete w.onTelegramAuth;
-    };
-  }, [user]);
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -557,38 +492,17 @@ export default function MemberProfilePage() {
                             </button>
                           </div>
                         ) : (
-                          <>
-                            <TelegramDeepLinkPanel
-                              botUsername={process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME}
-                              onLinked={(u) => setUser(u)}
-                              onFeedback={() => window.setTimeout(() => scrollToProfileFeedback(), 80)}
-                              setError={setError}
-                              setMessage={setMessage}
-                            />
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 font-medium">
-                              Or use the website button (may ask for phone verification in Telegram):
-                            </p>
-                            <TelegramStartHint
-                              botUsername={process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME}
-                            />
-                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 max-w-lg">
-                              <strong>After your phone number in Telegram:</strong> return to this browser tab.
-                              A <strong>green or red notice appears at the top</strong> of the page when linking
-                              finishes, and this section will show &quot;Telegram linked&quot;. A DM from the bot is
-                              separate—use <strong>Send test Telegram message</strong> after you tap Start in the bot.
-                            </p>
-                            {telegramLinking ? (
-                              <p className="mt-2 text-sm font-medium text-indigo-600 dark:text-indigo-400">
-                                Finishing link with the server…
-                              </p>
-                            ) : null}
-                            <div ref={telegramMountRef} className="min-h-[56px]" />
-                          </>
+                          <TelegramDeepLinkPanel
+                            botUsername={process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME}
+                            onLinked={(u) => setUser(u)}
+                            onFeedback={() => window.setTimeout(() => scrollToProfileFeedback(), 80)}
+                            setError={setError}
+                            setMessage={setMessage}
+                          />
                         )}
                         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                           <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                            Can&apos;t see the login button, or need to link a different Telegram account? Clear the
-                            saved link below, then use <strong>Log in with Telegram</strong> again.
+                            To use a different Telegram account, disconnect below, then generate a new link.
                           </p>
                           <button
                             type="button"

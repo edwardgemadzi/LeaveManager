@@ -301,16 +301,6 @@ export const schemas = {
       'object.min': 'At least one field is required to update',
     }),
 
-  telegramLogin: Joi.object({
-    id: Joi.alternatives().try(Joi.number(), Joi.string()).required(),
-    first_name: Joi.string().allow('').optional(),
-    last_name: Joi.string().allow('').optional(),
-    username: Joi.string().allow('').optional(),
-    photo_url: Joi.string().allow('').optional(),
-    auth_date: Joi.alternatives().try(Joi.number(), Joi.string()).required(),
-    hash: Joi.string().required(),
-  }),
-
   // Team settings schema
   teamSettings: Joi.object({
     concurrentLeave: Joi.number()

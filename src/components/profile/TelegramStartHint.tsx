@@ -1,8 +1,7 @@
 'use client';
 
 /**
- * Telegram bots cannot DM a user until they open the bot in Telegram and tap Start.
- * The Login Widget only proves identity on the website.
+ * Telegram may refuse DMs until the user has opened the bot chat and tapped Start.
  */
 export default function TelegramStartHint({ botUsername }: { botUsername: string }) {
   const handle = botUsername.trim().replace(/^@/, '');
@@ -14,9 +13,7 @@ export default function TelegramStartHint({ botUsername }: { botUsername: string
       <a href={href} target="_blank" rel="noreferrer" className="underline font-medium">
         @{handle}
       </a>{' '}
-      in the Telegram app and tap <strong>Start</strong>. Entering your phone number in the
-      login window only verifies your account; it does not open the bot chat, so the bot cannot
-      send you leave updates until you start the bot once.
+      in the Telegram app and tap <strong>Start</strong> if leave notifications don&apos;t arrive.
     </p>
   );
 }
