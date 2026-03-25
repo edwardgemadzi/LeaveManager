@@ -39,6 +39,11 @@ export interface User {
    * Omitted = default [5, 1]; empty array = off. Ignored for members.
    */
   leaderTeamLeaveReminderDays?: number[];
+  /**
+   * Local time (HH:MM) in your saved timezone to send upcoming-leave reminders.
+   * Omitted = default "09:00".
+   */
+  leaveReminderTimeLocal?: string;
   /** Last prompt version the user acknowledged (see NEXT_PUBLIC_NOTIFICATION_PROMPT_VERSION) */
   notificationPromptVersionSeen?: number;
   /** IANA timezone for calendar-based UX (reminders, etc.); unset defaults to UTC server-side */

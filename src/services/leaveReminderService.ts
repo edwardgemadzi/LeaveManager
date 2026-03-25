@@ -5,7 +5,7 @@ import {
   notifyLeaveApproachingReminder,
   notifyLeaderTeamLeaveApproaching,
 } from '@/services/notificationService';
-import { calendarDaysUntilLeaveStartInZone } from '@/lib/timezone';
+import { calendarDaysUntilLeaveStartInZone, hourInZone } from '@/lib/timezone';
 import {
   effectiveMemberReminderDays,
   effectiveLeaderTeamReminderDays,
@@ -35,6 +35,14 @@ export async function runLeaveApproachingReminders(now = new Date()): Promise<Le
 
   const candidates = await LeaveRequestModel.findApprovedForReminderScan(now);
 
+  const shouldSendToUserNow = (u: { timezone?: string | null; leaveReminderTimeLocal?: string | null }) => {
+    const raw = typeof u.leaveReminderTimeLocal === 'string' ? u.leaveReminderTimeLocal.trim() : '';
+    const time = raw || '09:00';
+    const hh = Number(time.split(':')[0] ?? '9');
+    if (!Number.isFinite(hh) || hh < 0 || hh > 23) return false;
+    return hourInZone(now, u.timezone) === hh;
+  };
+
   for (const req of candidates) {
     if (!req._id) continue;
     result.processed++;
@@ -56,7 +64,10 @@ export async function runLeaveApproachingReminders(now = new Date()): Promise<Le
     const leaderSent = leaderOffsetsAlreadySent(req);
 
     const memberOffsets = effectiveMemberReminderDays(member);
-    const needMember = memberOffsets.filter((d) => d === days && !memberSent.has(d));
+    const needMember =
+      shouldSendToUserNow(member)
+        ? memberOffsets.filter((d) => d === days && !memberSent.has(d))
+        : [];
 
     let leader: Awaited<ReturnType<typeof UserModel.findById>> = null;
     let leaderOffsets: number[] = [];
@@ -70,7 +81,10 @@ export async function runLeaveApproachingReminders(now = new Date()): Promise<Le
         leaderOffsets = effectiveLeaderTeamReminderDays(leader);
       }
     }
-    const needLeader = leaderOffsets.filter((d) => d === days && !leaderSent.has(d));
+    const needLeader =
+      leader && shouldSendToUserNow(leader)
+        ? leaderOffsets.filter((d) => d === days && !leaderSent.has(d))
+        : [];
 
     if (needMember.length === 0 && needLeader.length === 0) {
       result.skipped++;

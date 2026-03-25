@@ -63,6 +63,7 @@ export async function PATCH(request: NextRequest) {
       dismissNotificationPrompt?: boolean;
       leaveReminderDaysBefore?: number[];
       leaderTeamLeaveReminderDays?: number[];
+      leaveReminderTimeLocal?: string;
     };
 
     const db = await getDatabase();
@@ -134,6 +135,10 @@ export async function PATCH(request: NextRequest) {
       $set.leaderTeamLeaveReminderDays = normalizeReminderDays(
         data.leaderTeamLeaveReminderDays
       );
+    }
+
+    if (data.leaveReminderTimeLocal !== undefined) {
+      $set.leaveReminderTimeLocal = String(data.leaveReminderTimeLocal).trim();
     }
 
     if (Object.keys($set).length === 0) {

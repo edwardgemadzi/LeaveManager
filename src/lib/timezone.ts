@@ -41,3 +41,17 @@ export function calendarDaysUntilLeaveStartInZone(
   const t1 = Date.UTC(y2, m2 - 1, d2);
   return Math.round((t1 - t0) / 86400000);
 }
+
+/**
+ * Hour (0-23) in the user's timezone at `now`.
+ */
+export function hourInZone(now: Date, rawTimeZone: string | null | undefined): number {
+  const timeZone = resolveUserTimeZone(rawTimeZone);
+  const hh = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: '2-digit',
+    hour12: false,
+  }).format(now);
+  const n = Number(hh);
+  return Number.isFinite(n) ? n : 0;
+}

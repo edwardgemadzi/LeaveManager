@@ -305,6 +305,12 @@ export const schemas = {
       .max(12)
       .unique()
       .optional(),
+    leaveReminderTimeLocal: Joi.string()
+      .pattern(/^(?:[01]\d|2[0-3]):[0-5]\d$/)
+      .optional()
+      .messages({
+        'string.pattern.base': 'Reminder time must be in HH:MM (24-hour) format',
+      }),
   })
     .min(1)
     .messages({

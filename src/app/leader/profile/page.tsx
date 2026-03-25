@@ -41,6 +41,7 @@ export default function LeaderProfilePage() {
     notifyTelegram: true,
     leaveReminderDaysBefore: [5, 1] as number[],
     leaderTeamLeaveReminderDays: [5, 1] as number[],
+    leaveReminderTimeLocal: '09:00',
   });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -62,6 +63,7 @@ export default function LeaderProfilePage() {
           const u = userData.user as {
             leaveReminderDaysBefore?: number[];
             leaderTeamLeaveReminderDays?: number[];
+            leaveReminderTimeLocal?: string;
           };
           setProfileForm({
             fullName: userData.user.fullName || '',
@@ -75,6 +77,10 @@ export default function LeaderProfilePage() {
             leaderTeamLeaveReminderDays: Array.isArray(u.leaderTeamLeaveReminderDays)
               ? [...u.leaderTeamLeaveReminderDays]
               : [5, 1],
+            leaveReminderTimeLocal:
+              typeof u.leaveReminderTimeLocal === 'string' && u.leaveReminderTimeLocal.trim()
+                ? u.leaveReminderTimeLocal.trim()
+                : '09:00',
           });
         }
 
@@ -273,6 +279,7 @@ export default function LeaderProfilePage() {
           notifyTelegram: profileForm.notifyTelegram,
           leaveReminderDaysBefore: profileForm.leaveReminderDaysBefore,
           leaderTeamLeaveReminderDays: profileForm.leaderTeamLeaveReminderDays,
+          leaveReminderTimeLocal: profileForm.leaveReminderTimeLocal,
         }),
       });
 
@@ -283,6 +290,7 @@ export default function LeaderProfilePage() {
         const u = data.user as {
           leaveReminderDaysBefore?: number[];
           leaderTeamLeaveReminderDays?: number[];
+          leaveReminderTimeLocal?: string;
         };
         setProfileForm((prev) => ({
           ...prev,
@@ -292,6 +300,10 @@ export default function LeaderProfilePage() {
           leaderTeamLeaveReminderDays: Array.isArray(u.leaderTeamLeaveReminderDays)
             ? [...u.leaderTeamLeaveReminderDays]
             : prev.leaderTeamLeaveReminderDays,
+          leaveReminderTimeLocal:
+            typeof u.leaveReminderTimeLocal === 'string' && u.leaveReminderTimeLocal.trim()
+              ? u.leaveReminderTimeLocal.trim()
+              : prev.leaveReminderTimeLocal,
         }));
         if (data.emailConfirmationSent === true) {
           setMessage(
@@ -490,6 +502,25 @@ export default function LeaderProfilePage() {
                         Uses your time zone. Sent by email and/or Telegram when those are enabled above. Uncheck all
                         days to turn off that type of reminder.
                       </p>
+                      <div className="mt-3">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Reminder time
+                        </label>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                          Sent around this time in your profile time zone (cron runs hourly).
+                        </p>
+                        <input
+                          type="time"
+                          value={profileForm.leaveReminderTimeLocal}
+                          onChange={(e) =>
+                            setProfileForm({
+                              ...profileForm,
+                              leaveReminderTimeLocal: e.target.value || '09:00',
+                            })
+                          }
+                          className="mt-1 block w-full max-w-[220px] px-3 py-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-200 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        />
+                      </div>
                       <LeaveReminderDayChips
                         label="My approved leave"
                         description="Remind me this many calendar days before my own leave starts."
