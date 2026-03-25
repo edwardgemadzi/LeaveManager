@@ -79,8 +79,24 @@ export default function MemberRequestsPage() {
   });
 
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    setUserId(user.id || null);
+    const run = async () => {
+      try {
+        const res = await fetch('/api/users/profile', { credentials: 'include' });
+        if (!res.ok) {
+          setUserId(null);
+          return;
+        }
+        const data = await res.json();
+        const id = (data?.user?.id as string | undefined) || null;
+        setUserId(id);
+        if (data?.user) {
+          localStorage.setItem('user', JSON.stringify(data.user));
+        }
+      } catch {
+        setUserId(null);
+      }
+    };
+    run();
   }, []);
 
   useEffect(() => {
