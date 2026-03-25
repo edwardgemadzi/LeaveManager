@@ -1,6 +1,7 @@
 import { getDatabase, getDatabaseRaw } from '@/lib/mongodb';
 import { ObjectId, ClientSession, Filter } from 'mongodb';
 import { LeaveRequest } from '@/types';
+import { MAX_REMINDER_DAY_OFFSET } from '@/lib/leaveReminderPrefs';
 
 export class LeaveRequestModel {
   private static buildIdQuery(field: 'userId' | 'teamId', id: string): Record<string, unknown> {
@@ -288,7 +289,7 @@ export class LeaveRequestModel {
 
   /**
    * Approved, not deleted, leave with startDate in a wide UTC window for reminder cron.
-   * Wider than "10 days" in UTC so members ahead/behind UTC still get correct in-zone day counts.
+   * Window covers configurable offsets up to MAX_REMINDER_DAY_OFFSET calendar days ahead.
    */
   static async findApprovedForReminderScan(now: Date): Promise<LeaveRequest[]> {
     const db = await getDatabase();
@@ -298,7 +299,7 @@ export class LeaveRequestModel {
     const m = now.getUTCMonth();
     const d = now.getUTCDate();
     const windowStart = new Date(Date.UTC(y, m, d - 3));
-    const windowEnd = new Date(Date.UTC(y, m, d + 23));
+    const windowEnd = new Date(Date.UTC(y, m, d + MAX_REMINDER_DAY_OFFSET + 5));
 
     const query = {
       $and: [
@@ -311,19 +312,30 @@ export class LeaveRequestModel {
     return requests.find(query).toArray();
   }
 
-  static async markReminderSent(id: string, which: '10' | '5'): Promise<void> {
+  static async markMemberReminderOffsetSent(id: string, day: number): Promise<void> {
     const db = await getDatabase();
     const requests = db.collection<LeaveRequest>('leaveRequests');
     const objectId = new ObjectId(id);
-    const field = which === '10' ? 'reminder10DaysSentAt' : 'reminder5DaysSentAt';
     await requests.updateOne(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       { _id: objectId } as any,
       {
-        $set: {
-          [field]: new Date(),
-          updatedAt: new Date(),
-        },
+        $addToSet: { reminderMemberOffsetsSent: day },
+        $set: { updatedAt: new Date() },
+      }
+    );
+  }
+
+  static async markLeaderReminderOffsetSent(id: string, day: number): Promise<void> {
+    const db = await getDatabase();
+    const requests = db.collection<LeaveRequest>('leaveRequests');
+    const objectId = new ObjectId(id);
+    await requests.updateOne(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { _id: objectId } as any,
+      {
+        $addToSet: { reminderLeaderOffsetsSent: day },
+        $set: { updatedAt: new Date() },
       }
     );
   }

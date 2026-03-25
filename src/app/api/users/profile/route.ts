@@ -61,6 +61,8 @@ export async function PATCH(request: NextRequest) {
       notifyEmail?: boolean;
       notifyTelegram?: boolean;
       dismissNotificationPrompt?: boolean;
+      leaveReminderDaysBefore?: number[];
+      leaderTeamLeaveReminderDays?: number[];
     };
 
     const db = await getDatabase();
@@ -116,6 +118,22 @@ export async function PATCH(request: NextRequest) {
 
     if (data.dismissNotificationPrompt === true) {
       $set.notificationPromptVersionSeen = PROMPT_VERSION;
+    }
+
+    const normalizeReminderDays = (arr: number[]) =>
+      [...new Set(arr.filter((n) => Number.isInteger(n) && n >= 1 && n <= 90))].sort((a, b) => a - b);
+
+    if (data.leaveReminderDaysBefore !== undefined) {
+      $set.leaveReminderDaysBefore = normalizeReminderDays(data.leaveReminderDaysBefore);
+    }
+
+    if (
+      user.role === 'leader' &&
+      data.leaderTeamLeaveReminderDays !== undefined
+    ) {
+      $set.leaderTeamLeaveReminderDays = normalizeReminderDays(
+        data.leaderTeamLeaveReminderDays
+      );
     }
 
     if (Object.keys($set).length === 0) {

@@ -1,26 +1,34 @@
 import { LeaveRequestModel } from '@/models/LeaveRequest';
 import { UserModel } from '@/models/User';
 import { TeamModel } from '@/models/Team';
-import { notifyLeaveApproachingReminder } from '@/services/notificationService';
+import {
+  notifyLeaveApproachingReminder,
+  notifyLeaderTeamLeaveApproaching,
+} from '@/services/notificationService';
 import { calendarDaysUntilLeaveStartInZone } from '@/lib/timezone';
+import {
+  effectiveMemberReminderDays,
+  effectiveLeaderTeamReminderDays,
+  leaderOffsetsAlreadySent,
+  memberOffsetsAlreadySent,
+} from '@/lib/leaveReminderPrefs';
 
 export type LeaveReminderRunResult = {
   processed: number;
-  sent10: number;
-  sent5: number;
+  sentMember: number;
+  sentLeader: number;
   skipped: number;
   failed: number;
 };
 
 /**
- * Send 10-day and 5-day reminders for approved leave (email + Telegram per user prefs).
- * Idempotent via reminder10DaysSentAt / reminder5DaysSentAt on each request.
+ * Send configurable upcoming-leave reminders (member + team leader), idempotent per offset on each request.
  */
 export async function runLeaveApproachingReminders(now = new Date()): Promise<LeaveReminderRunResult> {
   const result: LeaveReminderRunResult = {
     processed: 0,
-    sent10: 0,
-    sent5: 0,
+    sentMember: 0,
+    sentLeader: 0,
     skipped: 0,
     failed: 0,
   };
@@ -41,37 +49,58 @@ export async function runLeaveApproachingReminders(now = new Date()): Promise<Le
       req.startDate instanceof Date ? req.startDate : new Date(req.startDate);
     const days = calendarDaysUntilLeaveStartInZone(start, now, member.timezone);
 
-    const need10 = days === 10 && !req.reminder10DaysSentAt;
-    const need5 = days === 5 && !req.reminder5DaysSentAt;
+    const team = await TeamModel.findById(String(req.teamId));
+    const teamName = team?.name || 'Your team';
 
-    if (!need10 && !need5) {
+    const memberSent = memberOffsetsAlreadySent(req);
+    const leaderSent = leaderOffsetsAlreadySent(req);
+
+    const memberOffsets = effectiveMemberReminderDays(member);
+    const needMember = memberOffsets.filter((d) => d === days && !memberSent.has(d));
+
+    let leader: Awaited<ReturnType<typeof UserModel.findById>> = null;
+    let leaderOffsets: number[] = [];
+    if (team?.leaderId) {
+      leader = await UserModel.findById(String(team.leaderId));
+      if (
+        leader &&
+        leader._id &&
+        String(leader._id) !== String(member._id)
+      ) {
+        leaderOffsets = effectiveLeaderTeamReminderDays(leader);
+      }
+    }
+    const needLeader = leaderOffsets.filter((d) => d === days && !leaderSent.has(d));
+
+    if (needMember.length === 0 && needLeader.length === 0) {
       result.skipped++;
       continue;
     }
 
-    const team = await TeamModel.findById(String(req.teamId));
-    const teamName = team?.name || 'Your team';
-
     try {
-      if (need10) {
+      for (const d of needMember) {
         await notifyLeaveApproachingReminder({
           leaveRequest: req,
           member,
           teamName,
-          daysUntil: 10,
+          daysUntil: d,
         });
-        await LeaveRequestModel.markReminderSent(req._id, '10');
-        result.sent10++;
+        await LeaveRequestModel.markMemberReminderOffsetSent(req._id, d);
+        result.sentMember++;
       }
-      if (need5) {
-        await notifyLeaveApproachingReminder({
-          leaveRequest: req,
-          member,
-          teamName,
-          daysUntil: 5,
-        });
-        await LeaveRequestModel.markReminderSent(req._id, '5');
-        result.sent5++;
+
+      if (leader && needLeader.length > 0) {
+        for (const d of needLeader) {
+          await notifyLeaderTeamLeaveApproaching({
+            leaveRequest: req,
+            leader,
+            member,
+            teamName,
+            daysUntil: d,
+          });
+          await LeaveRequestModel.markLeaderReminderOffsetSent(req._id, d);
+          result.sentLeader++;
+        }
       }
     } catch {
       result.failed++;

@@ -214,30 +214,34 @@ export async function notifyLeaveDecision(params: {
   await Promise.allSettled(tasks);
 }
 
-/** Reminder that approved leave starts in `daysUntil` calendar days (10 or 5). */
-export async function notifyLeaveApproachingReminder(params: {
-  leaveRequest: LeaveRequest;
-  member: User;
-  teamName: string;
-  daysUntil: 10 | 5;
-}): Promise<void> {
-  const { leaveRequest, member, teamName, daysUntil } = params;
+function leaveDateRange(leaveRequest: LeaveRequest): string {
   const start = leaveRequest.startDate instanceof Date
     ? leaveRequest.startDate.toISOString().split('T')[0]
     : String(leaveRequest.startDate);
   const end = leaveRequest.endDate instanceof Date
     ? leaveRequest.endDate.toISOString().split('T')[0]
     : String(leaveRequest.endDate);
-  const range = formatDateRange(start, end);
+  return formatDateRange(start, end);
+}
+
+/** Reminder that approved leave starts in `daysUntil` calendar days (per user timezone on cron). */
+export async function notifyLeaveApproachingReminder(params: {
+  leaveRequest: LeaveRequest;
+  member: User;
+  teamName: string;
+  daysUntil: number;
+}): Promise<void> {
+  const { leaveRequest, member, teamName, daysUntil } = params;
+  const range = leaveDateRange(leaveRequest);
   const base = appBaseUrl();
   const link =
     member.role === 'leader'
       ? `${base}/leader/calendar`
       : `${base}/member/requests`;
   const when =
-    daysUntil === 10
-      ? 'Your approved leave starts in 10 days.'
-      : 'Your approved leave starts in 5 days.';
+    daysUntil === 1
+      ? 'Your approved leave starts tomorrow.'
+      : `Your approved leave starts in ${daysUntil} days.`;
 
   const tasks: Promise<unknown>[] = [];
 
@@ -257,9 +261,9 @@ export async function notifyLeaveApproachingReminder(params: {
     tasks.push(
       sendHtmlEmail({
         to: member.email!.trim(),
-        subject: `Leave reminder: starts in ${daysUntil} days — ${range}`,
+        subject: `Leave reminder: starts in ${daysUntil} day${daysUntil === 1 ? '' : 's'} — ${range}`,
         html: shell(inner, {
-          title: `Leave in ${daysUntil} days`,
+          title: `Leave in ${daysUntil} day${daysUntil === 1 ? '' : 's'}`,
           preheader: `${when} ${range}`,
         }),
       })
@@ -271,13 +275,184 @@ export async function notifyLeaveApproachingReminder(params: {
       sendTelegramMessage({
         chatId: member.telegramUserId!,
         text:
-          `Leave reminder (${daysUntil} days)\n` +
+          `Leave reminder (${daysUntil} day${daysUntil === 1 ? '' : 's'})\n` +
           `${when}\n` +
           `Team: ${teamName}\n` +
           `Dates: ${range}\n` +
           `Reason: ${leaveRequest.reason}`,
       })
     );
+  }
+
+  await Promise.allSettled(tasks);
+}
+
+/** Leader heads-up: teammate's approved leave starts in `daysUntil` days. */
+export async function notifyLeaderTeamLeaveApproaching(params: {
+  leaveRequest: LeaveRequest;
+  leader: User;
+  member: User;
+  teamName: string;
+  daysUntil: number;
+}): Promise<void> {
+  const { leaveRequest, leader, member, teamName, daysUntil } = params;
+  const range = leaveDateRange(leaveRequest);
+  const base = appBaseUrl();
+  const leaderLink = `${base}/leader/calendar`;
+  const memberLabel = member.fullName?.trim() || member.username;
+  const when =
+    daysUntil === 1
+      ? `${escapeForHtml(memberLabel)}'s leave starts tomorrow.`
+      : `${escapeForHtml(memberLabel)}'s leave starts in ${daysUntil} days.`;
+
+  const tasks: Promise<unknown>[] = [];
+
+  if (wantsEmail(leader)) {
+    const inner = `
+      <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Team planning reminder</p>
+      <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;"><strong>${when}</strong></p>
+      <table role="presentation" style="margin:16px 0;border-collapse:collapse;width:100%;">
+        <tr><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:13px;">Team</td><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;font-size:14px;">${escapeForHtml(teamName)}</td></tr>
+        <tr><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:13px;">Member</td><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;font-size:14px;">${escapeForHtml(memberLabel)}</td></tr>
+        <tr><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:13px;">Dates</td><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;font-size:14px;">${escapeForHtml(range)}</td></tr>
+        <tr><td style="padding:8px 0;color:#64748b;font-size:13px;">Reason</td><td style="padding:8px 0;font-size:14px;">${escapeForHtml(leaveRequest.reason)}</td></tr>
+      </table>
+      <p style="margin:20px 0 0;">
+        <a href="${leaderLink}" style="display:inline-block;background:#4f46e5;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:14px;">Open calendar</a>
+      </p>
+    `;
+    tasks.push(
+      sendHtmlEmail({
+        to: leader.email!.trim(),
+        subject: `Team leave in ${daysUntil} day${daysUntil === 1 ? '' : 's'} — ${memberLabel} — ${range}`,
+        html: shell(inner, {
+          title: 'Team leave reminder',
+          preheader: `${memberLabel} · ${range}`,
+        }),
+      })
+    );
+  }
+
+  if (wantsTelegram(leader)) {
+    const line =
+      daysUntil === 1
+        ? `Team reminder: ${memberLabel}'s leave starts tomorrow`
+        : `Team reminder: ${memberLabel}'s leave in ${daysUntil} days`;
+    tasks.push(
+      sendTelegramMessage({
+        chatId: leader.telegramUserId!,
+        text: `${line}\nTeam: ${teamName}\nDates: ${range}\nReason: ${leaveRequest.reason}`,
+      })
+    );
+  }
+
+  await Promise.allSettled(tasks);
+}
+
+export type LeaveRemovedKind = 'member_withdrew_pending' | 'leader_removed_approved';
+
+/** After soft-delete: notify member and optionally leader (skipped if leave already ended by calendar). */
+export async function notifyLeaveRemoved(params: {
+  leaveRequest: LeaveRequest;
+  member: User;
+  leader: User | null;
+  actor: User;
+  teamName: string;
+  kind: LeaveRemovedKind;
+}): Promise<void> {
+  const { leaveRequest, member, leader, actor, teamName, kind } = params;
+  const range = leaveDateRange(leaveRequest);
+  const memberLabel = member.fullName?.trim() || member.username;
+  const actorLabel = actor.fullName?.trim() || actor.username;
+  const base = appBaseUrl();
+  const memberLink = `${base}/member/requests`;
+  const leaderLink = `${base}/leader/requests`;
+
+  const tasks: Promise<unknown>[] = [];
+
+  if (kind === 'member_withdrew_pending') {
+    const memberSubject = `Leave request withdrawn — ${range}`;
+    const memberBody = `
+      <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Hi ${escapeForHtml(member.username)},</p>
+      <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Your <strong>pending</strong> leave request (${escapeForHtml(range)}) was removed.</p>
+      <p style="margin:0;font-size:14px;line-height:1.5;color:#64748b;">Team: ${escapeForHtml(teamName)}</p>
+      <p style="margin:20px 0 0;">
+        <a href="${memberLink}" style="display:inline-block;background:#4f46e5;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:14px;">View requests</a>
+      </p>
+    `;
+    if (wantsEmail(member)) {
+      tasks.push(
+        sendHtmlEmail({
+          to: member.email!.trim(),
+          subject: memberSubject,
+          html: shell(memberBody, { title: 'Request withdrawn', preheader: range }),
+        })
+      );
+    }
+    if (wantsTelegram(member)) {
+      tasks.push(
+        sendTelegramMessage({
+          chatId: member.telegramUserId!,
+          text: `Pending leave withdrawn\nDates: ${range}\nTeam: ${teamName}`,
+        })
+      );
+    }
+
+    if (leader && leader._id && String(leader._id) !== String(member._id)) {
+      const subj = `${memberLabel} withdrew a pending leave — ${range}`;
+      const inner = `
+        <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;"><strong>${escapeForHtml(memberLabel)}</strong> removed a pending leave request.</p>
+        <p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:#334155;">Dates: ${escapeForHtml(range)}</p>
+        <p style="margin:0;font-size:14px;line-height:1.5;color:#64748b;">Reason: ${escapeForHtml(leaveRequest.reason)}</p>
+        <p style="margin:20px 0 0;">
+          <a href="${leaderLink}" style="display:inline-block;background:#4f46e5;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:14px;">Review requests</a>
+        </p>
+      `;
+      if (wantsEmail(leader)) {
+        tasks.push(
+          sendHtmlEmail({
+            to: leader.email!.trim(),
+            subject: subj,
+            html: shell(inner, { title: 'Pending leave withdrawn', preheader: range }),
+          })
+        );
+      }
+      if (wantsTelegram(leader)) {
+        tasks.push(
+          sendTelegramMessage({
+            chatId: leader.telegramUserId!,
+            text: `Pending leave withdrawn\nFrom: ${memberLabel}\nDates: ${range}`,
+          })
+        );
+      }
+    }
+  } else {
+    const subj = `Approved leave removed — ${range}`;
+    const inner = `
+      <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Hi ${escapeForHtml(member.username)},</p>
+      <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Your <strong>approved</strong> leave (${escapeForHtml(range)}) was removed by ${escapeForHtml(actorLabel)}.</p>
+      <p style="margin:0;font-size:14px;line-height:1.5;color:#64748b;">Team: ${escapeForHtml(teamName)}</p>
+      <p style="margin:20px 0 0;">
+        <a href="${memberLink}" style="display:inline-block;background:#4f46e5;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:14px;">View requests</a>
+      </p>
+    `;
+    if (wantsEmail(member)) {
+      tasks.push(
+        sendHtmlEmail({
+          to: member.email!.trim(),
+          subject: subj,
+          html: shell(inner, { title: 'Leave removed', preheader: range }),
+        })
+      );
+    }
+    if (wantsTelegram(member)) {
+      tasks.push(
+        sendTelegramMessage({
+          chatId: member.telegramUserId!,
+          text: `Approved leave removed by ${actorLabel}\nDates: ${range}\nTeam: ${teamName}`,
+        })
+      );
+    }
   }
 
   await Promise.allSettled(tasks);

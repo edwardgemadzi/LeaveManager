@@ -3,7 +3,8 @@ import { runLeaveApproachingReminders } from '@/services/leaveReminderService';
 import { info, error as logError } from '@/lib/logger';
 
 /**
- * Daily cron: remind members of approved leave starting in 10 and 5 days (UTC calendar days).
+ * Daily cron: upcoming approved leave — reminders to the member (per their profile offsets) and
+ * to the team leader about teammates’ leave (per leader profile offsets). Defaults include 5 and 1 days before.
  *
  * Vercel Cron: set CRON_SECRET in project env; Vercel sends `Authorization: Bearer <CRON_SECRET>`.
  * Manual: curl -H "Authorization: Bearer $CRON_SECRET" https://your-app/api/cron/leave-reminders

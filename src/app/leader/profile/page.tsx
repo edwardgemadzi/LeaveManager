@@ -7,6 +7,7 @@ import { User, Team } from '@/types';
 import TimezoneSelect from '@/components/profile/TimezoneSelect';
 import TelegramStartHint from '@/components/profile/TelegramStartHint';
 import TelegramDeepLinkPanel from '@/components/profile/TelegramDeepLinkPanel';
+import LeaveReminderDayChips from '@/components/profile/LeaveReminderDayChips';
 import TelegramLocalDevHint from '@/components/profile/TelegramLocalDevHint';
 import ProfilePageFeedback from '@/components/profile/ProfilePageFeedback';
 import { isTelegramLinked } from '@/lib/telegramLinked';
@@ -38,6 +39,8 @@ export default function LeaderProfilePage() {
     timezone: 'UTC',
     notifyEmail: true,
     notifyTelegram: true,
+    leaveReminderDaysBefore: [5, 1] as number[],
+    leaderTeamLeaveReminderDays: [5, 1] as number[],
   });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -56,12 +59,22 @@ export default function LeaderProfilePage() {
         if (userResponse.ok) {
           const userData = await userResponse.json();
           setUser(userData.user);
+          const u = userData.user as {
+            leaveReminderDaysBefore?: number[];
+            leaderTeamLeaveReminderDays?: number[];
+          };
           setProfileForm({
             fullName: userData.user.fullName || '',
             email: (userData.user as { email?: string }).email || '',
             timezone: (userData.user as { timezone?: string | null }).timezone || 'UTC',
             notifyEmail: (userData.user as { notifyEmail?: boolean }).notifyEmail !== false,
             notifyTelegram: (userData.user as { notifyTelegram?: boolean }).notifyTelegram !== false,
+            leaveReminderDaysBefore: Array.isArray(u.leaveReminderDaysBefore)
+              ? [...u.leaveReminderDaysBefore]
+              : [5, 1],
+            leaderTeamLeaveReminderDays: Array.isArray(u.leaderTeamLeaveReminderDays)
+              ? [...u.leaderTeamLeaveReminderDays]
+              : [5, 1],
           });
         }
 
@@ -258,6 +271,8 @@ export default function LeaderProfilePage() {
           timezone: profileForm.timezone,
           notifyEmail: profileForm.notifyEmail,
           notifyTelegram: profileForm.notifyTelegram,
+          leaveReminderDaysBefore: profileForm.leaveReminderDaysBefore,
+          leaderTeamLeaveReminderDays: profileForm.leaderTeamLeaveReminderDays,
         }),
       });
 
@@ -265,6 +280,19 @@ export default function LeaderProfilePage() {
 
       if (response.ok) {
         setUser(data.user);
+        const u = data.user as {
+          leaveReminderDaysBefore?: number[];
+          leaderTeamLeaveReminderDays?: number[];
+        };
+        setProfileForm((prev) => ({
+          ...prev,
+          leaveReminderDaysBefore: Array.isArray(u.leaveReminderDaysBefore)
+            ? [...u.leaveReminderDaysBefore]
+            : prev.leaveReminderDaysBefore,
+          leaderTeamLeaveReminderDays: Array.isArray(u.leaderTeamLeaveReminderDays)
+            ? [...u.leaderTeamLeaveReminderDays]
+            : prev.leaderTeamLeaveReminderDays,
+        }));
         if (data.emailConfirmationSent === true) {
           setMessage(
             'Profile updated successfully! A short confirmation was sent to your email (check spam).'
@@ -454,6 +482,31 @@ export default function LeaderProfilePage() {
                       />
                       Telegram notifications (after linking below)
                     </label>
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-3 space-y-1">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        Upcoming leave reminders
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Uses your time zone. Sent by email and/or Telegram when those are enabled above. Uncheck all
+                        days to turn off that type of reminder.
+                      </p>
+                      <LeaveReminderDayChips
+                        label="My approved leave"
+                        description="Remind me this many calendar days before my own leave starts."
+                        value={profileForm.leaveReminderDaysBefore}
+                        onChange={(leaveReminderDaysBefore) =>
+                          setProfileForm({ ...profileForm, leaveReminderDaysBefore })
+                        }
+                      />
+                      <LeaveReminderDayChips
+                        label="Teammates on approved leave"
+                        description="Heads-up before people on your team go on leave (planning)."
+                        value={profileForm.leaderTeamLeaveReminderDays}
+                        onChange={(leaderTeamLeaveReminderDays) =>
+                          setProfileForm({ ...profileForm, leaderTeamLeaveReminderDays })
+                        }
+                      />
+                    </div>
                     {process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ? (
                       <>
                         {isTelegramLinked(user) ? (

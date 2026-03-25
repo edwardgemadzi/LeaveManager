@@ -9,6 +9,7 @@ import { UserIcon } from '@heroicons/react/24/outline';
 import TimezoneSelect from '@/components/profile/TimezoneSelect';
 import TelegramStartHint from '@/components/profile/TelegramStartHint';
 import TelegramDeepLinkPanel from '@/components/profile/TelegramDeepLinkPanel';
+import LeaveReminderDayChips from '@/components/profile/LeaveReminderDayChips';
 import TelegramLocalDevHint from '@/components/profile/TelegramLocalDevHint';
 import ProfilePageFeedback from '@/components/profile/ProfilePageFeedback';
 import { isTelegramLinked } from '@/lib/telegramLinked';
@@ -40,6 +41,7 @@ export default function MemberProfilePage() {
     timezone: 'UTC',
     notifyEmail: true,
     notifyTelegram: true,
+    leaveReminderDaysBefore: [5, 1] as number[],
   });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -58,12 +60,18 @@ export default function MemberProfilePage() {
         if (userResponse.ok) {
           const userData = await userResponse.json();
           setUser(userData.user);
+          const u = userData.user as {
+            leaveReminderDaysBefore?: number[];
+          };
           setProfileForm({
             fullName: userData.user.fullName || '',
             email: (userData.user as { email?: string }).email || '',
             timezone: (userData.user as { timezone?: string | null }).timezone || 'UTC',
             notifyEmail: (userData.user as { notifyEmail?: boolean }).notifyEmail !== false,
             notifyTelegram: (userData.user as { notifyTelegram?: boolean }).notifyTelegram !== false,
+            leaveReminderDaysBefore: Array.isArray(u.leaveReminderDaysBefore)
+              ? [...u.leaveReminderDaysBefore]
+              : [5, 1],
           });
         }
 
@@ -260,6 +268,7 @@ export default function MemberProfilePage() {
           timezone: profileForm.timezone,
           notifyEmail: profileForm.notifyEmail,
           notifyTelegram: profileForm.notifyTelegram,
+          leaveReminderDaysBefore: profileForm.leaveReminderDaysBefore,
         }),
       });
 
@@ -267,6 +276,13 @@ export default function MemberProfilePage() {
 
       if (response.ok) {
         setUser(data.user);
+        const u = data.user as { leaveReminderDaysBefore?: number[] };
+        setProfileForm((prev) => ({
+          ...prev,
+          leaveReminderDaysBefore: Array.isArray(u.leaveReminderDaysBefore)
+            ? [...u.leaveReminderDaysBefore]
+            : prev.leaveReminderDaysBefore,
+        }));
         if (data.emailConfirmationSent === true) {
           setMessage(
             'Profile updated successfully! A short confirmation was sent to your email (check spam).'
@@ -468,6 +484,23 @@ export default function MemberProfilePage() {
                       />
                       Telegram notifications (after linking below)
                     </label>
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-3 space-y-1">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        Upcoming leave reminders
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Uses your time zone. Sent by email and/or Telegram when those are enabled above. Uncheck all
+                        days to turn off reminders for your own approved leave.
+                      </p>
+                      <LeaveReminderDayChips
+                        label="My approved leave"
+                        description="Remind me this many calendar days before my leave starts."
+                        value={profileForm.leaveReminderDaysBefore}
+                        onChange={(leaveReminderDaysBefore) =>
+                          setProfileForm({ ...profileForm, leaveReminderDaysBefore })
+                        }
+                      />
+                    </div>
                     {process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ? (
                       <>
                         {isTelegramLinked(user) ? (

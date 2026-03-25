@@ -29,6 +29,16 @@ export interface User {
   notifyEmail?: boolean;
   /** When false, skip Telegram (default true if Telegram linked) */
   notifyTelegram?: boolean;
+  /**
+   * Calendar days before your approved leave starts to send reminders (email/Telegram per prefs).
+   * Omitted = default [5, 1]; empty array = no upcoming-self reminders.
+   */
+  leaveReminderDaysBefore?: number[];
+  /**
+   * Calendar days before a teammate's approved leave to notify you as team leader.
+   * Omitted = default [5, 1]; empty array = off. Ignored for members.
+   */
+  leaderTeamLeaveReminderDays?: number[];
   /** Last prompt version the user acknowledged (see NEXT_PUBLIC_NOTIFICATION_PROMPT_VERSION) */
   notificationPromptVersionSeen?: number;
   /** IANA timezone for calendar-based UX (reminders, etc.); unset defaults to UTC server-side */
@@ -94,6 +104,10 @@ export interface LeaveRequest {
   reminder10DaysSentAt?: Date;
   /** Set when the 5-day-upcoming reminder was sent (idempotency for cron). */
   reminder5DaysSentAt?: Date;
+  /** Offsets (days before start) already sent to the leave owner (cron idempotency). */
+  reminderMemberOffsetsSent?: number[];
+  /** Offsets already sent to the team leader about this leave (cron idempotency). */
+  reminderLeaderOffsetsSent?: number[];
   createdAt: Date;
   updatedAt: Date;
 }

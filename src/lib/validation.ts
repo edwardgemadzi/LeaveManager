@@ -295,6 +295,16 @@ export const schemas = {
     notifyEmail: Joi.boolean().optional(),
     notifyTelegram: Joi.boolean().optional(),
     dismissNotificationPrompt: Joi.boolean().optional(),
+    leaveReminderDaysBefore: Joi.array()
+      .items(Joi.number().integer().min(1).max(90))
+      .max(12)
+      .unique()
+      .optional(),
+    leaderTeamLeaveReminderDays: Joi.array()
+      .items(Joi.number().integer().min(1).max(90))
+      .max(12)
+      .unique()
+      .optional(),
   })
     .min(1)
     .messages({

@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTokenFromRequest, shouldRejectCsrf, verifyToken } from '@/lib/auth';
 import { LeaveRequestModel } from '@/models/LeaveRequest';
 import { AuditLogModel } from '@/models/AuditLog';
-import { notifyLeaveDecision } from '@/services/notificationService';
+import { notifyLeaveDecision, notifyLeaveRemoved } from '@/services/notificationService';
 import { UserModel } from '@/models/User';
+import { TeamModel } from '@/models/Team';
+import { isLeaveEndOnOrAfterTodayInMemberZone } from '@/lib/leaveReminderPrefs';
 import { teamIdsMatch } from '@/lib/helpers';
 import { ObjectId } from 'mongodb';
 import { broadcastTeamUpdate } from '@/lib/teamEvents';
@@ -263,6 +265,32 @@ export async function DELETE(
           status: leaveRequest.status,
         }
       );
+
+      const stillRelevant = isLeaveEndOnOrAfterTodayInMemberZone(
+        leaveRequest,
+        new Date(),
+        targetUser.timezone
+      );
+      if (stillRelevant) {
+        const team = await TeamModel.findById(String(leaveRequest.teamId));
+        const leader =
+          team?.leaderId != null
+            ? await UserModel.findById(String(team.leaderId))
+            : null;
+        const teamName = team?.name || 'Your team';
+        const kind =
+          user.role === 'member'
+            ? 'member_withdrew_pending'
+            : 'leader_removed_approved';
+        await notifyLeaveRemoved({
+          leaveRequest,
+          member: targetUser,
+          leader,
+          actor: actorUser,
+          teamName,
+          kind,
+        });
+      }
     }
 
     // Broadcast event after deletion
