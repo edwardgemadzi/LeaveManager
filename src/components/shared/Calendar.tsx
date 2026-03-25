@@ -64,6 +64,8 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
   // Date selection state (only for members)
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
+  const selectionForEventsRef = useRef({ selectionMode: false, selectedDates: [] as Date[] });
+  selectionForEventsRef.current = { selectionMode, selectedDates };
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [teamSettings, setTeamSettings] = useState<{
     minimumNoticePeriod: number;
@@ -763,15 +765,16 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
     setRequestAsRange(false);
   }, []);
 
-  // Page-level floating panel hooks (member/calendar) uses these events.
+  // Page-level floating panel + desktop sidebar dispatch these; ref avoids stale closure on the listener.
   useEffect(() => {
     if (!isMember) return;
     const openHandler = () => {
-      if (!selectionMode || selectedDates.length === 0) return;
+      const { selectionMode: sm, selectedDates: sd } = selectionForEventsRef.current;
+      if (!sm || sd.length === 0) return;
       setShowRequestModal(true);
     };
     const clearHandler = () => {
-      if (!selectionMode) return;
+      if (!selectionForEventsRef.current.selectionMode) return;
       clearSelectionMode();
     };
     window.addEventListener('lm:calendar:open-request', openHandler as EventListener);
@@ -780,7 +783,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
       window.removeEventListener('lm:calendar:open-request', openHandler as EventListener);
       window.removeEventListener('lm:calendar:clear-selection', clearHandler as EventListener);
     };
-  }, [isMember, selectionMode, selectedDates.length, clearSelectionMode]);
+  }, [isMember, clearSelectionMode]);
 
   useEffect(() => {
     if (!isMember || !onMemberSelectionChange) return;

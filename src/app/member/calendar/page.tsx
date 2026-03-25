@@ -228,20 +228,30 @@ export default function MemberCalendarPage() {
           <aside className="hidden lg:block lg:col-span-3">
             <div className="sticky top-14 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5">
               <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Selection</p>
-              {selectionSummary.selectedCount > 0 ? (
+              {selectionSummary.selectionMode && selectionSummary.selectedCount > 0 ? (
                 <div className="mt-2">
                   <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                     {selectionSummary.selectedCount} day{selectionSummary.selectedCount === 1 ? '' : 's'} selected
                   </p>
-                  <p className="app-page-subheading text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Use the floating panel to submit.</p>
-                  {selectionSummary.clearSelection && (
+                  <p className="app-page-subheading text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Submit your leave request for the selected dates.
+                  </p>
+                  <div className="mt-3 flex flex-col gap-2">
                     <button
-                      onClick={selectionSummary.clearSelection}
-                      className="mt-2 text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 underline"
+                      type="button"
+                      onClick={() => window.dispatchEvent(new CustomEvent('lm:calendar:open-request'))}
+                      className="btn-primary text-sm justify-center w-full py-2.5"
+                    >
+                      Request leave
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => window.dispatchEvent(new CustomEvent('lm:calendar:clear-selection'))}
+                      className="btn-secondary text-sm justify-center w-full py-2.5"
                     >
                       Clear selection
                     </button>
-                  )}
+                  </div>
                 </div>
               ) : (
                 <div className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
@@ -266,7 +276,7 @@ export default function MemberCalendarPage() {
 
         {/* Page-level floating “mini cart” (members only) */}
         {user?.role === 'member' && selectionSummary.selectionMode && selectionSummary.selectedCount > 0 ? (
-          <div className="fixed bottom-6 right-6 z-50 w-[min(380px,calc(100vw-3rem))] lg:hidden">
+          <div className="fixed bottom-24 right-4 sm:right-6 z-[60] w-[min(380px,calc(100vw-2rem))] lg:hidden">
             <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-900/95 backdrop-blur shadow-2xl">
               <div className="p-4 flex items-start gap-3">
                 <div className="flex-1 min-w-0">
