@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import NotificationPromptBanner from '@/components/shared/NotificationPromptBanner';
+import { useAuth } from '@/contexts/AuthContext';
 import { clearStoredUser, setStoredUser } from '@/lib/clientUserStorage';
 
 interface ProtectedRouteProps {
@@ -11,108 +12,100 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
+  const { user: authUser, loading: authLoading } = useAuth();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const user = localStorage.getItem('user');
+    if (authLoading) {
+      setIsLoading(true);
+      return;
+    }
 
-        if (!user) {
+    if (!authUser) {
+      clearStoredUser();
+      router.push('/login');
+      setIsAuthenticated(false);
+      setIsLoading(false);
+      return;
+    }
+
+    if (requiredRole && authUser.role !== requiredRole) {
+      if (authUser.role === 'leader') {
+        router.push('/leader/dashboard');
+      } else if (authUser.role === 'member') {
+        router.push('/member/dashboard');
+      } else {
+        router.push('/login');
+      }
+      setIsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const profileResponse = await fetch('/api/users/profile', { credentials: 'include' });
+        if (cancelled) return;
+        if (!profileResponse.ok) {
+          clearStoredUser();
           router.push('/login');
-          setIsLoading(false);
+          setIsAuthenticated(false);
           return;
         }
 
-        try {
-          const userData = JSON.parse(user);
-          
-          // Validate user data structure
-          if (!userData || !userData.role || !userData.id) {
-            // Invalid user data structure, clear it
-            console.error('Invalid user data structure:', userData);
-            clearStoredUser();
-            router.push('/login');
-            setIsLoading(false);
-            return;
-          }
-          
-          // Check role if required
-          if (requiredRole && userData.role !== requiredRole) {
-            // Redirect to appropriate dashboard
-            if (userData.role === 'leader') {
-              router.push('/leader/dashboard');
-            } else if (userData.role === 'member') {
-              router.push('/member/dashboard');
-            } else {
-              // Unknown role, redirect to login
-              router.push('/login');
-            }
-            setIsLoading(false);
-            return;
-          }
-
-          // Validate active session with backend cookie auth.
-          const profileResponse = await fetch('/api/users/profile', { credentials: 'include' });
-          if (!profileResponse.ok) {
-            clearStoredUser();
-            router.push('/login');
-            setIsLoading(false);
-            return;
-          }
-
-          const profileData = await profileResponse.json();
-          if (!profileData?.user?.id || !profileData?.user?.role) {
-            clearStoredUser();
-            router.push('/login');
-            setIsLoading(false);
-            return;
-          }
-
-          const u = profileData.user as {
-            firstName?: string;
-            lastName?: string;
-            role?: 'leader' | 'member';
-            nameReviewRequired?: boolean;
-          };
-          const hasName = Boolean(u?.firstName?.trim?.() && u?.lastName?.trim?.());
-          const needsReview = u?.nameReviewRequired === true;
-          if (!hasName || needsReview) {
-            const target = u.role === 'leader' ? '/leader/profile' : '/member/profile';
-            if (pathname !== target) {
-              router.push(target);
-              setIsLoading(false);
-              return;
-            }
-            // On the profile route: allow the page to render so the user can complete their name.
-            setIsAuthenticated(true);
-            setIsLoading(false);
-            return;
-          }
-
-          setStoredUser(profileData.user);
-          setIsAuthenticated(true);
-        } catch (parseError) {
-          console.error('Error parsing user data:', parseError);
+        const profileData = await profileResponse.json();
+        if (!profileData?.user?.id || !profileData?.user?.role) {
           clearStoredUser();
           router.push('/login');
+          setIsAuthenticated(false);
+          return;
         }
+
+        const u = profileData.user as {
+          firstName?: string;
+          lastName?: string;
+          role?: 'leader' | 'member';
+          nameReviewRequired?: boolean;
+        };
+        const hasName = Boolean(u?.firstName?.trim?.() && u?.lastName?.trim?.());
+        const needsReview = u?.nameReviewRequired === true;
+        if (!hasName || needsReview) {
+          const target = u.role === 'leader' ? '/leader/profile' : '/member/profile';
+          if (pathname !== target) {
+            router.push(target);
+            setIsAuthenticated(false);
+            return;
+          }
+          setIsAuthenticated(true);
+          return;
+        }
+
+        setStoredUser(profileData.user);
+        setIsAuthenticated(true);
       } catch (error) {
-        // localStorage might not be available
-        console.error('Error accessing localStorage:', error);
-        router.push('/login');
+        console.error('Protected route auth error:', error);
+        if (!cancelled) {
+          clearStoredUser();
+          router.push('/login');
+          setIsAuthenticated(false);
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
+    })();
+
+    return () => {
+      cancelled = true;
     };
+  }, [authLoading, authUser, requiredRole, pathname, router]);
 
-    checkAuth();
-  }, [router, requiredRole, pathname]);
-
-  if (isLoading) {
+  if (isLoading || authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-black">
         <div className="text-center">

@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { UserModel } from '@/models/User';
-import { generateToken, setAuthCookie } from '@/lib/auth';
+import {
+  AUTH_REMEMBER_JWT_EXPIRES_IN,
+  AUTH_REMEMBER_ME_MAX_AGE_SEC,
+  AUTH_SESSION_JWT_EXPIRES_IN,
+  generateToken,
+  setAuthCookie,
+} from '@/lib/auth';
 import { LoginRequest } from '@/types';
 import { authRateLimit } from '@/lib/rateLimit';
 import { validateRequest, schemas } from '@/lib/validation';
 import { error as logError } from '@/lib/logger';
 import { internalServerError, unauthorizedError, badRequestError } from '@/lib/errors';
+import { NO_STORE_JSON_HEADERS } from '@/lib/securityHeaders';
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,6 +35,8 @@ export async function POST(request: NextRequest) {
 
     const username = validation.data.username.toLowerCase();
     const { password } = validation.data;
+    // Omitting the field (older clients) keeps prior behavior: stay signed in with a persistent cookie.
+    const rememberMe = validation.data.rememberMe !== false;
 
     const user = await UserModel.findByUsername(username);
     
@@ -57,18 +66,25 @@ export async function POST(request: NextRequest) {
       tokenData.teamId = user.teamId;
     }
 
-    const token = generateToken(tokenData);
+    const token = rememberMe
+      ? generateToken(tokenData, AUTH_REMEMBER_JWT_EXPIRES_IN)
+      : generateToken(tokenData, AUTH_SESSION_JWT_EXPIRES_IN);
 
-    const response = NextResponse.json({
-      user: {
-        id: user._id,
-        username: user.username,
-        role: user.role,
-        teamId: user.teamId,
+    const response = NextResponse.json(
+      {
+        user: {
+          id: user._id,
+          username: user.username,
+          role: user.role,
+          teamId: user.teamId,
+        },
       },
-    });
+      { headers: NO_STORE_JSON_HEADERS }
+    );
 
-    setAuthCookie(response, token);
+    setAuthCookie(response, token, {
+      maxAgeSeconds: rememberMe ? AUTH_REMEMBER_ME_MAX_AGE_SEC : null,
+    });
     return response;
   } catch (error) {
     logError('Login error:', error);

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Navbar from '@/components/shared/Navbar';
+import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import MigrationCalendar from '@/components/shared/MigrationCalendar';
 import { LeaveRequest, User } from '@/types';
 import { LEAVE_REASONS, EMERGENCY_REASONS, isEmergencyReason } from '@/lib/leaveReasons';
@@ -494,15 +495,13 @@ export default function LeaderRequestsPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-zinc-950 flex items-center justify-center">
-        <div className="w-5 h-5 border-2 border-zinc-200 dark:border-zinc-700 border-t-indigo-600 rounded-full animate-spin" />
-      </div>
-    );
-  }
-
   return (
+    <ProtectedRoute requiredRole="leader">
+      {loading ? (
+        <div className="min-h-screen bg-white dark:bg-zinc-950 flex items-center justify-center">
+          <div className="w-5 h-5 border-2 border-zinc-200 dark:border-zinc-700 border-t-indigo-600 rounded-full animate-spin" />
+        </div>
+      ) : (
     <div className="min-h-screen bg-white dark:bg-zinc-950">
       <Navbar />
       
@@ -1035,5 +1034,7 @@ export default function LeaderRequestsPage() {
         </div>
       </div>
     </div>
+      )}
+    </ProtectedRoute>
   );
 }

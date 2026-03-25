@@ -194,7 +194,8 @@ export const schemas = {
         'string.min': 'Password is required',
         'string.max': 'Password is too long',
         'any.required': 'Password is required'
-      })
+      }),
+    rememberMe: Joi.boolean().optional(),
   }),
 
   // Leave request schema

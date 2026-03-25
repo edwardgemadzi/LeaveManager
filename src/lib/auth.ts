@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import jwt, { type SignOptions } from 'jsonwebtoken';
 import { AuthUser } from '@/types';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
@@ -12,8 +12,21 @@ if (!JWT_SECRET || JWT_SECRET.length < 32) {
   );
 }
 
-export const generateToken = (user: AuthUser): string => {
-  return jwt.sign(user, JWT_SECRET, { expiresIn: '7d' });
+/** Default cookie/JWT lifetime when “Remember me” is on (30 days). */
+export const AUTH_REMEMBER_ME_MAX_AGE_SEC = 60 * 60 * 24 * 30;
+
+/** JWT lifetime when “Remember me” is off (session-style; cookie has no maxAge). */
+export const AUTH_SESSION_JWT_EXPIRES_IN = '12h';
+
+/** JWT lifetime when “Remember me” is on (matches cookie maxAge). */
+export const AUTH_REMEMBER_JWT_EXPIRES_IN = '30d';
+
+/**
+ * Sign a JWT for the auth cookie. Call sites must pair `expiresIn` with {@link setAuthCookie}
+ * `maxAgeSeconds` (or defaults) so the cookie lifetime matches the token `exp` claim.
+ */
+export const generateToken = (user: AuthUser, expiresIn: string = '7d'): string => {
+  return jwt.sign(user, JWT_SECRET, { expiresIn } as SignOptions);
 };
 
 interface DecodedToken {
@@ -168,15 +181,39 @@ export function shouldRejectCsrf(request: NextRequest): boolean {
   return !getAllowedOrigins(request).has(requestOrigin);
 }
 
-export function setAuthCookie(response: NextResponse, token: string): void {
+export type SetAuthCookieOptions = {
+  /**
+   * Cookie Max-Age in seconds. Omit or `null` for a browser session cookie (clears when the browser session ends; behavior varies by OS/browser).
+   * When set, should align with JWT `exp` from `generateToken`.
+   */
+  maxAgeSeconds?: number | null;
+};
+
+/** Default Max-Age when callers use `setAuthCookie` without options (register / magic links). */
+const DEFAULT_COOKIE_MAX_AGE_SEC = 60 * 60 * 24 * 7;
+
+/**
+ * Attach the auth cookie. Pair with {@link generateToken}: same effective lifetime as the JWT
+ * (or use defaults for register/magic routes).
+ */
+export function setAuthCookie(response: NextResponse, token: string, options?: SetAuthCookieOptions): void {
   const isProduction = process.env.NODE_ENV === 'production';
-  response.cookies.set('token', token, {
+  const base = {
     httpOnly: true,
     secure: isProduction,
-    sameSite: 'lax',
+    sameSite: 'lax' as const,
     path: '/',
-    maxAge: 60 * 60 * 24 * 7, // 7 days
-  });
+  };
+  if (options === undefined) {
+    response.cookies.set('token', token, { ...base, maxAge: DEFAULT_COOKIE_MAX_AGE_SEC });
+    return;
+  }
+  const maxAge = options.maxAgeSeconds;
+  if (maxAge != null && maxAge > 0) {
+    response.cookies.set('token', token, { ...base, maxAge });
+  } else {
+    response.cookies.set('token', token, base);
+  }
 }
 
 export function clearAuthCookie(response: NextResponse): void {

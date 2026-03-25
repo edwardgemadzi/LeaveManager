@@ -214,31 +214,35 @@ export default function LeaderAnalyticsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white dark:bg-zinc-950 flex items-center justify-center">
-        <div className="w-5 h-5 border-2 border-zinc-200 dark:border-zinc-700 border-t-indigo-600 rounded-full animate-spin" />
-      </div>
+      <ProtectedRoute requiredRole="leader">
+        <div className="min-h-screen bg-white dark:bg-zinc-950 flex items-center justify-center">
+          <div className="w-5 h-5 border-2 border-zinc-200 dark:border-zinc-700 border-t-indigo-600 rounded-full animate-spin" />
+        </div>
+      </ProtectedRoute>
     );
   }
 
   if (!analytics || !team) {
     return (
-      <div className="min-h-screen bg-white dark:bg-zinc-950">
-        <Navbar />
-        <div className="flex items-center justify-center h-64 pt-24">
-          <div className="text-center">
-            <p className="text-zinc-600 dark:text-zinc-400 text-lg mb-2">No analytics data available</p>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              {!analytics ? 'Analytics data not loaded' : ''}
-              {!team ? 'Team data not loaded' : ''}
-            </p>
-            {analytics && analytics.groups && analytics.groups.length === 0 && (
-              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2">
-                No members found. Add team members to see analytics.
+      <ProtectedRoute requiredRole="leader">
+        <div className="min-h-screen bg-white dark:bg-zinc-950">
+          <Navbar />
+          <div className="flex items-center justify-center h-64 pt-24">
+            <div className="text-center">
+              <p className="text-zinc-600 dark:text-zinc-400 text-lg mb-2">No analytics data available</p>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                {!analytics ? 'Analytics data not loaded' : ''}
+                {!team ? 'Team data not loaded' : ''}
               </p>
-            )}
+              {analytics && analytics.groups && analytics.groups.length === 0 && (
+                <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2">
+                  No members found. Add team members to see analytics.
+                </p>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      </ProtectedRoute>
     );
   }
 
@@ -268,15 +272,17 @@ export default function LeaderAnalyticsPage() {
   // Check if analytics has required data
   if (!analytics.aggregate || !analytics.groups) {
     return (
-      <div className="min-h-screen bg-white dark:bg-zinc-950">
-        <Navbar />
-        <div className="flex items-center justify-center h-64 pt-24">
-          <div className="text-center">
-            <p className="text-zinc-600 dark:text-zinc-400 text-lg mb-2">Analytics data structure is invalid</p>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Please check the console for details</p>
+      <ProtectedRoute requiredRole="leader">
+        <div className="min-h-screen bg-white dark:bg-zinc-950">
+          <Navbar />
+          <div className="flex items-center justify-center h-64 pt-24">
+            <div className="text-center">
+              <p className="text-zinc-600 dark:text-zinc-400 text-lg mb-2">Analytics data structure is invalid</p>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">Please check the console for details</p>
+            </div>
           </div>
         </div>
-      </div>
+      </ProtectedRoute>
     );
   }
 

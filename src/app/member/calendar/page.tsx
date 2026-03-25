@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import Navbar from '@/components/shared/Navbar';
+import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import TeamCalendar from '@/components/shared/Calendar';
 import { Team, User, LeaveRequest } from '@/types';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
@@ -148,21 +149,13 @@ export default function MemberCalendarPage() {
     });
   }, [members, filteredRequests, filter, user]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-zinc-950">
-        <Navbar />
-        <div className="flex items-center justify-center h-64 pt-24">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-800 border-t-indigo-600 dark:border-t-indigo-400 mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">Loading calendar...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
+    <ProtectedRoute requiredRole="member">
+      {loading ? (
+        <div className="min-h-screen bg-white dark:bg-zinc-950 flex items-center justify-center">
+          <div className="w-5 h-5 border-2 border-zinc-200 dark:border-zinc-700 border-t-indigo-600 rounded-full animate-spin" />
+        </div>
+      ) : (
     <div className="min-h-screen bg-white dark:bg-zinc-950">
       <Navbar />
       
@@ -313,5 +306,7 @@ export default function MemberCalendarPage() {
         ) : null}
       </div>
     </div>
+      )}
+    </ProtectedRoute>
   );
 }

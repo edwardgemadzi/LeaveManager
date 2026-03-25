@@ -117,6 +117,7 @@ export function rateLimit(options: RateLimitOptions) {
             'X-RateLimit-Limit': maxRequests.toString(),
             'X-RateLimit-Remaining': '0',
             'X-RateLimit-Reset': Math.floor(entry.resetTime / 1000).toString(), // Unix timestamp in seconds
+            'Cache-Control': 'no-store',
           }
         }
       );
@@ -163,6 +164,22 @@ export const apiRateLimit = rateLimit({
   maxRequests: 100, // 100 requests per 15 minutes
   message: 'Too many API requests. Please slow down.'
 });
+
+const authMeRateLimitConfig = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 200,
+  message: 'Too many session checks. Please try again later.',
+});
+
+/**
+ * Limits polling of GET /api/auth/me (abuse / token probing) while allowing normal multi-tab SPA use.
+ */
+export function authMeRateLimit(request: NextRequest): NextResponse | null {
+  if (process.env.NODE_ENV === 'test') {
+    return null;
+  }
+  return authMeRateLimitConfig(request);
+}
 
 export const emergencyRateLimit = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Navbar from '@/components/shared/Navbar';
+import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { Team } from '@/types';
 import { useToast } from '@/contexts/ToastContext';
 import { MinusIcon, PlusIcon } from '@heroicons/react/24/outline';
@@ -230,15 +231,13 @@ export default function TeamSettingsPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-zinc-950 flex items-center justify-center">
-        <div className="w-5 h-5 border-2 border-zinc-200 dark:border-zinc-700 border-t-indigo-600 rounded-full animate-spin" />
-      </div>
-    );
-  }
-
   return (
+    <ProtectedRoute requiredRole="leader">
+      {loading ? (
+        <div className="min-h-screen bg-white dark:bg-zinc-950 flex items-center justify-center">
+          <div className="w-5 h-5 border-2 border-zinc-200 dark:border-zinc-700 border-t-indigo-600 rounded-full animate-spin" />
+        </div>
+      ) : (
     <div className="min-h-screen bg-white dark:bg-zinc-950">
       <Navbar />
       
@@ -1132,5 +1131,7 @@ export default function TeamSettingsPage() {
         </div>
       </div>
     </div>
+      )}
+    </ProtectedRoute>
   );
 }

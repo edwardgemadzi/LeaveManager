@@ -1,4 +1,11 @@
 /** @type {import('next').NextConfig} */
+const corsOrigin =
+  process.env.NEXT_PUBLIC_APP_URL ||
+  process.env.APP_URL ||
+  (process.env.NODE_ENV === 'production'
+    ? 'https://leave-manager-one.vercel.app'
+    : 'http://localhost:3000');
+
 const nextConfig = {
   images: {
     domains: [],
@@ -17,9 +24,7 @@ const nextConfig = {
         headers: [
           {
             key: 'Access-Control-Allow-Origin',
-            value: process.env.NODE_ENV === 'production' 
-              ? 'https://leave-manager-one.vercel.app' 
-              : 'http://localhost:3000',
+            value: corsOrigin,
           },
           {
             key: 'Access-Control-Allow-Methods',
@@ -49,6 +54,14 @@ const nextConfig = {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin',
           },
+          ...(process.env.NODE_ENV === 'production'
+            ? [
+                {
+                  key: 'Strict-Transport-Security',
+                  value: 'max-age=31536000; includeSubDomains',
+                },
+              ]
+            : []),
         ],
       },
       {
@@ -75,6 +88,14 @@ const nextConfig = {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(), geolocation=()',
           },
+          ...(process.env.NODE_ENV === 'production'
+            ? [
+                {
+                  key: 'Strict-Transport-Security',
+                  value: 'max-age=31536000; includeSubDomains',
+                },
+              ]
+            : []),
         ],
       },
     ];

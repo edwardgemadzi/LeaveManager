@@ -18,7 +18,8 @@ import {
   ArrowRightOnRectangleIcon,
 } from '@heroicons/react/24/outline';
 import { useTheme } from '@/contexts/ThemeContext';
-import { clearStoredUser, LEAVE_MANAGER_USER_STORAGE_EVENT } from '@/lib/clientUserStorage';
+import { useAuth } from '@/contexts/AuthContext';
+import { LEAVE_MANAGER_USER_STORAGE_EVENT } from '@/lib/clientUserStorage';
 
 interface User {
   id: string;
@@ -52,6 +53,7 @@ export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
+  const { logout: logoutSession } = useAuth();
 
   useEffect(() => {
     const readUser = () => {
@@ -85,14 +87,8 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
-    } catch {
-      // Best-effort cookie cleanup
+      await logoutSession();
     } finally {
-      clearStoredUser();
       setUser(null);
       router.push('/login');
     }

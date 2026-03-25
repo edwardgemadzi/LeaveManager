@@ -139,6 +139,8 @@ export interface AuthUser {
 export interface LoginRequest {
   username: string;
   password: string;
+  /** When true, set a persistent cookie (30 days). When false/omitted, session cookie + shorter JWT. */
+  rememberMe?: boolean;
 }
 
 export interface RegisterLeaderRequest {

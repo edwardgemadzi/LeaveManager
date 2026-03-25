@@ -5,13 +5,16 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { CalendarIcon, SunIcon, MoonIcon } from '@heroicons/react/24/outline';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { setStoredUser } from '@/lib/clientUserStorage';
 
 export default function LoginPage() {
+  const { refresh: refreshAuth } = useAuth();
   const [formData, setFormData] = useState({
     username: '',
     password: '',
   });
+  const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
@@ -28,13 +31,14 @@ export default function LoginPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, rememberMe }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
         setStoredUser(data.user);
+        await refreshAuth();
         if (data.user.role === 'leader') {
           router.push('/leader/dashboard');
         } else {
@@ -108,6 +112,18 @@ export default function LoginPage() {
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               />
             </div>
+
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="rounded border-zinc-300 dark:border-zinc-600 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                Remember this device (30 days)
+              </span>
+            </label>
 
             {error && (
               <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">

@@ -344,16 +344,13 @@ export default function MemberProfilePage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-zinc-950 flex items-center justify-center">
-        <div className="w-5 h-5 border-2 border-zinc-200 dark:border-zinc-700 border-t-indigo-600 rounded-full animate-spin" />
-      </div>
-    );
-  }
-
   return (
     <ProtectedRoute requiredRole="member">
+      {loading ? (
+        <div className="min-h-screen bg-white dark:bg-zinc-950 flex items-center justify-center">
+          <div className="w-5 h-5 border-2 border-zinc-200 dark:border-zinc-700 border-t-indigo-600 rounded-full animate-spin" />
+        </div>
+      ) : (
       <div className="min-h-screen bg-white dark:bg-zinc-950">
         <Navbar />
         <div className="w-full px-4 sm:px-6 pt-16 lg:pt-20 lg:pl-24 pb-6 lg:h-[calc(100vh-5rem)] app-page-shell">
@@ -772,6 +769,7 @@ export default function MemberProfilePage() {
             </div>
         </div>
       </div>
+      )}
     </ProtectedRoute>
   );
 }
