@@ -562,30 +562,241 @@ export default function MemberDashboard() {
             </div>
           </div>
 
-          {/* Stat cards — reference layout: label, value, sublines, themed icon */}
-          {analytics && user && team && (() => {
+          {/* Health + balance first; stat cards and competition require analytics */}
+          {user && team && (() => {
+            const maxPerYear = team.settings.maxLeavePerYear || 20;
+            const used = Math.max(0, Math.round(maxPerYear - annualRemainingBalance));
             const pendingCount = myRequests.filter((r) => r.status === 'pending').length;
-            const carriedOver = Math.round(user.carryoverFromPreviousYear ?? 0);
-            const usedCarry = Math.round(analytics.carryoverDaysUsed ?? 0);
-            const carryRem = analytics.carryoverExpired
-              ? Math.round(analytics.carryoverRemainingDisplay ?? 0)
-              : Math.round(analytics.carryoverBalance ?? 0);
-            const matPat = getMaternityLeaveBalance();
-            const paternityEnabled = team.settings.paternityLeave?.enabled === true;
-            const isPaternityUser = user.maternityPaternityType === 'paternity';
+            const remaining = Math.round(leaveBalance.balance);
+            const progress = maxPerYear > 0 ? Math.max(0, Math.min(1, used / maxPerYear)) : 0;
+            const currentYear = new Date().getFullYear();
+            const shiftSchedule =
+              user?.shiftSchedule || {
+                pattern: [true, true, true, true, true, false, false],
+                startDate: new Date(),
+                type: 'rotating' as const,
+              };
+            const monthlyUsage = Array.from({ length: 12 }, (_, month) => {
+              let sum = 0;
+              const monthStart = new Date(currentYear, month, 1);
+              const monthEnd = new Date(currentYear, month + 1, 0, 23, 59, 59, 999);
+              for (const r of myRequests) {
+                if (r.status !== 'approved') continue;
+                const start = parseDateSafe(r.startDate);
+                const end = parseDateSafe(r.endDate);
+                start.setHours(0, 0, 0, 0);
+                end.setHours(23, 59, 59, 999);
+                if (end < monthStart || start > monthEnd) continue;
+                const ms = start > monthStart ? start : monthStart;
+                const me = end < monthEnd ? end : monthEnd;
+                sum += countWorkingDays(ms, me, shiftSchedule);
+              }
+              return sum;
+            });
 
-            const workingDaysTagLine =
-              user.shiftSchedule
-                ? user.shiftSchedule.type === 'rotating'
-                  ? generateWorkingDaysTag(user.shiftSchedule)
-                  : user.workingDaysTag || generateWorkingDaysTag(user.shiftSchedule)
-                : '';
-            const groupName = workingDaysTagLine
-              ? getWorkingDaysGroupDisplayName(workingDaysTagLine, team.settings)
-              : '';
+            const leaveScore = analytics
+              ? calculateTimeBasedLeaveScore(
+                  maxPerYear,
+                  used,
+                  analytics.remainingLeaveBalance,
+                  analytics.realisticUsableDays ?? 0,
+                  analytics.willLose ?? 0,
+                  analytics.willCarryover ?? 0,
+                  user?.manualYearToDateUsed !== undefined,
+                  team?.settings.carryoverSettings?.limitedToMonths,
+                  team?.settings.carryoverSettings?.maxCarryoverDays,
+                  team?.settings.carryoverSettings?.expiryDate
+                    ? new Date(team.settings.carryoverSettings.expiryDate)
+                    : undefined
+                )
+              : null;
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const upcomingApproved = myRequests
+              .filter((r) => r.status === 'approved' && parseDateSafe(r.endDate).getTime() >= today.getTime())
+              .sort((a, b) => parseDateSafe(a.startDate).getTime() - parseDateSafe(b.startDate).getTime());
+            const nextApproved =
+              upcomingApproved.find((r) => parseDateSafe(r.startDate).getTime() >= today.getTime()) ?? upcomingApproved[0];
+
+            const upcomingItems = [
+              ...(pendingCount > 0
+                ? [{
+                    id: 'pending',
+                    title: `${pendingCount} pending request${pendingCount !== 1 ? 's' : ''}`,
+                    subtitle: 'Waiting for approval',
+                    tone: 'warning' as const,
+                    right: <Link href="/member/requests" className="btn-secondary text-xs py-1 px-2">View</Link>,
+                  }]
+                : []),
+              ...(nextApproved?._id
+                ? [{
+                    id: `next-${nextApproved._id}`,
+                    title: 'Next leave',
+                    subtitle: `${parseDateSafe(nextApproved.startDate).toLocaleDateString()} \u2013 ${parseDateSafe(nextApproved.endDate).toLocaleDateString()}`,
+                    meta: nextApproved.reason || undefined,
+                    tone: 'info' as const,
+                    right: <Link href="/member/calendar" className="btn-secondary text-xs py-1 px-2">Calendar</Link>,
+                  }]
+                : [{
+                    id: 'no-upcoming',
+                    title: 'No upcoming leave',
+                    subtitle: 'Plan something to recharge',
+                    tone: 'neutral' as const,
+                    right: <Link href="/member/requests" className="btn-primary text-xs py-1 px-2">Request</Link>,
+                  }]),
+            ];
+
+            const recentActivity = myRequests
+              .slice()
+              .sort((a, b) => parseDateSafe(b.updatedAt).getTime() - parseDateSafe(a.updatedAt).getTime())
+              .slice(0, 6)
+              .map((r) => {
+                const tone: 'success' | 'danger' | 'warning' =
+                  r.status === 'approved' ? 'success' : r.status === 'rejected' ? 'danger' : 'warning';
+                return {
+                  id: r._id || `${r.userId}-${r.status}`,
+                  title: `${r.status[0].toUpperCase()}${r.status.slice(1)} request`,
+                  description: `${parseDateSafe(r.startDate).toLocaleDateString()} \u2013 ${parseDateSafe(r.endDate).toLocaleDateString()}${r.reason ? ` \u00b7 ${r.reason}` : ''}`,
+                  time: parseDateSafe(r.updatedAt).toLocaleDateString(),
+                  tone,
+                };
+              });
 
             return (
               <>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-4 shrink-0">
+                  {/* Leave Health Score */}
+                  {leaveScore ? (
+                    <div className={`rounded-[32px] border-2 ${leaveScore.borderColor} ${leaveScore.bgGradient} p-5 sm:p-6 lg:col-span-7`}>
+                      <div className="flex items-start gap-4 mb-4">
+                        <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${leaveScore.gradientColors} flex items-center justify-center shadow-md shrink-0`}>
+                          <ChartBarIcon className="h-7 w-7 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Leave Health Score</p>
+                          <h2 className={`text-2xl font-bold ${leaveScore.textColor} mt-0.5`}>{leaveScore.scoreLabel}</h2>
+                        </div>
+                        <span className={`text-xs font-semibold px-3 py-1.5 rounded-full shrink-0 ${leaveScore.badgeColor}`}>
+                          {used}/{maxPerYear} used
+                        </span>
+                      </div>
+                      <p className={`text-base italic ${leaveScore.textColor} mb-2 leading-relaxed`}>&ldquo;{leaveScore.quote}&rdquo;</p>
+                      <p className="text-sm text-zinc-600 dark:text-zinc-300 leading-relaxed mb-4">{leaveScore.message}</p>
+                      <div className="flex flex-wrap gap-2 pt-4 border-t border-zinc-200/50 dark:border-zinc-700/50">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white/60 dark:bg-zinc-900/40 text-zinc-700 dark:text-zinc-200">
+                          {Math.round(analytics?.realisticUsableDays ?? 0)} realistic days left
+                        </span>
+                        {(analytics?.willLose ?? 0) > 0 && (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-red-100/80 dark:bg-red-900/30 text-red-700 dark:text-red-300">
+                            <ExclamationTriangleIcon className="h-3.5 w-3.5" />
+                            {Math.round(analytics!.willLose ?? 0)} at risk
+                          </span>
+                        )}
+                        {(analytics?.willCarryover ?? 0) > 0 && (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-indigo-100/80 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
+                            {Math.round(analytics!.willCarryover ?? 0)} carry over
+                          </span>
+                        )}
+                        {(analytics?.membersSharingSameShift ?? 0) > 0 && (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white/60 dark:bg-zinc-900/40 text-zinc-700 dark:text-zinc-200">
+                            <UsersIcon className="h-3.5 w-3.5" />
+                            {analytics!.membersSharingSameShift} competing
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-[32px] border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 p-6 flex items-center justify-center min-h-[140px] lg:col-span-7">
+                      <p className="text-sm text-zinc-400 dark:text-zinc-500">Loading health score&hellip;</p>
+                    </div>
+                  )}
+
+                  {/* Balance today */}
+                  <div className="rounded-[32px] border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 sm:p-6 lg:col-span-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                          Balance today
+                        </p>
+                        <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 mt-1 tabular-nums">
+                          {remaining} <span className="text-zinc-400 dark:text-zinc-500 font-semibold">/</span>{' '}
+                          {maxPerYear}
+                        </p>
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Days remaining this year</p>
+                      </div>
+                      <ProgressRing
+                        value={progress}
+                        size={52}
+                        stroke={6}
+                        label={
+                          <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">
+                            {Math.round(progress * 100)}%
+                          </span>
+                        }
+                      />
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-zinc-100/90 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-200">
+                        {used} used
+                      </span>
+                      {analytics && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-100/80 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200">
+                          Carryover {Math.round(analytics.carryoverBalance ?? 0)}
+                        </span>
+                      )}
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-100/80 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
+                        {pendingCount} pending
+                      </span>
+                    </div>
+                    <div className="mt-4 flex items-center justify-between gap-3">
+                      <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0">This year (by month)</span>
+                      <Sparkline
+                        data={monthlyUsage}
+                        width={160}
+                        height={32}
+                        className="text-indigo-600 dark:text-indigo-400 min-w-0 max-w-full"
+                      />
+                    </div>
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      <Link href="/member/requests" className="btn-primary">
+                        <DocumentTextIcon className="h-4 w-4" />
+                        Request leave
+                      </Link>
+                      <Link href="/member/calendar" className="btn-secondary">
+                        <CalendarIcon className="h-4 w-4" />
+                        Calendar
+                      </Link>
+                      <Link href="/member/analytics" className="btn-secondary">
+                        <ChartBarIcon className="h-4 w-4" />
+                        Insights
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+
+                {analytics && (() => {
+                  const carriedOver = Math.round(user.carryoverFromPreviousYear ?? 0);
+                  const usedCarry = Math.round(analytics.carryoverDaysUsed ?? 0);
+                  const carryRem = analytics.carryoverExpired
+                    ? Math.round(analytics.carryoverRemainingDisplay ?? 0)
+                    : Math.round(analytics.carryoverBalance ?? 0);
+                  const matPat = getMaternityLeaveBalance();
+                  const paternityEnabled = team.settings.paternityLeave?.enabled === true;
+                  const isPaternityUser = user.maternityPaternityType === 'paternity';
+
+                  const workingDaysTagLine =
+                    user.shiftSchedule
+                      ? user.shiftSchedule.type === 'rotating'
+                        ? generateWorkingDaysTag(user.shiftSchedule)
+                        : user.workingDaysTag || generateWorkingDaysTag(user.shiftSchedule)
+                      : '';
+                  const groupName = workingDaysTagLine
+                    ? getWorkingDaysGroupDisplayName(workingDaysTagLine, team.settings)
+                    : '';
+
+                  return (
+                    <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mb-4 shrink-0">
                   {/* Pending */}
                   <div className="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 p-4 shadow-sm relative overflow-hidden">
@@ -890,257 +1101,40 @@ export default function MemberDashboard() {
                     </div>
                   )}
                 </div>
+                    </>
+                  );
+                })()}
+
+                <div className="grid lg:grid-cols-12 gap-5 lg:min-h-[min(520px,calc(100vh-32rem))] lg:overflow-hidden">
+                  <div className="lg:col-span-7 flex flex-col gap-5 lg:h-full lg:min-h-0 lg:overflow-hidden">
+                    <div className="rounded-[32px] border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 sm:p-6 flex-1 flex flex-col min-h-0 lg:overflow-hidden">
+                      <div className="flex items-center justify-between mb-4 shrink-0">
+                        <div>
+                          <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Recent activity</p>
+                          <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mt-0.5">Your latest request updates</p>
+                        </div>
+                        <Link href="/member/requests" className="btn-secondary text-xs py-1 px-2">View all</Link>
+                      </div>
+                      <div className="app-scroll-list max-h-[min(320px,50vh)] lg:max-h-none">
+                        <ActivityFeed items={recentActivity} empty={<p className="text-sm text-zinc-500 dark:text-zinc-400">No activity yet.</p>} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="lg:col-span-5 flex flex-col gap-5 lg:h-full lg:min-h-0 lg:overflow-hidden">
+                    <div className="rounded-[32px] border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 sm:p-6 flex-1 lg:overflow-auto">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Upcoming</p>
+                          <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mt-0.5">What&apos;s next</p>
+                        </div>
+                        <ClockIcon className="h-5 w-5 text-zinc-400 dark:text-zinc-500" />
+                      </div>
+                      <Timeline items={upcomingItems} empty={<p className="text-sm text-zinc-500 dark:text-zinc-400">Nothing queued yet.</p>} />
+                    </div>
+                  </div>
+                </div>
               </>
-            );
-          })()}
-
-          {/* Dashboard — 2-column layout filling the viewport */}
-          {(() => {
-            const maxPerYear = team?.settings.maxLeavePerYear || 20;
-            const used = Math.max(0, Math.round(maxPerYear - annualRemainingBalance));
-            const pendingCount = myRequests.filter((r) => r.status === 'pending').length;
-            const remaining = Math.round(leaveBalance.balance);
-            const progress = maxPerYear > 0 ? Math.max(0, Math.min(1, used / maxPerYear)) : 0;
-            const currentYear = new Date().getFullYear();
-            const shiftSchedule =
-              user?.shiftSchedule || {
-                pattern: [true, true, true, true, true, false, false],
-                startDate: new Date(),
-                type: 'rotating' as const,
-              };
-            const monthlyUsage = Array.from({ length: 12 }, (_, month) => {
-              let sum = 0;
-              const monthStart = new Date(currentYear, month, 1);
-              const monthEnd = new Date(currentYear, month + 1, 0, 23, 59, 59, 999);
-              for (const r of myRequests) {
-                if (r.status !== 'approved') continue;
-                const start = parseDateSafe(r.startDate);
-                const end = parseDateSafe(r.endDate);
-                start.setHours(0, 0, 0, 0);
-                end.setHours(23, 59, 59, 999);
-                if (end < monthStart || start > monthEnd) continue;
-                const ms = start > monthStart ? start : monthStart;
-                const me = end < monthEnd ? end : monthEnd;
-                sum += countWorkingDays(ms, me, shiftSchedule);
-              }
-              return sum;
-            });
-
-            const leaveScore = analytics
-              ? calculateTimeBasedLeaveScore(
-                  maxPerYear,
-                  used,
-                  analytics.remainingLeaveBalance,
-                  analytics.realisticUsableDays ?? 0,
-                  analytics.willLose ?? 0,
-                  analytics.willCarryover ?? 0,
-                  user?.manualYearToDateUsed !== undefined,
-                  team?.settings.carryoverSettings?.limitedToMonths,
-                  team?.settings.carryoverSettings?.maxCarryoverDays,
-                  team?.settings.carryoverSettings?.expiryDate
-                    ? new Date(team.settings.carryoverSettings.expiryDate)
-                    : undefined
-                )
-              : null;
-
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const upcomingApproved = myRequests
-              .filter((r) => r.status === 'approved' && parseDateSafe(r.endDate).getTime() >= today.getTime())
-              .sort((a, b) => parseDateSafe(a.startDate).getTime() - parseDateSafe(b.startDate).getTime());
-            const nextApproved =
-              upcomingApproved.find((r) => parseDateSafe(r.startDate).getTime() >= today.getTime()) ?? upcomingApproved[0];
-
-            const upcomingItems = [
-              ...(pendingCount > 0
-                ? [{
-                    id: 'pending',
-                    title: `${pendingCount} pending request${pendingCount !== 1 ? 's' : ''}`,
-                    subtitle: 'Waiting for approval',
-                    tone: 'warning' as const,
-                    right: <Link href="/member/requests" className="btn-secondary text-xs py-1 px-2">View</Link>,
-                  }]
-                : []),
-              ...(nextApproved?._id
-                ? [{
-                    id: `next-${nextApproved._id}`,
-                    title: 'Next leave',
-                    subtitle: `${parseDateSafe(nextApproved.startDate).toLocaleDateString()} \u2013 ${parseDateSafe(nextApproved.endDate).toLocaleDateString()}`,
-                    meta: nextApproved.reason || undefined,
-                    tone: 'info' as const,
-                    right: <Link href="/member/calendar" className="btn-secondary text-xs py-1 px-2">Calendar</Link>,
-                  }]
-                : [{
-                    id: 'no-upcoming',
-                    title: 'No upcoming leave',
-                    subtitle: 'Plan something to recharge',
-                    tone: 'neutral' as const,
-                    right: <Link href="/member/requests" className="btn-primary text-xs py-1 px-2">Request</Link>,
-                  }]),
-            ];
-
-            const recentActivity = myRequests
-              .slice()
-              .sort((a, b) => parseDateSafe(b.updatedAt).getTime() - parseDateSafe(a.updatedAt).getTime())
-              .slice(0, 6)
-              .map((r) => {
-                const tone: 'success' | 'danger' | 'warning' =
-                  r.status === 'approved' ? 'success' : r.status === 'rejected' ? 'danger' : 'warning';
-                return {
-                  id: r._id || `${r.userId}-${r.status}`,
-                  title: `${r.status[0].toUpperCase()}${r.status.slice(1)} request`,
-                  description: `${parseDateSafe(r.startDate).toLocaleDateString()} \u2013 ${parseDateSafe(r.endDate).toLocaleDateString()}${r.reason ? ` \u00b7 ${r.reason}` : ''}`,
-                  time: parseDateSafe(r.updatedAt).toLocaleDateString(),
-                  tone,
-                };
-              });
-
-            return (
-              <div className="grid lg:grid-cols-12 gap-5 lg:min-h-[min(520px,calc(100vh-32rem))] lg:overflow-hidden">
-
-                {/* Left column: Health Score + Recent Activity */}
-                <div className="lg:col-span-7 flex flex-col gap-5 lg:h-full lg:min-h-0 lg:overflow-hidden">
-
-                  {/* Leave Health Score */}
-                  {leaveScore ? (
-                    <div className={`rounded-[32px] border-2 ${leaveScore.borderColor} ${leaveScore.bgGradient} p-5 sm:p-6`}>
-                      <div className="flex items-start gap-4 mb-4">
-                        <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${leaveScore.gradientColors} flex items-center justify-center shadow-md shrink-0`}>
-                          <ChartBarIcon className="h-7 w-7 text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Leave Health Score</p>
-                          <h2 className={`text-2xl font-bold ${leaveScore.textColor} mt-0.5`}>{leaveScore.scoreLabel}</h2>
-                        </div>
-                        <span className={`text-xs font-semibold px-3 py-1.5 rounded-full shrink-0 ${leaveScore.badgeColor}`}>
-                          {used}/{maxPerYear} used
-                        </span>
-                      </div>
-                      <p className={`text-base italic ${leaveScore.textColor} mb-2 leading-relaxed`}>&ldquo;{leaveScore.quote}&rdquo;</p>
-                      <p className="text-sm text-zinc-600 dark:text-zinc-300 leading-relaxed mb-4">{leaveScore.message}</p>
-                      <div className="flex flex-wrap gap-2 pt-4 border-t border-zinc-200/50 dark:border-zinc-700/50">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white/60 dark:bg-zinc-900/40 text-zinc-700 dark:text-zinc-200">
-                          {Math.round(analytics?.realisticUsableDays ?? 0)} realistic days left
-                        </span>
-                        {(analytics?.willLose ?? 0) > 0 && (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-red-100/80 dark:bg-red-900/30 text-red-700 dark:text-red-300">
-                            <ExclamationTriangleIcon className="h-3.5 w-3.5" />
-                            {Math.round(analytics!.willLose ?? 0)} at risk
-                          </span>
-                        )}
-                        {(analytics?.willCarryover ?? 0) > 0 && (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-indigo-100/80 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
-                            {Math.round(analytics!.willCarryover ?? 0)} carry over
-                          </span>
-                        )}
-                        {(analytics?.membersSharingSameShift ?? 0) > 0 && (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white/60 dark:bg-zinc-900/40 text-zinc-700 dark:text-zinc-200">
-                            <UsersIcon className="h-3.5 w-3.5" />
-                            {analytics!.membersSharingSameShift} competing
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="rounded-[32px] border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 p-6 flex items-center justify-center min-h-[140px]">
-                      <p className="text-sm text-zinc-400 dark:text-zinc-500">Loading health score&hellip;</p>
-                    </div>
-                  )}
-
-                  {/* Recent Activity */}
-                  <div className="rounded-[32px] border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 sm:p-6 flex-1 flex flex-col min-h-0 lg:overflow-hidden">
-                    <div className="flex items-center justify-between mb-4 shrink-0">
-                      <div>
-                        <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Recent activity</p>
-                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mt-0.5">Your latest request updates</p>
-                      </div>
-                      <Link href="/member/requests" className="btn-secondary text-xs py-1 px-2">View all</Link>
-                    </div>
-                    <div className="app-scroll-list max-h-[min(320px,50vh)] lg:max-h-none">
-                      <ActivityFeed items={recentActivity} empty={<p className="text-sm text-zinc-500 dark:text-zinc-400">No activity yet.</p>} />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right column: Balance today + Upcoming */}
-                <div className="lg:col-span-5 flex flex-col gap-5 lg:h-full lg:min-h-0 lg:overflow-hidden">
-
-                  {/* Balance today */}
-                  <div className="rounded-[32px] border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 sm:p-6">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                          Balance today
-                        </p>
-                        <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 mt-1 tabular-nums">
-                          {remaining} <span className="text-zinc-400 dark:text-zinc-500 font-semibold">/</span>{' '}
-                          {maxPerYear}
-                        </p>
-                        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Days remaining this year</p>
-                      </div>
-                      <ProgressRing
-                        value={progress}
-                        size={52}
-                        stroke={6}
-                        label={
-                          <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">
-                            {Math.round(progress * 100)}%
-                          </span>
-                        }
-                      />
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-zinc-100/90 dark:bg-zinc-800/80 text-zinc-700 dark:text-zinc-200">
-                        {used} used
-                      </span>
-                      {analytics && (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-100/80 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200">
-                          Carryover {Math.round(analytics.carryoverBalance ?? 0)}
-                        </span>
-                      )}
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-100/80 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
-                        {pendingCount} pending
-                      </span>
-                    </div>
-                    <div className="mt-4 flex items-center justify-between gap-3">
-                      <span className="text-xs text-zinc-400 dark:text-zinc-500 shrink-0">This year (by month)</span>
-                      <Sparkline
-                        data={monthlyUsage}
-                        width={160}
-                        height={32}
-                        className="text-indigo-600 dark:text-indigo-400 min-w-0 max-w-full"
-                      />
-                    </div>
-                    <div className="mt-5 flex flex-wrap gap-2">
-                      <Link href="/member/requests" className="btn-primary">
-                        <DocumentTextIcon className="h-4 w-4" />
-                        Request leave
-                      </Link>
-                      <Link href="/member/calendar" className="btn-secondary">
-                        <CalendarIcon className="h-4 w-4" />
-                        Calendar
-                      </Link>
-                      <Link href="/member/analytics" className="btn-secondary">
-                        <ChartBarIcon className="h-4 w-4" />
-                        Insights
-                      </Link>
-                    </div>
-                  </div>
-
-                  {/* Upcoming */}
-                  <div className="rounded-[32px] border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 sm:p-6 flex-1 lg:overflow-auto">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Upcoming</p>
-                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mt-0.5">What&apos;s next</p>
-                      </div>
-                      <ClockIcon className="h-5 w-5 text-zinc-400 dark:text-zinc-500" />
-                    </div>
-                    <Timeline items={upcomingItems} empty={<p className="text-sm text-zinc-500 dark:text-zinc-400">Nothing queued yet.</p>} />
-                  </div>
-                </div>
-
-              </div>
             );
           })()}
 
