@@ -165,41 +165,41 @@ export default function MemberCalendarPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       <Navbar />
       
-      <div className="w-full px-6 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12">
-        {/* Header Section - Enhanced */}
-        <div className="mb-8 fade-in">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-3">
-            <div>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">
+      <div className="w-full px-0 sm:px-8 lg:px-12 xl:px-16 2xl:px-20 pt-20 sm:pt-24 pb-12">
+        {/* Header Section */}
+        <div className="mb-4 sm:mb-8 fade-in px-4 sm:px-0">
+          <div className="flex items-center justify-between gap-3 sm:gap-4">
+            <div className="min-w-0">
+              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white tracking-tight truncate">
                 {team?.settings?.enableSubgrouping && user?.subgroupTag 
                   ? `${user.subgroupTag} Calendar`
                   : 'Team Calendar'}
               </h1>
-              <p className="text-base sm:text-lg lg:text-xl text-gray-600 dark:text-gray-400">
+              <p className="text-sm sm:text-lg lg:text-xl text-gray-500 dark:text-gray-400 mt-0.5 sm:mt-1">
                 {team?.settings?.enableSubgrouping && user?.subgroupTag
-                  ? `View all leave requests for your subgroup`
-                  : 'View all leave requests for your team'}
+                  ? 'Your subgroup leave requests'
+                  : 'Team leave requests'}
               </p>
             </div>
-            
+
             {/* Filter Dropdown */}
-            <div className="flex items-center gap-2">
-              <FunnelIcon className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <FunnelIcon className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 dark:text-gray-500" />
               <select
                 value={filter}
                 onChange={(e) => setFilter(e.target.value as CalendarFilter)}
-                className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent cursor-pointer"
+                className="text-xs sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
               >
-                <option value="all">All Leave Requests</option>
-                <option value="my-leave">My Leave Days</option>
-                <option value="same-working-days">Same Working Days</option>
+                <option value="all">All</option>
+                <option value="my-leave">Mine</option>
+                <option value="same-working-days">Same Days</option>
               </select>
             </div>
           </div>
         </div>
 
-        <div className="card rounded-none relative z-10">
-          <div className="px-6 py-8 relative z-10">
+        <div className="card rounded-none sm:rounded-2xl relative z-10 border-x-0 sm:border-x shadow-none sm:shadow">
+          <div className="px-0 sm:px-6 py-2 sm:py-8 relative z-10">
             {team?._id ? (
               <TeamCalendar 
                 teamId={team._id} 

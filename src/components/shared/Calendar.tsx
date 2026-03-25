@@ -56,6 +56,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [currentView, setCurrentView] = useState<View>(Views.MONTH);
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [calendarHeight, setCalendarHeight] = useState(850);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [showModal, setShowModal] = useState(false);
   
@@ -78,6 +79,17 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
   const isMember = currentUser?.role === 'member';
   
   const leaveReasons = useMemo(() => LEAVE_REASONS, []);
+
+  // Responsive calendar height: compact on mobile, full on desktop
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const update = (e: MediaQueryListEvent | MediaQueryList) => {
+      setCalendarHeight(e.matches ? 560 : 850);
+    };
+    update(mq);
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
 
   // Fetch team settings for validation (only if not provided as prop)
   useEffect(() => {
@@ -793,7 +805,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
           events={events}
           startAccessor="start"
           endAccessor="end"
-          style={{ height: '850px' }}
+          style={{ height: `${calendarHeight}px` }}
           eventPropGetter={eventStyleGetter}
           dayPropGetter={dayPropGetter}
           views={[Views.MONTH, Views.WEEK]}

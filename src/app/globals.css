@@ -667,31 +667,92 @@ p {
 
 /* Responsive calendar improvements */
 @media (max-width: 768px) {
+  /* Compact single-row toolbar */
   .rbc-toolbar {
-    flex-direction: column;
-    gap: 12px;
-    padding: 16px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 8px;
   }
-  
+
   .rbc-toolbar-label {
-    font-size: 20px;
+    font-size: 17px;
+    font-weight: 700;
     margin: 0;
-    order: 1;
+    flex: 1;
+    text-align: center;
+    order: 0;
   }
-  
+
   .rbc-btn-group {
-    order: 2;
-    justify-content: center;
+    display: flex;
+    gap: 2px;
   }
-  
+
+  /* First button group (Prev/Today/Next) hides on mobile — custom bottom nav handles this */
+  .rbc-toolbar .rbc-btn-group:first-child {
+    display: none;
+  }
+
   .rbc-toolbar button {
-    min-width: 70px;
-    padding: 8px 16px;
-    font-size: 12px;
+    min-width: unset;
+    padding: 6px 12px;
+    font-size: 11px;
+    border-radius: 8px;
   }
-  
-  .rbc-calendar {
-    height: 650px;
+
+  /* Larger, bolder day numbers */
+  .rbc-date-cell {
+    font-size: 14px;
+    font-weight: 600;
+    padding: 4px 6px;
+  }
+
+  .rbc-date-cell a {
+    font-size: 14px;
+  }
+
+  /* More breathing room per row */
+  .rbc-month-row {
+    min-height: 64px;
+  }
+
+  /* Compact event pills */
+  .rbc-event {
+    padding: 2px 5px !important;
+    font-size: 10px !important;
+    border-radius: 4px !important;
+    min-height: 16px;
+  }
+
+  .rbc-event-content {
+    font-size: 10px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Show-more link */
+  .rbc-show-more {
+    font-size: 10px;
+    padding: 0 4px;
+  }
+
+  /* Day header (Mon, Tue …) */
+  .rbc-header {
+    font-size: 11px;
+    padding: 6px 2px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+  }
+
+  /* Remove overflow border on mobile so calendar sits flush */
+  .rbc-month-view {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
   }
 }
 
@@ -1042,4 +1103,9 @@ p {
 
 .dark .backdrop-blur-nav {
   background: rgba(0, 0, 0, 0.8);
+}
+
+/* Safe-area padding for iPhone home indicator under the bottom tab bar */
+.mobile-bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }

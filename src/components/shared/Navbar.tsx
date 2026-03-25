@@ -15,7 +15,6 @@ interface User {
 
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
-  const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
@@ -43,12 +42,9 @@ export default function Navbar() {
 
   if (!user) return null;
 
-  // Helper function to check if pathname matches a route
-  const isActiveRoute = (route: string) => {
-    return pathname === route || pathname?.startsWith(route + '/');
-  };
+  const isActiveRoute = (route: string) =>
+    pathname === route || pathname?.startsWith(route + '/');
 
-  // Navigation links for leader
   const leaderLinks = [
     { href: '/leader/dashboard', label: 'Dashboard' },
     { href: '/leader/leave-balance', label: 'Leave Balance' },
@@ -60,7 +56,6 @@ export default function Navbar() {
     { href: '/leader/profile', label: 'Profile' },
   ];
 
-  // Navigation links for member
   const memberLinks = [
     { href: '/member/dashboard', label: 'Dashboard' },
     { href: '/member/analytics', label: 'Analytics' },
@@ -75,10 +70,10 @@ export default function Navbar() {
     <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-nav border-b border-gray-200/50 dark:border-gray-800/50 shadow-sm w-full">
       <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16 lg:h-18">
-          {/* Logo Section - Enhanced with hover effects */}
+          {/* Logo */}
           <div className="flex items-center">
-            <Link 
-              href={user.role === 'leader' ? '/leader/dashboard' : '/member/dashboard'} 
+            <Link
+              href={user.role === 'leader' ? '/leader/dashboard' : '/member/dashboard'}
               className="group flex items-center space-x-2.5 transition-all duration-300 hover:scale-105"
             >
               <div className="relative">
@@ -91,7 +86,7 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* Desktop Navigation - Enhanced with backdrop blur and underline animation */}
+          {/* Desktop Navigation */}
           <div className="hidden lg:flex items-center space-x-2">
             <nav className="flex items-center space-x-1">
               {navLinks.map((link) => {
@@ -106,14 +101,12 @@ export default function Navbar() {
                         : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
                     }`}
                   >
-                    {/* Active indicator with underline animation */}
                     {isActive && (
                       <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-indigo-500 via-indigo-600 to-indigo-500 rounded-t-full animate-fade-in"></span>
                     )}
-                    {/* Hover background */}
                     <span className={`absolute inset-0 rounded-lg transition-opacity duration-300 ${
-                      isActive 
-                        ? 'bg-indigo-50/50 dark:bg-indigo-900/20 opacity-100' 
+                      isActive
+                        ? 'bg-indigo-50/50 dark:bg-indigo-900/20 opacity-100'
                         : 'bg-gray-100/50 dark:bg-gray-800/50 opacity-0 hover:opacity-100'
                     }`}></span>
                     <span className="relative z-10">{link.label}</span>
@@ -123,7 +116,7 @@ export default function Navbar() {
             </nav>
           </div>
 
-          {/* Desktop User Actions - Enhanced */}
+          {/* Desktop User Actions */}
           <div className="hidden lg:flex items-center space-x-3 ml-6">
             <Link
               href="/contact"
@@ -159,8 +152,8 @@ export default function Navbar() {
             </button>
           </div>
 
-          {/* Mobile/Tablet Controls */}
-          <div className="lg:hidden flex items-center gap-2">
+          {/* Mobile: theme toggle only — navigation handled by bottom tab bar */}
+          <div className="lg:hidden flex items-center">
             <button
               onClick={toggleTheme}
               className="p-2.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100/80 dark:hover:bg-gray-800/80 transition-all duration-200 active:scale-95"
@@ -173,92 +166,6 @@ export default function Navbar() {
                 <SunIcon className="h-5 w-5" />
               )}
             </button>
-            <button
-              onClick={() => setIsOpen(!isOpen)}
-              className={`p-2.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100/80 dark:hover:bg-gray-800/80 transition-all duration-200 active:scale-95 ${
-                isOpen ? 'bg-gray-100 dark:bg-gray-800' : ''
-              }`}
-              aria-label="Toggle menu"
-            >
-              <svg 
-                className={`h-5 w-5 transition-transform duration-300 ${isOpen ? 'rotate-90' : ''}`} 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-              >
-                {isOpen ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                )}
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile/Tablet Navigation Menu - Enhanced with smooth animations */}
-        <div 
-          className={`lg:hidden overflow-hidden transition-all duration-300 ease-in-out ${
-            isOpen ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'
-          }`}
-        >
-          <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm border-t border-gray-200/50 dark:border-gray-800/50 shadow-lg">
-            <nav className="px-2 pt-3 pb-4 space-y-1">
-              {navLinks.map((link, index) => {
-                const isActive = isActiveRoute(link.href);
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setIsOpen(false)}
-                    className={`block px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 stagger-item ${
-                      isActive
-                        ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 font-semibold shadow-sm'
-                        : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-gray-800/80'
-                    }`}
-                    style={{ animationDelay: `${index * 0.05}s` }}
-                  >
-                    {link.label}
-                  </Link>
-                );
-              })}
-              
-              {/* Contact link */}
-              <Link
-                href="/contact"
-                onClick={() => setIsOpen(false)}
-                className="block px-4 py-3 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/80 dark:hover:bg-gray-800/80 transition-all duration-200"
-              >
-                <div className="flex items-center gap-2">
-                  <ChatBubbleLeftRightIcon className="h-5 w-5" />
-                  Contact Developer
-                </div>
-              </Link>
-
-              {/* User info and logout section */}
-              <div className="border-t border-gray-200/50 dark:border-gray-800/50 mt-3 pt-3">
-                <div className="px-4 py-2.5 bg-gray-50/50 dark:bg-gray-800/50 rounded-lg mb-2">
-                  <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                    Logged in as
-                  </p>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                    {user.username}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-1 capitalize">
-                    {user.role}
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    setIsOpen(false);
-                    handleLogout();
-                  }}
-                  className="w-full mx-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 dark:from-red-700 dark:to-red-800 dark:hover:from-red-800 dark:hover:to-red-900 text-white px-4 py-2.5 rounded-lg text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-200 active:scale-95"
-                >
-                  Logout
-                </button>
-              </div>
-            </nav>
           </div>
         </div>
       </div>
