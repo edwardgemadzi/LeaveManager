@@ -23,6 +23,10 @@ export default function MemberCalendarPage() {
 
   const [allRequests, setAllRequests] = useState<LeaveRequest[]>([]);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [selectionSummary, setSelectionSummary] = useState<{ selectionMode: boolean; selectedCount: number }>({
+    selectionMode: false,
+    selectedCount: 0,
+  });
 
   const { data: teamData, mutate: mutateTeam, isLoading: teamLoading } = useTeamData({ members: 'full' });
   const { data: requestsData, mutate: mutateRequests, isLoading: requestsLoading } = useRequests({
@@ -208,6 +212,7 @@ export default function MemberCalendarPage() {
                   paternityLeave: team.settings.paternityLeave
                 } : undefined}
                 initialRequests={filteredRequests}
+                onMemberSelectionChange={setSelectionSummary}
               />
             ) : (
               <div className="flex items-center justify-center h-64">
@@ -219,6 +224,44 @@ export default function MemberCalendarPage() {
             )}
           </div>
         </div>
+
+        {/* Page-level floating “mini cart” (members only) */}
+        {user?.role === 'member' && selectionSummary.selectionMode && selectionSummary.selectedCount > 0 ? (
+          <div className="fixed bottom-6 right-6 z-50 w-[min(380px,calc(100vw-3rem))]">
+            <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-900/95 backdrop-blur shadow-2xl">
+              <div className="p-4 flex items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                    Leave selection
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    {selectionSummary.selectedCount} day{selectionSummary.selectedCount === 1 ? '' : 's'} selected
+                  </p>
+                </div>
+              </div>
+              <div className="px-4 pb-4 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Click the existing in-calendar CTA by triggering the request modal via custom event.
+                    // We keep logic inside the calendar component; this event is handled there.
+                    window.dispatchEvent(new CustomEvent('lm:calendar:open-request'));
+                  }}
+                  className="flex-1 rounded-xl bg-indigo-600 text-white px-4 py-2.5 text-sm font-semibold hover:bg-indigo-700 transition-colors shadow"
+                >
+                  Request leave
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent('lm:calendar:clear-selection'))}
+                  className="rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2.5 text-sm font-semibold text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -47,9 +47,10 @@ interface CalendarProps {
     paternityLeave?: { countingMethod?: 'calendar' | 'working' };
   }; // Optional: team settings (if provided, skip fetching)
   initialRequests?: LeaveRequest[]; // Optional: initial requests (if provided, skip fetching)
+  onMemberSelectionChange?: (summary: { selectionMode: boolean; selectedCount: number }) => void;
 }
 
-export default function TeamCalendar({ teamId, members, currentUser, teamSettings: providedTeamSettings, initialRequests }: CalendarProps) {
+export default function TeamCalendar({ teamId, members, currentUser, teamSettings: providedTeamSettings, initialRequests, onMemberSelectionChange }: CalendarProps) {
   const { showSuccess, showError, showInfo } = useNotification();
   const { showNotification: showBrowserNotification } = useBrowserNotification();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -573,11 +574,6 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
     }
   }, [teamId, members]);
 
-  const handleRequestLeave = useCallback(() => {
-    if (selectedDates.length === 0) return;
-    setShowRequestModal(true);
-  }, [selectedDates]);
-
   const handleSubmitLeaveRequest = useCallback(async () => {
     if (!selectedReasonType) {
       showInfo('Please select a reason for your leave request.');
@@ -737,19 +733,32 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
     setRequestAsRange(false);
   }, []);
 
-  const selectedSummary = useMemo(() => {
-    if (!isMember || selectedDates.length === 0) return null;
-    const sorted = [...selectedDates].sort((a, b) => a.getTime() - b.getTime());
-    const start = sorted[0]!;
-    const end = sorted[sorted.length - 1]!;
-    const same = start.toDateString() === end.toDateString();
-    return {
-      count: sorted.length,
-      startLabel: start.toLocaleDateString(),
-      endLabel: end.toLocaleDateString(),
-      rangeLabel: same ? start.toLocaleDateString() : `${start.toLocaleDateString()} – ${end.toLocaleDateString()}`,
+  // Page-level floating panel hooks (member/calendar) uses these events.
+  useEffect(() => {
+    if (!isMember) return;
+    const openHandler = () => {
+      if (!selectionMode || selectedDates.length === 0) return;
+      setShowRequestModal(true);
     };
-  }, [isMember, selectedDates]);
+    const clearHandler = () => {
+      if (!selectionMode) return;
+      clearSelectionMode();
+    };
+    window.addEventListener('lm:calendar:open-request', openHandler as EventListener);
+    window.addEventListener('lm:calendar:clear-selection', clearHandler as EventListener);
+    return () => {
+      window.removeEventListener('lm:calendar:open-request', openHandler as EventListener);
+      window.removeEventListener('lm:calendar:clear-selection', clearHandler as EventListener);
+    };
+  }, [isMember, selectionMode, selectedDates.length, clearSelectionMode]);
+
+  useEffect(() => {
+    if (!isMember || !onMemberSelectionChange) return;
+    onMemberSelectionChange({
+      selectionMode: Boolean(selectionMode),
+      selectedCount: selectedDates.length,
+    });
+  }, [isMember, onMemberSelectionChange, selectionMode, selectedDates.length]);
 
   return (
     <div className="min-h-[600px] relative">
@@ -776,50 +785,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
         </div>
       )}
 
-      {/* Floating “mini cart” for leave request (members only) */}
-      {isMember && selectionMode && selectedSummary && (
-        <div className="fixed bottom-6 right-6 z-50 w-[min(420px,calc(100vw-3rem))]">
-          <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-900/95 backdrop-blur shadow-2xl">
-            <div className="p-4 flex items-start gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                  Leave selection
-                </p>
-                <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
-                  {selectedSummary.rangeLabel}
-                </p>
-                <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">
-                  {selectedSummary.count} day{selectedSummary.count === 1 ? '' : 's'} selected
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={clearSelectionMode}
-                className="text-xs font-medium text-gray-600 dark:text-gray-300 hover:underline"
-              >
-                Clear
-              </button>
-            </div>
-            <div className="px-4 pb-4 flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleRequestLeave}
-                className="flex-1 rounded-xl bg-indigo-600 text-white px-4 py-2.5 text-sm font-semibold hover:bg-indigo-700 transition-colors shadow"
-              >
-                Request leave
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowRequestModal(true)}
-                className="rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2.5 text-sm font-semibold text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                title="Open details"
-              >
-                Details
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Floating request panel is rendered at page-level (member/calendar). */}
 
       <div className="relative z-10">
         <Calendar
