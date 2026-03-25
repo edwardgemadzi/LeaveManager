@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     // Best-effort migration: derive first/middle/last from legacy fullName once.
     const existing = await users.findOne(
       { _id: new ObjectId(user.id) },
-      { projection: { firstName: 1, middleName: 1, lastName: 1, fullName: 1 } }
+      { projection: { firstName: 1, middleName: 1, lastName: 1, fullName: 1, nameReviewRequired: 1 } }
     );
     const needsName =
       !existing?.firstName || !String(existing.firstName).trim() || !existing?.lastName || !String(existing.lastName).trim();
@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
               firstName: parsed.firstName,
               middleName: parsed.middleName,
               lastName: parsed.lastName,
+              nameReviewRequired: true,
             },
           }
         );
@@ -126,6 +127,15 @@ export async function PATCH(request: NextRequest) {
 
     if (data.lastName !== undefined) {
       $set.lastName = data.lastName.trim();
+    }
+
+    const willHaveFirst =
+      data.firstName !== undefined ? String($set.firstName ?? '').trim() !== '' : true;
+    const willHaveLast =
+      data.lastName !== undefined ? String($set.lastName ?? '').trim() !== '' : true;
+    if ((data.firstName !== undefined || data.lastName !== undefined || data.middleName !== undefined) && willHaveFirst && willHaveLast) {
+      // Any explicit name save counts as confirmation.
+      $set.nameReviewRequired = false;
     }
 
     if (data.timezone !== undefined) {

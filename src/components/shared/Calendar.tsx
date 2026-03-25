@@ -825,6 +825,47 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
           }}
         />
       </div>
+
+      {/* Bottom navigation (avoids scrolling to top toolbar) */}
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            const d = new Date(currentDate);
+            if (currentView === Views.WEEK) {
+              d.setDate(d.getDate() - 7);
+            } else {
+              d.setMonth(d.getMonth() - 1);
+            }
+            handleNavigate(d);
+          }}
+          className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2 text-sm font-semibold text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800"
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          onClick={() => handleNavigate(new Date())}
+          className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2 text-sm font-semibold text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800"
+        >
+          Today
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const d = new Date(currentDate);
+            if (currentView === Views.WEEK) {
+              d.setDate(d.getDate() + 7);
+            } else {
+              d.setMonth(d.getMonth() + 1);
+            }
+            handleNavigate(d);
+          }}
+          className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2 text-sm font-semibold text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800"
+        >
+          Next
+        </button>
+      </div>
       
       {/* Legend */}
       <div className="mt-6 space-y-4">

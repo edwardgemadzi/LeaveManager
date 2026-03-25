@@ -52,6 +52,8 @@ export interface User {
   notificationPromptVersionSeen?: number;
   /** IANA timezone for calendar-based UX (reminders, etc.); unset defaults to UTC server-side */
   timezone?: string | null;
+  /** When true, user must review/confirm their auto-split name on next login. */
+  nameReviewRequired?: boolean;
   createdAt: Date;
 }
 

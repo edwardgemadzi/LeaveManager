@@ -52,6 +52,8 @@ export default function MemberProfilePage() {
   const [testEmailLoading, setTestEmailLoading] = useState(false);
   const [telegramUnlinking, setTelegramUnlinking] = useState(false);
 
+  const nameReviewRequired = (user as { nameReviewRequired?: boolean } | null)?.nameReviewRequired === true;
+
   useEffect(() => {
     const fetchUserData = async () => {
       try {
@@ -370,6 +372,14 @@ export default function MemberProfilePage() {
           </div>
 
           <ProfilePageFeedback error={error} message={message} />
+          {nameReviewRequired ? (
+            <div className="mb-6 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
+              <p className="font-semibold">Please review your name</p>
+              <p className="text-xs mt-1 text-amber-800/90 dark:text-amber-200/90">
+                We auto-split your legacy full name into first/middle/last. Confirm it and click <strong>Update Profile</strong> to continue.
+              </p>
+            </div>
+          ) : null}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
             {/* Profile Information */}

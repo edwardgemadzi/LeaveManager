@@ -71,9 +71,15 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
             return;
           }
 
-          const u = profileData.user as { firstName?: string; lastName?: string; role?: 'leader' | 'member' };
+          const u = profileData.user as {
+            firstName?: string;
+            lastName?: string;
+            role?: 'leader' | 'member';
+            nameReviewRequired?: boolean;
+          };
           const hasName = Boolean(u?.firstName?.trim?.() && u?.lastName?.trim?.());
-          if (!hasName) {
+          const needsReview = u?.nameReviewRequired === true;
+          if (!hasName || needsReview) {
             const target = u.role === 'leader' ? '/leader/profile' : '/member/profile';
             if (pathname !== target) {
               router.push(target);
