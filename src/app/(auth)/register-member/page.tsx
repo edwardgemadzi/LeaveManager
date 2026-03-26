@@ -12,6 +12,7 @@ import { setStoredUser } from '@/lib/clientUserStorage';
 export default function RegisterMemberPage() {
   const [formData, setFormData] = useState({
     username: '',
+    email: '',
     firstName: '',
     middleName: '',
     lastName: '',
@@ -49,6 +50,7 @@ export default function RegisterMemberPage() {
         },
         body: JSON.stringify({
           username: formData.username,
+          email: formData.email || null,
           firstName: formData.firstName,
           middleName: formData.middleName || null,
           lastName: formData.lastName,
@@ -119,6 +121,13 @@ export default function RegisterMemberPage() {
               <input id="username" name="username" type="text" required className={inputCls} placeholder="your username"
                 value={formData.username}
                 onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase() })} />
+            </div>
+
+            <div>
+              <label htmlFor="email" className={labelCls}>Email (optional)</label>
+              <input id="email" name="email" type="email" className={inputCls} placeholder="you@company.com"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value.toLowerCase() })} />
             </div>
 
             <div>

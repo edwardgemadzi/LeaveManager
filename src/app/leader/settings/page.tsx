@@ -44,6 +44,8 @@ export default function TeamSettingsPage() {
       maxDays: 90,
       countingMethod: 'working' as 'calendar' | 'working',
     },
+    allowMemberHistoricalSubmissions: false,
+    historicalSubmissionLookbackDays: 365,
   });
 
   useEffect(() => {
@@ -98,6 +100,8 @@ export default function TeamSettingsPage() {
             maxDays: 90,
             countingMethod: 'working' as 'calendar' | 'working',
           },
+          allowMemberHistoricalSubmissions: false,
+          historicalSubmissionLookbackDays: 365,
         };
         const teamSettings = data.team?.settings || defaultSettings;
         // Convert carryover expiry date from Date object to ISO string for input field
@@ -201,6 +205,8 @@ export default function TeamSettingsPage() {
               maxDays: 90,
               countingMethod: 'working' as 'calendar' | 'working',
             },
+            allowMemberHistoricalSubmissions: false,
+            historicalSubmissionLookbackDays: 365,
           };
           const teamSettings = teamData.team?.settings || defaultSettings;
           // Convert bypass dates from Date objects to ISO strings for input fields
@@ -530,6 +536,49 @@ export default function TeamSettingsPage() {
                       </div>
                     )}
                   </div>
+
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="allowMemberHistoricalSubmissions"
+                      checked={settings.allowMemberHistoricalSubmissions || false}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          allowMemberHistoricalSubmissions: e.target.checked,
+                        })
+                      }
+                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-gray-900"
+                    />
+                    <label htmlFor="allowMemberHistoricalSubmissions" className="ml-2 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                      Allow Member Historical Submissions
+                    </label>
+                  </div>
+                  <p className="mt-1 ml-6 text-sm text-zinc-500 dark:text-zinc-400">
+                    Let members submit past-date leave entries for leader approval during migration.
+                  </p>
+                  {settings.allowMemberHistoricalSubmissions && (
+                    <div className="mt-3 ml-6">
+                      <label htmlFor="historicalSubmissionLookbackDays" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                        Historical Lookback Window (days)
+                      </label>
+                      <input
+                        type="number"
+                        id="historicalSubmissionLookbackDays"
+                        min="30"
+                        max="3650"
+                        value={settings.historicalSubmissionLookbackDays ?? 365}
+                        onChange={(e) => {
+                          const parsed = parseInt(e.target.value, 10);
+                          setSettings({
+                            ...settings,
+                            historicalSubmissionLookbackDays: Number.isNaN(parsed) ? 365 : Math.min(3650, Math.max(30, parsed)),
+                          });
+                        }}
+                        className="input-modern w-full sm:w-52"
+                      />
+                    </div>
+                  )}
 
                   <div className="flex items-center">
                     <input

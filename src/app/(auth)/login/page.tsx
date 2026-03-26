@@ -11,10 +11,10 @@ import { setStoredUser } from '@/lib/clientUserStorage';
 export default function LoginPage() {
   const { refresh: refreshAuth } = useAuth();
   const [formData, setFormData] = useState({
-    username: '',
+    identifier: '',
     password: '',
   });
-  const [rememberMe, setRememberMe] = useState(true);
+  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
@@ -81,19 +81,19 @@ export default function LoginPage() {
         <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm">
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div>
-              <label htmlFor="username" className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1.5">
-                Username
+              <label htmlFor="identifier" className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1.5">
+                Username or Email
               </label>
               <input
-                id="username"
-                name="username"
+                id="identifier"
+                name="identifier"
                 type="text"
                 required
                 autoComplete="username"
                 className="input-modern"
-                placeholder="your username"
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                placeholder="your username or email"
+                value={formData.identifier}
+                onChange={(e) => setFormData({ ...formData, identifier: e.target.value })}
               />
             </div>
             <div>

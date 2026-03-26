@@ -150,7 +150,10 @@ export function authRateLimit(request: NextRequest): NextResponse | null {
     console.error('[SECURITY ERROR] DISABLE_RATE_LIMIT is not allowed in production.');
   }
 
-  const shouldDisable = process.env.NODE_ENV === 'test';
+  const shouldDisable =
+    process.env.NODE_ENV === 'test' ||
+    process.env.DISABLE_RATE_LIMIT === 'true' ||
+    process.env.CI === 'true';
 
   if (shouldDisable) {
     return null;

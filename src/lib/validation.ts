@@ -15,6 +15,15 @@ export const schemas = {
         'string.max': 'Username must be no more than 30 characters long',
         'any.required': 'Username is required'
       }),
+    email: Joi.string()
+      .email()
+      .max(320)
+      .allow('', null)
+      .optional()
+      .messages({
+        'string.email': 'Email must be a valid email address',
+        'string.max': 'Email must be no more than 320 characters long',
+      }),
     firstName: Joi.string()
       .min(1)
       .max(50)
@@ -93,6 +102,15 @@ export const schemas = {
         'string.max': 'Username must be no more than 30 characters long',
         'any.required': 'Username is required'
       }),
+    email: Joi.string()
+      .email()
+      .max(320)
+      .allow('', null)
+      .optional()
+      .messages({
+        'string.email': 'Email must be a valid email address',
+        'string.max': 'Email must be no more than 320 characters long',
+      }),
     firstName: Joi.string()
       .min(1)
       .max(50)
@@ -146,6 +164,13 @@ export const schemas = {
         'string.max': 'Team username must be no more than 30 characters long',
         'any.required': 'Team username is required'
       }),
+    maternityPaternityType: Joi.string()
+      .valid('maternity', 'paternity')
+      .allow('', null)
+      .optional()
+      .messages({
+        'any.only': 'Maternity/Paternity type must be maternity or paternity',
+      }),
     shiftSchedule: Joi.object({
       pattern: Joi.array()
         .items(Joi.boolean())
@@ -175,16 +200,23 @@ export const schemas = {
 
   // Login schema
   login: Joi.object({
+    identifier: Joi.string()
+      .trim()
+      .min(3)
+      .max(320)
+      .optional()
+      .messages({
+        'string.min': 'Identifier must be at least 3 characters long',
+        'string.max': 'Identifier must be no more than 320 characters long',
+      }),
     username: Joi.string()
-      .alphanum()
+      .trim()
       .min(3)
       .max(30)
-      .required()
+      .optional()
       .messages({
-        'string.alphanum': 'Username must contain only letters and numbers',
         'string.min': 'Username must be at least 3 characters long',
         'string.max': 'Username must be no more than 30 characters long',
-        'any.required': 'Username is required'
       }),
     password: Joi.string()
       .min(1)
@@ -196,7 +228,11 @@ export const schemas = {
         'any.required': 'Password is required'
       }),
     rememberMe: Joi.boolean().optional(),
-  }),
+  })
+    .or('identifier', 'username')
+    .messages({
+      'object.missing': 'Identifier is required',
+    }),
 
   // Leave request schema
   leaveRequest: Joi.object({
@@ -443,6 +479,19 @@ export const schemas = {
           'any.only': 'Counting method must be either "calendar" or "working"'
         })
     }).optional()
+    ,
+    allowMemberHistoricalSubmissions: Joi.boolean().optional(),
+    historicalSubmissionLookbackDays: Joi.number()
+      .integer()
+      .min(30)
+      .max(3650)
+      .optional()
+      .messages({
+        'number.base': 'Historical submission lookback days must be a number',
+        'number.integer': 'Historical submission lookback days must be a whole number',
+        'number.min': 'Historical submission lookback days must be at least 30',
+        'number.max': 'Historical submission lookback days cannot exceed 3650',
+      }),
   }),
   contact: Joi.object({
     name: Joi.string()

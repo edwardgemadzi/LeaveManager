@@ -1,6 +1,7 @@
 'use client';
 
 import Navbar from '@/components/shared/Navbar';
+import Link from 'next/link';
 import { EnvelopeIcon, ChatBubbleLeftRightIcon, PaperAirplaneIcon, PhoneIcon } from '@heroicons/react/24/outline';
 
 export default function ContactPage() {
@@ -23,6 +24,20 @@ export default function ContactPage() {
         </div>
 
         {/* Direct Contact Options */}
+        <div className="mb-6 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 p-4">
+          <p className="text-sm text-indigo-900 dark:text-indigo-200">
+            Need product guidance first? Visit the{' '}
+            <Link href="/help" className="font-semibold underline">
+              Help Center
+            </Link>{' '}
+            and{' '}
+            <Link href="/help/metrics" className="font-semibold underline">
+              Metric Glossary
+            </Link>
+            .
+          </p>
+        </div>
+
         <div className="space-y-4">
           <a
             href="mailto:edwardgemadzi@rocketmail.com?subject=Leave Manager Inquiry"

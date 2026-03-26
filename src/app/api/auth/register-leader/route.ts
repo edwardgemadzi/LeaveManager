@@ -26,12 +26,13 @@ export async function POST(request: NextRequest) {
 
     const username = validation.data.username.toLowerCase();
     const teamUsername = validation.data.teamUsername.toLowerCase();
-    const { firstName, middleName, lastName, password, teamName } = validation.data as unknown as {
+    const { firstName, middleName, lastName, password, teamName, email } = validation.data as unknown as {
       firstName: string;
       middleName?: string | null;
       lastName: string;
       password: string;
       teamName: string;
+      email?: string | null;
     };
 
     if (!username || !firstName || !lastName || !password || !teamName || !teamUsername) {
@@ -42,6 +43,13 @@ export async function POST(request: NextRequest) {
     const existingUser = await UserModel.findByUsername(username);
     if (existingUser) {
       return badRequestError('Username already exists');
+    }
+    const normalizedEmail = email ? email.trim().toLowerCase() : null;
+    if (normalizedEmail) {
+      const existingEmailUser = await UserModel.findByEmail(normalizedEmail);
+      if (existingEmailUser) {
+        return badRequestError('Email already exists');
+      }
     }
 
     // Check if team username already exists
@@ -68,6 +76,8 @@ export async function POST(request: NextRequest) {
               concurrentLeave: 2,
               maxLeavePerYear: 20,
               minimumNoticePeriod: 1,
+              allowMemberHistoricalSubmissions: false,
+              historicalSubmissionLookbackDays: 365,
             },
           },
           session
@@ -86,6 +96,7 @@ export async function POST(request: NextRequest) {
             password: hashedPassword,
             role: 'leader',
             teamId: team._id,
+            ...(normalizedEmail ? { email: normalizedEmail } : {}),
           },
           session
         );

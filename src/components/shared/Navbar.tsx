@@ -8,6 +8,7 @@ import {
   SunIcon,
   MoonIcon,
   ChatBubbleLeftRightIcon,
+  QuestionMarkCircleIcon,
   HomeIcon,
   ChartBarIcon,
   DocumentTextIcon,
@@ -236,6 +237,13 @@ export default function Navbar() {
           </div>
 
           <div className="mt-auto flex flex-col items-center gap-2 pb-3">
+            <Link
+              href="/help"
+              className="w-12 h-12 rounded-full flex items-center justify-center text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition"
+              title="Help Center"
+            >
+              <QuestionMarkCircleIcon className="h-5 w-5" />
+            </Link>
             <Link
               href="/contact"
               className="w-12 h-12 rounded-full flex items-center justify-center text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition"

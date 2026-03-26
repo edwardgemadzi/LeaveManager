@@ -18,7 +18,7 @@ export default function LeaderRequestsPage() {
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [members, setMembers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'deleted'>('all');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'historicalPending' | 'approved' | 'rejected' | 'deleted'>('all');
   
   // Emergency request state
   const [showEmergencyForm, setShowEmergencyForm] = useState(false);
@@ -71,7 +71,7 @@ export default function LeaderRequestsPage() {
   const { data: requestsData, mutate: mutateRequests, isLoading: requestsLoading } = useRequests({
     teamId,
     includeDeleted: true,
-    fields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'decisionNote', 'decisionAt', 'decisionByUsername', 'createdAt', 'updatedAt', 'deletedAt', 'deletedBy', 'requestedBy'],
+    fields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'decisionNote', 'decisionAt', 'decisionByUsername', 'createdAt', 'updatedAt', 'deletedAt', 'deletedBy', 'requestedBy', 'isHistoricalSubmission', 'submittedByMember'],
   });
 
   useEffect(() => {
@@ -381,6 +381,9 @@ export default function LeaderRequestsPage() {
       return !!request.deletedAt;
     }
     if (request.deletedAt) return false;
+    if (filter === 'historicalPending') {
+      return request.status === 'pending' && request.isHistoricalSubmission === true;
+    }
     if (filter === 'all') return true;
     return request.status === filter;
   });
@@ -826,13 +829,14 @@ export default function LeaderRequestsPage() {
                 {[
                   { key: 'all', label: 'All Requests' },
                   { key: 'pending', label: 'Pending' },
+                  { key: 'historicalPending', label: 'Historical Pending' },
                   { key: 'approved', label: 'Approved' },
                   { key: 'rejected', label: 'Rejected' },
                   { key: 'deleted', label: 'Deleted' },
                 ].map((tab) => (
                   <button
                     key={tab.key}
-                    onClick={() => setFilter(tab.key as 'all' | 'pending' | 'approved' | 'rejected' | 'deleted')}
+                    onClick={() => setFilter(tab.key as 'all' | 'pending' | 'historicalPending' | 'approved' | 'rejected' | 'deleted')}
                     className={`py-2 px-1 border-b-2 font-semibold text-sm transition-colors ${
                       filter === tab.key
                         ? 'tab-active'
@@ -908,6 +912,11 @@ export default function LeaderRequestsPage() {
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${getStatusColor(request.status)}`}>
                               {request.status}
                             </span>
+                            {request.isHistoricalSubmission && (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300">
+                                historical
+                              </span>
+                            )}
                             {request.deletedAt && (
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-200 dark:bg-gray-700 text-zinc-700 dark:text-zinc-300">
                                 deleted

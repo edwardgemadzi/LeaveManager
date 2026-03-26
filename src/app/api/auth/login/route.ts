@@ -33,12 +33,15 @@ export async function POST(request: NextRequest) {
       return badRequestError('Invalid input', validation.errors);
     }
 
-    const username = validation.data.username.toLowerCase();
+    const rawIdentifier = String(validation.data.identifier || validation.data.username || '').trim();
+    const identifier = rawIdentifier.toLowerCase();
     const { password } = validation.data;
     // Omitting the field (older clients) keeps prior behavior: stay signed in with a persistent cookie.
     const rememberMe = validation.data.rememberMe !== false;
 
-    const user = await UserModel.findByUsername(username);
+    const user = identifier.includes('@')
+      ? await UserModel.findByEmail(identifier)
+      : await UserModel.findByUsername(identifier);
     
     if (!user) {
       return unauthorizedError('Invalid credentials');

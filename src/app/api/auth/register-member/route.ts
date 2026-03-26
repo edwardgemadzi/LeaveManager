@@ -25,12 +25,13 @@ export async function POST(request: NextRequest) {
 
     const username = validation.data.username.toLowerCase();
     const teamUsername = validation.data.teamUsername.toLowerCase();
-    const { firstName, middleName, lastName, password, shiftSchedule } = validation.data as unknown as {
+    const { firstName, middleName, lastName, password, shiftSchedule, email } = validation.data as unknown as {
       firstName: string;
       middleName?: string | null;
       lastName: string;
       password: string;
       shiftSchedule: ShiftSchedule;
+      email?: string | null;
     };
     const { maternityPaternityType } = body;
 
@@ -42,6 +43,13 @@ export async function POST(request: NextRequest) {
     const existingUser = await UserModel.findByUsername(username);
     if (existingUser) {
       return badRequestError('Username already exists');
+    }
+    const normalizedEmail = email ? email.trim().toLowerCase() : null;
+    if (normalizedEmail) {
+      const existingEmailUser = await UserModel.findByEmail(normalizedEmail);
+      if (existingEmailUser) {
+        return badRequestError('Email already exists');
+      }
     }
 
     // Find team by team username
@@ -95,6 +103,7 @@ export async function POST(request: NextRequest) {
       shiftSchedule: ShiftSchedule;
       workingDaysTag?: string;
       maternityPaternityType?: 'maternity' | 'paternity' | null;
+      email?: string;
     } = {
       username,
       firstName,
@@ -104,6 +113,7 @@ export async function POST(request: NextRequest) {
       role: 'member',
       teamId: team._id,
       shiftSchedule: shiftScheduleCopy,
+      ...(normalizedEmail ? { email: normalizedEmail } : {}),
     };
 
     // Add maternityPaternityType if provided

@@ -94,6 +94,8 @@ export interface TeamSettings {
     maxDays?: number; // Maximum paternity leave days (configurable by leader, default: 90)
     countingMethod?: 'calendar' | 'working'; // How to count days: 'calendar' = count all calendar days, 'working' = count only working days (default: 'working')
   };
+  allowMemberHistoricalSubmissions?: boolean;
+  historicalSubmissionLookbackDays?: number;
 }
 
 export interface LeaveRequest {
@@ -119,6 +121,8 @@ export interface LeaveRequest {
   reminderMemberOffsetsSent?: number[];
   /** Offsets already sent to the team leader about this leave (cron idempotency). */
   reminderLeaderOffsetsSent?: number[];
+  isHistoricalSubmission?: boolean;
+  submittedByMember?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -137,7 +141,8 @@ export interface AuthUser {
 }
 
 export interface LoginRequest {
-  username: string;
+  username?: string;
+  identifier?: string;
   password: string;
   /** When true, set a persistent cookie (30 days). When false/omitted, session cookie + shorter JWT. */
   rememberMe?: boolean;
@@ -149,6 +154,7 @@ export interface RegisterLeaderRequest {
   password: string;
   teamName: string;
   teamUsername: string;
+  email?: string | null;
 }
 
 export interface RegisterMemberRequest {
@@ -158,6 +164,7 @@ export interface RegisterMemberRequest {
   teamUsername: string;
   shiftSchedule: ShiftSchedule;
   maternityPaternityType?: 'maternity' | 'paternity' | null;
+  email?: string | null;
 }
 
 export interface CreateLeaveRequest {

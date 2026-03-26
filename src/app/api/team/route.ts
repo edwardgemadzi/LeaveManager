@@ -315,6 +315,28 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    if (
+      settings.allowMemberHistoricalSubmissions !== undefined &&
+      typeof settings.allowMemberHistoricalSubmissions !== 'boolean'
+    ) {
+      return badRequestError('allowMemberHistoricalSubmissions must be a boolean');
+    }
+
+    if (settings.historicalSubmissionLookbackDays !== undefined) {
+      if (
+        typeof settings.historicalSubmissionLookbackDays !== 'number' ||
+        !Number.isInteger(settings.historicalSubmissionLookbackDays)
+      ) {
+        return badRequestError('historicalSubmissionLookbackDays must be an integer');
+      }
+      if (
+        settings.historicalSubmissionLookbackDays < 30 ||
+        settings.historicalSubmissionLookbackDays > 3650
+      ) {
+        return badRequestError('historicalSubmissionLookbackDays must be between 30 and 3650');
+      }
+    }
+
     // If subgrouping is enabled, validate subgroups
     if (settings.enableSubgrouping) {
       // Validate subgroups is an array

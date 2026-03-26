@@ -32,10 +32,13 @@ export default function MemberRequestsPage() {
     endDate: '',
     reason: '',
     customReason: '',
+    isHistorical: false,
   });
   const [teamSettings, setTeamSettings] = useState<{
     minimumNoticePeriod: number;
     bypassNoticePeriod?: { enabled: boolean; startDate?: Date | string; endDate?: Date | string };
+    allowMemberHistoricalSubmissions?: boolean;
+    historicalSubmissionLookbackDays?: number;
   }>({
     minimumNoticePeriod: 1,
   });
@@ -49,6 +52,12 @@ export default function MemberRequestsPage() {
   const bypassActive = isBypassNoticePeriodActive(teamSettings);
   const todayIso = new Date().toISOString().split('T')[0];
   const minStartDateIso = (() => {
+    if (formData.isHistorical) {
+      const minDate = new Date();
+      minDate.setHours(0, 0, 0, 0);
+      minDate.setDate(minDate.getDate() - (teamSettings.historicalSubmissionLookbackDays || 365));
+      return minDate.toISOString().split('T')[0];
+    }
     if (bypassActive || teamSettings.minimumNoticePeriod <= 0) {
       return todayIso;
     }
@@ -176,6 +185,9 @@ export default function MemberRequestsPage() {
   }, [showForm, minStartDateIso]);
 
   const isDateSelectable = (dateIso: string): { selectable: boolean; message?: string } => {
+    if (formData.isHistorical) {
+      return { selectable: true };
+    }
     if (!dateIso || dateIso < todayIso) {
       return { selectable: false, message: 'Past dates cannot be requested.' };
     }
@@ -201,7 +213,7 @@ export default function MemberRequestsPage() {
     }
     
     // Check minimum notice period
-    if (!bypassActive && teamSettings.minimumNoticePeriod > 0) {
+    if (!formData.isHistorical && !bypassActive && teamSettings.minimumNoticePeriod > 0) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const startDate = new Date(formData.startDate);
@@ -227,13 +239,14 @@ export default function MemberRequestsPage() {
         body: JSON.stringify({
           ...formData,
           reason: getFinalReason(),
+          isHistorical: formData.isHistorical,
         }),
       });
 
       if (response.ok) {
         await response.json();
         await mutateRequests();
-        setFormData({ startDate: '', endDate: '', reason: '', customReason: '' });
+        setFormData({ startDate: '', endDate: '', reason: '', customReason: '', isHistorical: false });
         setSelectedReasonType('');
         setShowForm(false);
         showSuccess('Leave request submitted successfully!');
@@ -383,6 +396,31 @@ export default function MemberRequestsPage() {
               </div>
               <div className="p-5 sm:p-6 overflow-y-auto max-h-[calc(100vh-80px)]">
                 <form onSubmit={handleSubmit} className="space-y-6">
+                {teamData?.team?.settings?.allowMemberHistoricalSubmissions && (
+                  <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={formData.isHistorical}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            isHistorical: e.target.checked,
+                            startDate: '',
+                            endDate: '',
+                          }))
+                        }
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-gray-900"
+                      />
+                      <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                        Historical submission
+                      </span>
+                    </label>
+                    <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                      Use this for past leave entries that require leader approval.
+                    </p>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div>
                     <label htmlFor="startDate" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">

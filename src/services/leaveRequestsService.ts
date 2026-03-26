@@ -74,6 +74,8 @@ export async function getLeaveRequests(
     'updatedAt',
     'deletedAt',
     'deletedBy',
+    'isHistoricalSubmission',
+    'submittedByMember',
   ]);
   const fields = fieldsParam
     ? fieldsParam
@@ -172,15 +174,6 @@ export async function createLeaveRequest(params: {
     };
   }
 
-  if (isHistorical && user.role !== 'leader') {
-    return {
-      error: {
-        status: 403,
-        body: { error: 'Only leaders can create historical leave entries' },
-      },
-    };
-  }
-
   const start = parseDateSafe(startDate);
   const end = parseDateSafe(endDate);
 
@@ -238,6 +231,17 @@ export async function createLeaveRequest(params: {
     return { error: { status: 404, body: { error: 'Team not found' } } };
   }
 
+  const allowMemberHistoricalSubmissions = team.settings.allowMemberHistoricalSubmissions === true;
+  const historicalSubmissionLookbackDays = team.settings.historicalSubmissionLookbackDays || 365;
+  if (isHistorical && user.role !== 'leader' && !allowMemberHistoricalSubmissions) {
+    return {
+      error: {
+        status: 403,
+        body: { error: 'Historical submissions are disabled for your team' },
+      },
+    };
+  }
+
   const requestUser = await UserModel.findById(requestUserId);
   if (!requestUser) {
     return { error: { status: 404, body: { error: 'Requesting user not found' } } };
@@ -255,10 +259,28 @@ export async function createLeaveRequest(params: {
   today.setHours(0, 0, 0, 0);
   const requestStartDate = new Date(start);
   requestStartDate.setHours(0, 0, 0, 0);
+  const requestEndDate = new Date(end);
+  requestEndDate.setHours(0, 0, 0, 0);
 
   const daysDifference = Math.ceil(
     (requestStartDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
   );
+
+  if (isHistorical && user.role !== 'leader') {
+    const oldestAllowedDate = new Date(today);
+    oldestAllowedDate.setDate(oldestAllowedDate.getDate() - historicalSubmissionLookbackDays);
+    oldestAllowedDate.setHours(0, 0, 0, 0);
+    if (requestStartDate < oldestAllowedDate || requestEndDate < oldestAllowedDate) {
+      return {
+        error: {
+          status: 400,
+          body: {
+            error: `Historical requests are limited to the past ${historicalSubmissionLookbackDays} day(s).`,
+          },
+        },
+      };
+    }
+  }
 
   if (!isHistorical) {
     const bypassActive = isBypassNoticePeriodActive(team, today);
@@ -454,8 +476,10 @@ export async function createLeaveRequest(params: {
       startDate: start,
       endDate: end,
       reason,
-      status: 'approved',
+      status: user.role === 'leader' ? 'approved' : 'pending',
       requestedBy: requestedFor ? user.id : undefined,
+      isHistoricalSubmission: user.role !== 'leader',
+      submittedByMember: user.role !== 'leader',
     });
   }
 

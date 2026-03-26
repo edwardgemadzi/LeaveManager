@@ -5,6 +5,12 @@ import { User, ShiftSchedule } from '@/types';
 import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
 
 export class UserModel {
+  private static normalizeEmail(email?: string | null): string | null {
+    if (!email) return null;
+    const normalized = email.trim().toLowerCase();
+    return normalized.length > 0 ? normalized : null;
+  }
+
   static async create(
     user: Omit<User, '_id' | 'createdAt'>,
     session?: ClientSession
@@ -12,8 +18,12 @@ export class UserModel {
     const db = await getDatabase();
     const users = db.collection<User>('users');
     
+    const normalizedEmail = UserModel.normalizeEmail(user.email);
     const newUser: User = {
       ...user,
+      ...(normalizedEmail
+        ? { email: normalizedEmail, emailNormalized: normalizedEmail, emailVerified: user.emailVerified ?? false }
+        : { email: undefined, emailNormalized: undefined }),
       createdAt: new Date(),
     };
     
@@ -34,6 +44,14 @@ export class UserModel {
     return await users.findOne({
       username: { $regex: `^${normalizedUsername}$`, $options: 'i' },
     });
+  }
+
+  static async findByEmail(email: string): Promise<User | null> {
+    const db = await getDatabase();
+    const users = db.collection<User>('users');
+    const normalizedEmail = UserModel.normalizeEmail(email);
+    if (!normalizedEmail) return null;
+    return await users.findOne({ emailNormalized: normalizedEmail });
   }
 
   static async findById(id: string): Promise<User | null> {
@@ -235,6 +253,13 @@ export class UserModel {
       await users.createIndex({ teamId: 1 });
       await users.createIndex({ teamId: 1, role: 1 }); // Compound index for team+role queries
       await users.createIndex({ username: 1 }, { unique: true }); // Unique index for username lookups
+      await users.createIndex(
+        { emailNormalized: 1 },
+        {
+          unique: true,
+          partialFilterExpression: { emailNormalized: { $type: 'string' } },
+        }
+      );
       console.log('User indexes created successfully');
     } catch (error) {
       console.error('Error creating User indexes:', error);
