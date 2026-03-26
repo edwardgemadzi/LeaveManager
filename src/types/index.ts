@@ -167,3 +167,13 @@ export interface CreateLeaveRequest {
   requestedFor?: string; // For leaders making requests on behalf
   isHistorical?: boolean; // For migration: allows past dates and auto-approves
 }
+
+export interface CreateLeaveRequestBatch {
+  reason: string;
+  segments: Array<{
+    startDate: string;
+    endDate: string;
+  }>;
+  requestedFor?: string;
+  isHistorical?: boolean;
+}

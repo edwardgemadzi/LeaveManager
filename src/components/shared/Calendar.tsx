@@ -654,101 +654,71 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
     setSubmitting(true);
 
     try {
-      if (requestAsRange) {
-        // Request as a single range (when checkbox is checked)
-        const startDate = sortedDates[0];
-        const endDate = sortedDates[sortedDates.length - 1];
-
-        const response = await fetch('/api/leave-requests', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            startDate: formatDateSafe(startDate),
-            endDate: formatDateSafe(endDate),
-            reason: reason,
-          }),
-        });
-
-        if (response.ok) {
-          // Refresh calendar and show success
-          await refreshCalendar();
-          showSuccess('Leave request submitted successfully!');
-          const startDate = new Date(sortedDates[0]).toLocaleDateString();
-          const endDate = new Date(sortedDates[sortedDates.length - 1]).toLocaleDateString();
-          showBrowserNotification(
-            'Leave Request Submitted',
-            `Your leave request for ${startDate} to ${endDate} has been submitted successfully!`
-          );
-          clearSelectionMode();
-          setShowRequestModal(false);
-          setSelectedReasonType('');
-          setCustomReason('');
-          setRequestAsRange(false);
-        } else {
-          const error = await response.json();
-          // Handle 409 Conflict specifically (slot no longer available)
-          if (response.status === 409) {
-            showError(`This time slot is no longer available. ${error.error || 'Please select different dates.'}`);
-          } else {
-            showError(error.error || 'Failed to submit request');
-          }
-        }
-      } else {
-        // Request each date separately (default)
-        let successCount = 0;
-        let failureCount = 0;
-
-        for (const date of sortedDates) {
-          const response = await fetch('/api/leave-requests', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
+      const segments = requestAsRange
+        ? [
+            {
+              startDate: formatDateSafe(sortedDates[0]),
+              endDate: formatDateSafe(sortedDates[sortedDates.length - 1]),
             },
-            credentials: 'include',
-            body: JSON.stringify({
-              startDate: formatDateSafe(date),
-              endDate: formatDateSafe(date),
-              reason: reason,
-            }),
-          });
+          ]
+        : sortedDates.map((date) => ({
+            startDate: formatDateSafe(date),
+            endDate: formatDateSafe(date),
+          }));
 
-          if (response.ok) {
-            successCount++;
-          } else {
-            failureCount++;
-            // Handle 409 Conflict specifically (slot no longer available)
-            if (response.status === 409) {
-              const errorData = await response.json();
-              const dateStr = date.toLocaleDateString();
-              showError(`Time slot no longer available for ${dateStr}. ${errorData.error || 'Please select different dates.'}`);
-            }
-          }
-        }
+      const response = await fetch('/api/leave-requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          reason,
+          segments,
+        }),
+      });
 
-        // Refresh calendar
-        await refreshCalendar();
-
-        if (failureCount === 0) {
-          showSuccess(`Leave request submitted successfully! (${successCount} date${successCount !== 1 ? 's' : ''})`);
-          const firstDate = sortedDates[0];
-          const lastDate = sortedDates[sortedDates.length - 1];
-          const startDate = new Date(firstDate).toLocaleDateString();
-          const endDate = new Date(lastDate).toLocaleDateString();
-          showBrowserNotification(
-            'Leave Request Submitted',
-            `Your leave request for ${successCount} date${successCount !== 1 ? 's' : ''} (${startDate} to ${endDate}) has been submitted successfully!`
-          );
-          clearSelectionMode();
-          setShowRequestModal(false);
-          setSelectedReasonType('');
-          setCustomReason('');
-          setRequestAsRange(false);
+      if (!response.ok) {
+        const error = await response.json();
+        if (response.status === 409) {
+          showError(`This time slot is no longer available. ${error.error || 'Please select different dates.'}`);
         } else {
-          showSuccess(`Submitted ${successCount} request(s) successfully. ${failureCount} request(s) failed.`);
+          showError(error.error || 'Failed to submit request');
         }
+        return;
+      }
+
+      const result = await response.json();
+      const createdRequests = Array.isArray(result.createdRequests)
+        ? result.createdRequests
+        : [result].filter(Boolean);
+      const failedSegments = Array.isArray(result.failedSegments) ? result.failedSegments : [];
+
+      await refreshCalendar();
+
+      const successCount = createdRequests.length;
+      const failureCount = failedSegments.length;
+      if (successCount > 0 && failureCount === 0) {
+        showSuccess(`Leave request submitted successfully! (${successCount} date${successCount !== 1 ? 's' : ''})`);
+      } else if (successCount > 0) {
+        showSuccess(`Submitted ${successCount} request(s) successfully. ${failureCount} request(s) failed.`);
+      }
+
+      const firstDate = sortedDates[0];
+      const lastDate = sortedDates[sortedDates.length - 1];
+      const startDate = new Date(firstDate).toLocaleDateString();
+      const endDate = new Date(lastDate).toLocaleDateString();
+      showBrowserNotification(
+        'Leave Request Submitted',
+        `Your leave request for ${successCount} date${successCount !== 1 ? 's' : ''} (${startDate} to ${endDate}) has been submitted successfully!`
+      );
+
+      if (successCount > 0) {
+        clearSelectionMode();
+        setShowRequestModal(false);
+        setSelectedReasonType('');
+        setCustomReason('');
+        setRequestAsRange(false);
       }
     } catch (error) {
       console.error('Error submitting request:', error);
@@ -771,6 +741,8 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
     const openHandler = () => {
       const { selectionMode: sm, selectedDates: sd } = selectionForEventsRef.current;
       if (!sm || sd.length === 0) return;
+      // Hide selection highlight/panel once request flow starts.
+      setSelectionMode(false);
       setShowRequestModal(true);
     };
     const clearHandler = () => {

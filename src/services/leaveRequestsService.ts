@@ -1,4 +1,4 @@
-import { AuthUser, CreateLeaveRequest, LeaveRequest } from '@/types';
+import { AuthUser, CreateLeaveRequest, CreateLeaveRequestBatch, LeaveRequest } from '@/types';
 import { LeaveRequestModel } from '@/models/LeaveRequest';
 import { TeamModel } from '@/models/Team';
 import { UserModel } from '@/models/User';
@@ -460,6 +460,59 @@ export async function createLeaveRequest(params: {
   }
 
   return { data: leaveRequest };
+}
+
+export async function createLeaveRequestBatch(params: {
+  user: AuthUser;
+  body: CreateLeaveRequestBatch;
+}): Promise<
+  ServiceResult<{
+    createdRequests: LeaveRequest[];
+    failedSegments: Array<{ segment: { startDate: string; endDate: string }; error: ServiceError }>;
+  }>
+> {
+  const { user, body } = params;
+  const segments = Array.isArray(body.segments) ? body.segments : [];
+
+  if (segments.length === 0) {
+    return { error: { status: 400, body: { error: 'At least one date segment is required' } } };
+  }
+
+  if (segments.length > 100) {
+    return { error: { status: 400, body: { error: 'Too many date segments (max 100)' } } };
+  }
+
+  const createdRequests: LeaveRequest[] = [];
+  const failedSegments: Array<{ segment: { startDate: string; endDate: string }; error: ServiceError }> = [];
+
+  for (const segment of segments) {
+    const createResult = await createLeaveRequest({
+      user,
+      body: {
+        startDate: segment.startDate,
+        endDate: segment.endDate,
+        reason: body.reason,
+        requestedFor: body.requestedFor,
+        isHistorical: body.isHistorical,
+      },
+    });
+
+    if ('error' in createResult) {
+      failedSegments.push({ segment, error: createResult.error });
+    } else {
+      createdRequests.push(createResult.data);
+    }
+  }
+
+  if (createdRequests.length === 0) {
+    const primaryError = failedSegments[0]?.error || {
+      status: 400,
+      body: { error: 'Failed to create leave requests' },
+    };
+    return { error: primaryError };
+  }
+
+  return { data: { createdRequests, failedSegments } };
 }
 
 export async function updateMemberPendingLeaveRequest(params: {

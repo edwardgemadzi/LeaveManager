@@ -321,33 +321,32 @@ export default function LeaderRequestsPage() {
     let errorCount = 0;
 
     try {
-      // Create leave requests for each selected range
-      const promises = selectedRanges.map(range => 
-        fetch('/api/leave-requests', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({
+      const response = await fetch('/api/leave-requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          reason: finalReason,
+          requestedFor: migrationForm.memberId,
+          isHistorical: true,
+          segments: selectedRanges.map((range) => ({
             startDate: formatDateSafe(range.startDate),
             endDate: formatDateSafe(range.endDate),
-            reason: finalReason,
-            requestedFor: migrationForm.memberId,
-            isHistorical: true
-          }),
-        })
-      );
-
-      const results = await Promise.allSettled(promises);
-      
-      results.forEach((result) => {
-        if (result.status === 'fulfilled' && result.value.ok) {
-          successCount++;
-        } else {
-          errorCount++;
-        }
+          })),
+        }),
       });
+
+      if (!response.ok) {
+        const data = await response.json();
+        showError(data.error || 'Failed to create historical requests.');
+        return;
+      }
+
+      const payload = await response.json();
+      successCount = Array.isArray(payload.createdRequests) ? payload.createdRequests.length : 0;
+      errorCount = Array.isArray(payload.failedSegments) ? payload.failedSegments.length : 0;
 
       if (successCount > 0) {
         await mutateRequests();

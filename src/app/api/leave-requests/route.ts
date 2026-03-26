@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTokenFromRequest, shouldRejectCsrf, verifyToken } from '@/lib/auth';
-import { CreateLeaveRequest, LeaveRequest } from '@/types';
+import { CreateLeaveRequest, CreateLeaveRequestBatch, LeaveRequest } from '@/types';
 import { broadcastTeamUpdate } from '@/lib/teamEvents';
 import { invalidateAnalyticsCache } from '@/lib/analyticsCache';
 import { error as logError, info } from '@/lib/logger';
@@ -8,9 +8,10 @@ import { internalServerError } from '@/lib/errors';
 import { apiRateLimit } from '@/lib/rateLimit';
 import {
   createLeaveRequest,
+  createLeaveRequestBatch,
   getLeaveRequests,
 } from '@/services/leaveRequestsService';
-import { notifyLeaveSubmitted } from '@/services/notificationService';
+import { notifyLeaveSubmitted, notifyLeaveSubmittedBatch } from '@/services/notificationService';
 import { UserModel } from '@/models/User';
 import { TeamModel } from '@/models/Team';
 
@@ -67,13 +68,64 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    let body: CreateLeaveRequest;
+    let body: CreateLeaveRequest | CreateLeaveRequestBatch;
     try {
-      body = (await request.json()) as CreateLeaveRequest;
+      body = (await request.json()) as CreateLeaveRequest | CreateLeaveRequestBatch;
     } catch {
       return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     }
-    const result = await createLeaveRequest({ user, body });
+    const hasSegments = Array.isArray((body as CreateLeaveRequestBatch).segments);
+    if (hasSegments) {
+      const batchResult = await createLeaveRequestBatch({
+        user,
+        body: body as CreateLeaveRequestBatch,
+      });
+      if ('error' in batchResult) {
+        return NextResponse.json(batchResult.error.body, { status: batchResult.error.status });
+      }
+
+      const { createdRequests, failedSegments } = batchResult.data;
+      for (const leaveRequest of createdRequests) {
+        const eventData = {
+          requestId: (leaveRequest._id || '').toString(),
+          userId: leaveRequest.userId.toString(),
+          startDate:
+            leaveRequest.startDate instanceof Date
+              ? leaveRequest.startDate.toISOString()
+              : new Date(leaveRequest.startDate).toISOString(),
+          endDate:
+            leaveRequest.endDate instanceof Date
+              ? leaveRequest.endDate.toISOString()
+              : new Date(leaveRequest.endDate).toISOString(),
+          reason: leaveRequest.reason,
+          status: leaveRequest.status,
+        };
+        info(`[LeaveRequest] Broadcasting leaveRequestCreated event for team ${user.teamId}:`, eventData);
+        broadcastTeamUpdate(user.teamId!, 'leaveRequestCreated', eventData);
+      }
+      invalidateAnalyticsCache(user.teamId!);
+
+      const memberUser = await UserModel.findById(createdRequests[0].userId.toString());
+      const team = await TeamModel.findById(user.teamId!);
+      if (memberUser && team) {
+        await notifyLeaveSubmittedBatch({
+          leaveRequests: createdRequests,
+          member: memberUser,
+          teamName: team.name,
+        });
+      }
+
+      return NextResponse.json({
+        createdRequests,
+        failedSegments: failedSegments.map((item) => ({
+          segment: item.segment,
+          status: item.error.status,
+          error: item.error.body?.error || 'Failed to create segment',
+        })),
+      });
+    }
+
+    const result = await createLeaveRequest({ user, body: body as CreateLeaveRequest });
     if ('error' in result) {
       return NextResponse.json(result.error.body, { status: result.error.status });
     }

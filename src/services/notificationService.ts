@@ -164,6 +164,138 @@ export async function notifyLeaveSubmitted(params: {
   await Promise.allSettled(tasks);
 }
 
+function toIsoDate(value: Date | string): string {
+  if (value instanceof Date) return value.toISOString().split('T')[0];
+  return String(value);
+}
+
+function buildRangeSummary(leaveRequests: LeaveRequest[]): { singleLine: string; lines: string[] } {
+  const ranges = leaveRequests
+    .map((request) => formatDateRange(toIsoDate(request.startDate), toIsoDate(request.endDate)))
+    .sort((a, b) => a.localeCompare(b));
+  return {
+    singleLine: ranges.join(', '),
+    lines: ranges,
+  };
+}
+
+export async function notifyLeaveSubmittedBatch(params: {
+  leaveRequests: LeaveRequest[];
+  member: User;
+  teamName: string;
+}): Promise<void> {
+  const { leaveRequests, member, teamName } = params;
+  if (leaveRequests.length === 0) return;
+  if (leaveRequests.length === 1) {
+    await notifyLeaveSubmitted({ leaveRequest: leaveRequests[0], member, teamName });
+    return;
+  }
+
+  const { singleLine, lines } = buildRangeSummary(leaveRequests);
+  const base = appBaseUrl();
+  const requestsMagic = await createSingleUseMagicLinkToken({
+    userId: String(member._id),
+    nextPath: '/member/requests',
+  });
+  const requestsLink = `${base}/api/auth/magic?token=${encodeURIComponent(requestsMagic)}`;
+  const reason = leaveRequests[0].reason;
+  const tasks: Promise<unknown>[] = [];
+
+  if (wantsEmail(member)) {
+    const rangesHtml = lines.map((line) => `<li>${escapeForHtml(line)}</li>`).join('');
+    const inner = `
+      <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Hi ${escapeForHtml(greetingName(member))},</p>
+      <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Your leave request was submitted and is <strong>pending approval</strong>.</p>
+      <table role="presentation" style="margin:16px 0;border-collapse:collapse;width:100%;">
+        <tr><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;color:${'#64748b'};font-size:13px;">Team</td><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;font-size:14px;">${escapeForHtml(teamName)}</td></tr>
+        <tr><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:13px;">Dates</td><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;font-size:14px;"><ul style="margin:0;padding-left:18px;">${rangesHtml}</ul></td></tr>
+        <tr><td style="padding:8px 0;color:#64748b;font-size:13px;">Reason</td><td style="padding:8px 0;font-size:14px;">${escapeForHtml(reason)}</td></tr>
+      </table>
+      <p style="margin:20px 0 0;">
+        <a href="${requestsLink}" style="display:inline-block;background:#4f46e5;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:14px;">View my requests</a>
+      </p>
+    `;
+    tasks.push(
+      sendHtmlEmail({
+        to: member.email!.trim(),
+        subject: `Leave request submitted — ${singleLine}`,
+        html: shell(inner, {
+          title: 'Request received',
+          preheader: `Pending approval · ${singleLine}`,
+        }),
+      })
+    );
+  }
+
+  if (wantsTelegram(member)) {
+    const rangeLines = lines.map((line) => `- ${line}`).join('\n');
+    tasks.push(
+      sendTelegramMessage({
+        chatId: member.telegramUserId!,
+        text:
+          `Leave request submitted\n` +
+          `Team: ${teamName}\n` +
+          `Dates:\n${rangeLines}\n` +
+          `Reason: ${reason}\n` +
+          `Status: pending approval`,
+      })
+    );
+  }
+
+  const team = await TeamModel.findById(String(leaveRequests[0].teamId));
+  if (team?.leaderId) {
+    const leader = await UserModel.findById(String(team.leaderId));
+    if (leader && leader._id && String(leader._id) !== String(member._id)) {
+      const leaderMagic = await createSingleUseMagicLinkToken({
+        userId: String(leader._id),
+        nextPath: '/leader/requests',
+      });
+      const leaderLink = `${base}/api/auth/magic?token=${encodeURIComponent(leaderMagic)}`;
+      const memberLabel = displayName(member);
+
+      if (wantsEmail(leader)) {
+        const rangesHtml = lines.map((line) => `<li>${escapeForHtml(line)}</li>`).join('');
+        const inner = `
+          <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;"><strong>${escapeForHtml(memberLabel)}</strong> submitted a leave request.</p>
+          <table role="presentation" style="margin:16px 0;border-collapse:collapse;width:100%;">
+            <tr><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:13px;">Dates</td><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;font-size:14px;"><ul style="margin:0;padding-left:18px;">${rangesHtml}</ul></td></tr>
+            <tr><td style="padding:8px 0;color:#64748b;font-size:13px;">Reason</td><td style="padding:8px 0;font-size:14px;">${escapeForHtml(reason)}</td></tr>
+          </table>
+          <p style="margin:20px 0 0;">
+            <a href="${leaderLink}" style="display:inline-block;background:#4f46e5;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:14px;">Review requests</a>
+          </p>
+        `;
+        tasks.push(
+          sendHtmlEmail({
+            to: leader.email!.trim(),
+            subject: `New leave request from ${memberLabel} — ${singleLine}`,
+            html: shell(inner, {
+              title: 'New leave request',
+              preheader: `${memberLabel} · ${singleLine}`,
+            }),
+          })
+        );
+      }
+
+      if (wantsTelegram(leader)) {
+        const rangeLines = lines.map((line) => `- ${line}`).join('\n');
+        tasks.push(
+          sendTelegramMessage({
+            chatId: leader.telegramUserId!,
+            text:
+              `New leave request\n` +
+              `From: ${memberLabel}\n` +
+              `Dates:\n${rangeLines}\n` +
+              `Reason: ${reason}`,
+          })
+        );
+      }
+    }
+  }
+
+  await Promise.allSettled(tasks);
+}
+
 export async function notifyLeaveDecision(params: {
   leaveRequest: LeaveRequest;
   member: User;
