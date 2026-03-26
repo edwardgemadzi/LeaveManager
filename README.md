@@ -36,16 +36,19 @@ A comprehensive leave management application built with Next.js, MongoDB, and Ta
 - Team-specific calendar highlighting leave requests
 - Role-based access control
 - JWT authentication
+- HTTP-only cookie sessions with optional "Remember me" persistence (up to 1 year)
 - Responsive design with Tailwind CSS
 - Shift schedule support for different work patterns
 - Real-time updates via Server-Sent Events (SSE) with polling fallback
 - Leave carryover from previous year (configurable)
 - Subgroup support for organizing team members
 - Contact form for feedback
+- In-app Help Center and Metrics Glossary pages
 
 ### Admin Panel (Localhost Only - Not Included in Repository)
 - Admin dashboard for managing users and teams
 - User management (create, edit, delete users)
+- Bulk user actions (multi-select delete and role changes)
 - Team management (create, edit, delete teams)
 - Password reset functionality
 - **Note**: Admin features are not included in this repository. They are intentionally excluded from version control as they are for localhost development only. Admin features require `ADMIN_ENABLED=true` environment variable and are only accessible from localhost.
@@ -249,6 +252,8 @@ See `SECURITY_FEATURES.md` for detailed security implementation documentation.
 
 ### Authentication
 - `POST /api/auth/login` - User login
+- `POST /api/auth/logout` - End current session
+- `GET /api/auth/me` - Get current session user
 - `POST /api/auth/register-leader` - Team leader registration
 - `POST /api/auth/register-member` - Team member registration
 - `POST /api/auth/change-password` - Change user password
@@ -293,6 +298,8 @@ See `SECURITY_FEATURES.md` for detailed security implementation documentation.
 
 The following endpoints would be available if admin features were included:
 - `GET /api/admin/users` - Get all users
+- `PATCH /api/admin/users` - Bulk update users (role)
+- `DELETE /api/admin/users` - Bulk delete users
 - `GET /api/admin/teams` - Get all teams
 - `GET /api/admin/users/{id}` - Get user details
 - `PATCH /api/admin/users/{id}` - Update user

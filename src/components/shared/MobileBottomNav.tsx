@@ -23,7 +23,6 @@ import {
   HomeIcon as HomeIconSolid,
   DocumentTextIcon as DocumentTextIconSolid,
   CalendarIcon as CalendarIconSolid,
-  ChartBarIcon as ChartBarIconSolid,
   UserCircleIcon as UserCircleIconSolid,
   UsersIcon as UsersIconSolid,
   InboxStackIcon as InboxStackIconSolid,

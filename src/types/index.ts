@@ -26,6 +26,8 @@ export interface User {
   email?: string | null;
   /** Lowercase email for lookups (set server-side) */
   emailNormalized?: string | null;
+  /** Whether the optional email has been verified. */
+  emailVerified?: boolean;
   /** Telegram user id from deep-link linking (string for bigint safety) */
   telegramUserId?: string | null;
   telegramUsername?: string | null;
