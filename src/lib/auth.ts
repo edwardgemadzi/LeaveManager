@@ -12,14 +12,14 @@ if (!JWT_SECRET || JWT_SECRET.length < 32) {
   );
 }
 
-/** Default cookie/JWT lifetime when “Remember me” is on (30 days). */
-export const AUTH_REMEMBER_ME_MAX_AGE_SEC = 60 * 60 * 24 * 30;
+/** Default cookie/JWT lifetime when “Remember me” is on (1 year). */
+export const AUTH_REMEMBER_ME_MAX_AGE_SEC = 60 * 60 * 24 * 365;
 
 /** JWT lifetime when “Remember me” is off (session-style; cookie has no maxAge). */
 export const AUTH_SESSION_JWT_EXPIRES_IN = '12h';
 
 /** JWT lifetime when “Remember me” is on (matches cookie maxAge). */
-export const AUTH_REMEMBER_JWT_EXPIRES_IN = '30d';
+export const AUTH_REMEMBER_JWT_EXPIRES_IN = '365d';
 
 /**
  * Sign a JWT for the auth cookie. Call sites must pair `expiresIn` with {@link setAuthCookie}

@@ -121,7 +121,7 @@ export default function LoginPage() {
                 className="rounded border-zinc-300 dark:border-zinc-600 text-indigo-600 focus:ring-indigo-500"
               />
               <span className="text-sm text-zinc-600 dark:text-zinc-400">
-                Remember this device (30 days)
+                Remember this device (1 year)
               </span>
             </label>
 

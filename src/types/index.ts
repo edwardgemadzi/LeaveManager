@@ -144,7 +144,7 @@ export interface LoginRequest {
   username?: string;
   identifier?: string;
   password: string;
-  /** When true, set a persistent cookie (30 days). When false/omitted, session cookie + shorter JWT. */
+  /** When true, set a persistent cookie (1 year). When false/omitted, session cookie + shorter JWT. */
   rememberMe?: boolean;
 }
 
