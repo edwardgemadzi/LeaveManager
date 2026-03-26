@@ -15,6 +15,8 @@ import {
   ChartPieIcon,
   ScaleIcon,
   Cog6ToothIcon,
+  QuestionMarkCircleIcon,
+  ChatBubbleLeftRightIcon,
   ArrowRightOnRectangleIcon,
 } from '@heroicons/react/24/outline';
 import {
@@ -38,7 +40,6 @@ const memberTabs = [
   { href: '/member/dashboard', label: 'Home', Icon: HomeIcon, IconSolid: HomeIconSolid },
   { href: '/member/requests', label: 'Requests', Icon: DocumentTextIcon, IconSolid: DocumentTextIconSolid },
   { href: '/member/calendar', label: 'Calendar', Icon: CalendarIcon, IconSolid: CalendarIconSolid },
-  { href: '/member/analytics', label: 'Analytics', Icon: ChartBarIcon, IconSolid: ChartBarIconSolid },
   { href: '/member/profile', label: 'Profile', Icon: UserCircleIcon, IconSolid: UserCircleIconSolid },
 ];
 
@@ -54,6 +55,14 @@ const leaderMoreItems = [
   { href: '/leader/leave-balance', label: 'Leave Balance', Icon: ScaleIcon },
   { href: '/leader/settings', label: 'Settings', Icon: Cog6ToothIcon },
   { href: '/leader/profile', label: 'Profile', Icon: UserCircleIcon },
+  { href: '/help', label: 'Help Center', Icon: QuestionMarkCircleIcon },
+  { href: '/contact', label: 'Contact Developer', Icon: ChatBubbleLeftRightIcon },
+];
+
+const memberMoreItems = [
+  { href: '/member/analytics', label: 'Analytics', Icon: ChartBarIcon },
+  { href: '/help', label: 'Help Center', Icon: QuestionMarkCircleIcon },
+  { href: '/contact', label: 'Contact Developer', Icon: ChatBubbleLeftRightIcon },
 ];
 
 export default function MobileBottomNav() {
@@ -82,14 +91,13 @@ export default function MobileBottomNav() {
 
   const isLeader = user.role === 'leader';
   const tabs = isLeader ? leaderTabs : memberTabs;
+  const moreItems = isLeader ? leaderMoreItems : memberMoreItems;
 
   const isActive = (href: string) =>
     pathname === href || pathname?.startsWith(href + '/');
 
   // For leader, "More" tab is active when any more-item route is active
-  const isMoreActive =
-    isLeader &&
-    leaderMoreItems.some((item) => isActive(item.href));
+  const isMoreActive = moreItems.some((item) => isActive(item.href));
 
   return (
     <>
@@ -119,7 +127,7 @@ export default function MobileBottomNav() {
           </p>
 
           <nav className="px-4 pb-4 space-y-1">
-            {leaderMoreItems.map(({ href, label, Icon }) => (
+            {moreItems.map(({ href, label, Icon }) => (
               <Link
                 key={href}
                 href={href}
@@ -179,30 +187,27 @@ export default function MobileBottomNav() {
             );
           })}
 
-          {/* More tab — leader only */}
-          {isLeader && (
-            <button
-              onClick={() => setMoreOpen((v) => !v)}
-              className="flex-1 flex flex-col items-center justify-center gap-0.5 min-w-0 transition-all duration-150 active:scale-95"
+          <button
+            onClick={() => setMoreOpen((v) => !v)}
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 min-w-0 transition-all duration-150 active:scale-95"
+          >
+            <EllipsisHorizontalCircleIcon
+              className={`h-6 w-6 flex-shrink-0 ${
+                isMoreActive || moreOpen
+                  ? 'text-indigo-600 dark:text-indigo-400'
+                  : 'text-gray-400 dark:text-gray-500'
+              }`}
+            />
+            <span
+              className={`text-[10px] font-semibold truncate leading-none ${
+                isMoreActive || moreOpen
+                  ? 'text-indigo-600 dark:text-indigo-400'
+                  : 'text-gray-400 dark:text-gray-500'
+              }`}
             >
-              <EllipsisHorizontalCircleIcon
-                className={`h-6 w-6 flex-shrink-0 ${
-                  isMoreActive || moreOpen
-                    ? 'text-indigo-600 dark:text-indigo-400'
-                    : 'text-gray-400 dark:text-gray-500'
-                }`}
-              />
-              <span
-                className={`text-[10px] font-semibold truncate leading-none ${
-                  isMoreActive || moreOpen
-                    ? 'text-indigo-600 dark:text-indigo-400'
-                    : 'text-gray-400 dark:text-gray-500'
-                }`}
-              >
-                More
-              </span>
-            </button>
-          )}
+              More
+            </span>
+          </button>
         </div>
       </nav>
     </>
