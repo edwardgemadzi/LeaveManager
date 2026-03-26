@@ -16,6 +16,8 @@ export default function TeamSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [newHolidayName, setNewHolidayName] = useState('');
+  const [newHolidayDate, setNewHolidayDate] = useState('');
   const [settings, setSettings] = useState({
     concurrentLeave: 2,
     maxLeavePerYear: 20,
@@ -46,6 +48,9 @@ export default function TeamSettingsPage() {
     },
     allowMemberHistoricalSubmissions: false,
     historicalSubmissionLookbackDays: 365,
+    holidays: [] as Array<{ id: string; name: string; date: string }>,
+    enforceHolidayBlocking: false,
+    delegatedApprovers: [] as Array<{ userId: string; username?: string; startsAt: string; endsAt: string; scope?: 'all' | 'team' | 'member' }>,
   });
 
   useEffect(() => {
@@ -102,6 +107,9 @@ export default function TeamSettingsPage() {
           },
           allowMemberHistoricalSubmissions: false,
           historicalSubmissionLookbackDays: 365,
+          holidays: [] as Array<{ id: string; name: string; date: string }>,
+          enforceHolidayBlocking: false,
+          delegatedApprovers: [] as Array<{ userId: string; username?: string; startsAt: string; endsAt: string; scope?: 'all' | 'team' | 'member' }>,
         };
         const teamSettings = data.team?.settings || defaultSettings;
         // Convert carryover expiry date from Date object to ISO string for input field
@@ -170,7 +178,9 @@ export default function TeamSettingsPage() {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ settings }),
+        body: JSON.stringify({
+          settings,
+        }),
       });
 
       if (response.ok) {
@@ -265,6 +275,62 @@ export default function TeamSettingsPage() {
                 <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100 mb-4">Leave Policies</h3>
                 
                 <div className="grid grid-cols-1 gap-6">
+                  <div className="card p-4 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800">
+                    <h4 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 mb-2">Onboarding</h4>
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                      Member invites are currently disabled. New members can register using your team username.
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 mb-2">Public holidays</h4>
+                    <label className="flex items-center gap-2 text-sm mb-3">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(settings.enforceHolidayBlocking)}
+                        onChange={(e) => setSettings({ ...settings, enforceHolidayBlocking: e.target.checked })}
+                      />
+                      Block leave requests on holiday dates
+                    </label>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">Turn this off if your team can work and request leave on holidays.</p>
+                    <div className="grid sm:grid-cols-3 gap-2 mb-2">
+                      <input className="input-modern sm:col-span-2" placeholder="Holiday name" value={newHolidayName} onChange={(e) => setNewHolidayName(e.target.value)} />
+                      <input className="input-modern" type="date" value={newHolidayDate} onChange={(e) => setNewHolidayDate(e.target.value)} />
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-secondary text-sm"
+                      onClick={() => {
+                        if (!newHolidayName.trim() || !newHolidayDate) return;
+                        setSettings({
+                          ...settings,
+                          holidays: [
+                            ...(settings.holidays || []),
+                            { id: `${newHolidayName}-${newHolidayDate}`, name: newHolidayName.trim(), date: newHolidayDate },
+                          ],
+                        });
+                        setNewHolidayName('');
+                        setNewHolidayDate('');
+                      }}
+                    >
+                      Add holiday
+                    </button>
+                    <div className="mt-2 space-y-2">
+                      {(settings.holidays || []).map((h) => (
+                        <div key={h.id} className="flex items-center justify-between text-sm border border-zinc-200 dark:border-zinc-800 rounded px-3 py-2">
+                          <span>{h.date} · {h.name}</span>
+                          <button
+                            type="button"
+                            className="text-red-600 text-xs"
+                            onClick={() => setSettings({ ...settings, holidays: (settings.holidays || []).filter((x) => x.id !== h.id) })}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <div>
                     <label htmlFor="concurrentLeave" className="block text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
                       Maximum Concurrent Leave

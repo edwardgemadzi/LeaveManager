@@ -33,6 +33,7 @@ interface DecodedToken {
   id: string;
   username: string;
   role: 'leader' | 'member';
+  accessRole?: 'leader' | 'member' | 'approver' | 'hr_admin' | 'viewer';
   teamId?: string;
   // Legacy fields for backward compatibility
   selectedTeamId?: string;
@@ -60,6 +61,7 @@ export const verifyToken = (token: string): AuthUser | null => {
       id: decoded.id,
       username: decoded.username,
       role: decoded.role,
+      accessRole: decoded.accessRole,
       // Use selectedTeamId or first teamIds entry if teamId is missing (for old tokens)
       teamId: decoded.teamId || decoded.selectedTeamId || (decoded.teamIds && decoded.teamIds.length > 0 ? decoded.teamIds[0] : undefined),
     };

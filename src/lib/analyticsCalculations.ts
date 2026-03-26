@@ -1061,7 +1061,8 @@ export const getMemberAnalytics = (
     user,
     user.manualLeaveBalance,
     effectiveManualYearToDateUsed,
-    team.settings.carryoverSettings
+    team.settings.carryoverSettings,
+    team.settings.accrual
   );
   
   // Filter members to only include those with remaining balance > 0 for competition calculations
@@ -1074,7 +1075,8 @@ export const getMemberAnalytics = (
       member,
       member.manualLeaveBalance,
       getEffectiveManualYearToDateUsed(member, currentYear),
-      team.settings.carryoverSettings
+      team.settings.carryoverSettings,
+      team.settings.accrual
     );
     return memberRemainingBalance > 0;
   });

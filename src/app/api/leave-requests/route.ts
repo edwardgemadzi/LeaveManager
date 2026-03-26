@@ -14,6 +14,7 @@ import {
 import { notifyLeaveSubmitted, notifyLeaveSubmittedBatch } from '@/services/notificationService';
 import { UserModel } from '@/models/User';
 import { TeamModel } from '@/models/Team';
+import { validateLeaveDatesAgainstTeamPolicy } from '@/lib/leaveDateRules';
 
 export async function GET(request: NextRequest) {
   try {
@@ -67,6 +68,9 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
+    if (!user.teamId) {
+      return NextResponse.json({ error: 'No team assigned' }, { status: 400 });
+    }
 
     let body: CreateLeaveRequest | CreateLeaveRequestBatch;
     try {
@@ -75,7 +79,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     }
     const hasSegments = Array.isArray((body as CreateLeaveRequestBatch).segments);
+    const teamForValidation = user.teamId ? await TeamModel.findById(user.teamId) : null;
     if (hasSegments) {
+      if (teamForValidation) {
+        for (const segment of (body as CreateLeaveRequestBatch).segments) {
+          const policyError = validateLeaveDatesAgainstTeamPolicy({
+            settings: teamForValidation.settings,
+            startDate: segment.startDate,
+            endDate: segment.endDate,
+          });
+          if (policyError) {
+            return NextResponse.json({ error: policyError }, { status: 400 });
+          }
+        }
+      }
       const batchResult = await createLeaveRequestBatch({
         user,
         body: body as CreateLeaveRequestBatch,
@@ -123,6 +140,17 @@ export async function POST(request: NextRequest) {
           error: item.error.body?.error || 'Failed to create segment',
         })),
       });
+    }
+
+    if (teamForValidation) {
+      const policyError = validateLeaveDatesAgainstTeamPolicy({
+        settings: teamForValidation.settings,
+        startDate: (body as CreateLeaveRequest).startDate,
+        endDate: (body as CreateLeaveRequest).endDate,
+      });
+      if (policyError) {
+        return NextResponse.json({ error: policyError }, { status: 400 });
+      }
     }
 
     const result = await createLeaveRequest({ user, body: body as CreateLeaveRequest });

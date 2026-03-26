@@ -189,3 +189,10 @@ export const emergencyRateLimit = rateLimit({
   maxRequests: 3, // 3 emergency requests per hour
   message: 'Too many emergency requests. Please contact support if this is urgent.'
 });
+
+/** Unauthenticated password recovery (forgot / validate / reset) — abuse protection. */
+export const passwordRecoveryRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  maxRequests: 15,
+  message: 'Too many password reset attempts. Please try again later.',
+});

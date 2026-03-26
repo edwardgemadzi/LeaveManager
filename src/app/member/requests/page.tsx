@@ -375,6 +375,14 @@ export default function MemberRequestsPage() {
           </button>
         </div>
 
+        {teamSettings.allowMemberHistoricalSubmissions && (
+          <div className="mb-4 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 p-3">
+            <p className="text-sm text-indigo-800 dark:text-indigo-300">
+              Historical submissions are enabled for your team. Open <strong>New Request</strong> and turn on <strong>Historical submission</strong> to file past leave for approval.
+            </p>
+          </div>
+        )}
+
         {/* Request drawer */}
         {showForm && (
           <div className="fixed inset-0 z-50">

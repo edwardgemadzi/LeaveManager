@@ -77,19 +77,3 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/**
- * GET /api/contact
- * Get contact submissions (admin only - for future use)
- * This could be used by the admin panel to view feedback
- */
-export async function GET() {
-  try {
-    // For now, this endpoint is not implemented
-    // In the future, this could be used by the admin panel
-    return NextResponse.json({ message: 'Contact submissions endpoint' });
-  } catch (error) {
-    logError('Contact GET error:', error);
-    return internalServerError();
-  }
-}
-

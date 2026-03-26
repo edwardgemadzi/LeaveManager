@@ -8,6 +8,8 @@ export interface User {
   lastName?: string;
   password: string;
   role: 'leader' | 'member';
+  /** Extended authorization role used for granular permissions. */
+  accessRole?: 'leader' | 'member' | 'approver' | 'hr_admin' | 'viewer';
   teamId?: string;
   shiftSchedule?: ShiftSchedule;
   shiftHistory?: Array<{ pattern: boolean[]; startDate: Date; endDate: Date; type: 'rotating' | 'fixed' }>; // Historical shift schedules
@@ -96,8 +98,59 @@ export interface TeamSettings {
     maxDays?: number; // Maximum paternity leave days (configurable by leader, default: 90)
     countingMethod?: 'calendar' | 'working'; // How to count days: 'calendar' = count all calendar days, 'working' = count only working days (default: 'working')
   };
+  delegatedApprovers?: Array<{
+    userId: string;
+    username?: string;
+    startsAt: Date;
+    endsAt: Date;
+    scope?: 'all' | 'team' | 'member';
+    memberIds?: string[];
+    createdAt?: Date;
+    createdBy?: string;
+  }>;
+  holidays?: Array<{
+    id: string;
+    name: string;
+    date: string; // YYYY-MM-DD
+    countryCode?: string;
+  }>;
+  enforceHolidayBlocking?: boolean;
+  blackoutDates?: Array<{
+    id: string;
+    name: string;
+    startDate: string; // YYYY-MM-DD
+    endDate: string; // YYYY-MM-DD
+    reason?: string;
+  }>;
+  accrual?: {
+    enabled: boolean;
+    cadence: 'monthly' | 'biweekly' | 'yearly';
+    annualEntitlementDays: number;
+    prorateOnJoin: boolean;
+    capDays?: number;
+  };
   allowMemberHistoricalSubmissions?: boolean;
   historicalSubmissionLookbackDays?: number;
+}
+
+export interface PasswordResetToken {
+  _id?: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: Date;
+  usedAt?: Date;
+  createdAt: Date;
+}
+
+export interface TeamPolicyVersion {
+  _id?: string;
+  teamId: string;
+  effectiveFrom: Date;
+  effectiveTo?: Date;
+  settings: TeamSettings;
+  versionLabel?: string;
+  createdBy: string;
+  createdAt: Date;
 }
 
 export interface LeaveRequest {
@@ -139,6 +192,7 @@ export interface AuthUser {
   id: string;
   username: string;
   role: 'leader' | 'member';
+  accessRole?: 'leader' | 'member' | 'approver' | 'hr_admin' | 'viewer';
   teamId?: string;
 }
 

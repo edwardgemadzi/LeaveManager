@@ -16,7 +16,7 @@ import {
   Cog6ToothIcon,
   UserCircleIcon,
   ScaleIcon,
-  ArrowRightOnRectangleIcon,
+  ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -107,6 +107,7 @@ export default function Navbar() {
     { href: '/leader/analytics', label: 'Analytics', Icon: ChartBarIcon },
     { href: '/leader/members', label: 'Members', Icon: UsersIcon },
     { href: '/leader/leave-balance', label: 'Leave balance', Icon: ScaleIcon },
+    { href: '/leader/exports', label: 'Exports', Icon: ArrowDownTrayIcon },
     { href: '/leader/settings', label: 'Settings', Icon: Cog6ToothIcon },
     { href: '/leader/profile', label: 'Profile', Icon: UserCircleIcon },
   ];
@@ -196,16 +197,6 @@ export default function Navbar() {
                   type="button"
                 >
                   {theme === 'light' ? <MoonIcon className="h-4 w-4" /> : <SunIcon className="h-4 w-4" />}
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                  aria-label="Log out"
-                  title="Log out"
-                  type="button"
-                >
-                  <ArrowRightOnRectangleIcon className="h-5 w-5 shrink-0" />
-                  <span className="text-[10px] font-semibold leading-none">Log out</span>
                 </button>
               </div>
             </div>

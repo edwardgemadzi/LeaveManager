@@ -58,11 +58,13 @@ export async function POST(request: NextRequest) {
       id: string;
       username: string;
       role: 'leader' | 'member';
+      accessRole?: 'leader' | 'member' | 'approver' | 'hr_admin' | 'viewer';
       teamId?: string;
     } = {
       id: user._id!,
       username: user.username,
       role: user.role,
+      accessRole: user.accessRole || user.role,
     };
     
     if (user.teamId) {
@@ -79,6 +81,7 @@ export async function POST(request: NextRequest) {
           id: user._id,
           username: user.username,
           role: user.role,
+          accessRole: user.accessRole || user.role,
           teamId: user.teamId,
         },
       },

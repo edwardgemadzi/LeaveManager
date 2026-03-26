@@ -35,9 +35,14 @@ export async function PATCH(request: NextRequest) {
     }
 
     const user = verifyToken(token);
-    if (!user || user.role !== 'leader') {
+    if (!user) {
       return forbiddenError();
     }
+    if (user.role !== 'leader') {
+      return forbiddenError();
+    }
+    const actorUser = await UserModel.findById(user.id);
+    if (!actorUser) return forbiddenError();
 
     const body: BulkActionRequest = await request.json();
     const { action, requestIds, decisionNote } = body;
@@ -96,12 +101,6 @@ export async function PATCH(request: NextRequest) {
 
         // Update the request status
         const newStatus = action === 'approve' ? 'approved' : 'rejected';
-        const actorUser = await UserModel.findById(user.id);
-        if (!actorUser) {
-          results.failed.push({ id: requestId, error: 'User not found' });
-          continue;
-        }
-
         await LeaveRequestModel.updateStatus(requestId, newStatus, {
           note: normalizedDecisionNote || undefined,
           byUserId: user.id,
@@ -128,7 +127,10 @@ export async function PATCH(request: NextRequest) {
               reason: leaveRequest.reason,
               decisionNote: normalizedDecisionNote || undefined,
             },
-            { bulkAction: true, reason: normalizedDecisionNote || undefined }
+            {
+              bulkAction: true,
+              reason: normalizedDecisionNote || undefined,
+            }
           );
 
           await notifyLeaveDecision({

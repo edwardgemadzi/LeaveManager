@@ -27,7 +27,16 @@ interface CalendarEvent {
     fullName?: string;
     isEmergency?: boolean;
     requestedBy?: string;
+    aggregated?: boolean;
+    memberNames?: string[];
+    requestCount?: number;
   };
+}
+
+function toShortBannerName(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return 'User';
+  return `${trimmed.slice(0, 4)}...`;
 }
 
 type LeaveDateConstraintDay = {
@@ -78,6 +87,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
   const [submitting, setSubmitting] = useState(false);
   const [requestAsRange, setRequestAsRange] = useState(false); // Checkbox: request as range (default: individual dates)
   const [dateConstraints, setDateConstraints] = useState<Record<string, LeaveDateConstraintDay>>({});
+  const [isMobile, setIsMobile] = useState(false);
   
   const isMember = currentUser?.role === 'member';
   
@@ -109,6 +119,13 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
       observer.disconnect();
       window.removeEventListener('resize', updateHeight);
     };
+  }, []);
+
+  useEffect(() => {
+    const update = () => setIsMobile(window.innerWidth < 768);
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
   }, []);
 
   // Fetch team settings for validation (only if not provided as prop)
@@ -267,8 +284,58 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
       }
     });
 
+    if (isMobile && currentView === Views.MONTH) {
+      const grouped = new Map<string, { date: Date; events: CalendarEvent[] }>();
+      for (const event of calendarEvents) {
+        const day = new Date(event.start);
+        day.setHours(0, 0, 0, 0);
+        const key = day.toISOString().split('T')[0];
+        const existing = grouped.get(key);
+        if (!existing) {
+          grouped.set(key, {
+            date: day,
+            events: [event],
+          });
+        } else {
+          existing.events.push(event);
+        }
+      }
+
+      const mobileMonthEvents: CalendarEvent[] = [];
+      Array.from(grouped.values()).forEach((group, groupIndex) => {
+        const names = group.events.map((e) => e.resource.fullName || e.resource.username).filter(Boolean);
+        if (group.events.length >= 4) {
+          mobileMonthEvents.push({
+            id: `agg-${groupIndex}-${group.date.toISOString()}`,
+            title: `${group.events.length} on leave`,
+            start: group.date,
+            end: group.date,
+            resource: {
+              status: group.events.some((e) => e.resource.status === 'pending') ? 'pending' : 'approved',
+              userId: 'aggregated',
+              username: 'aggregated',
+              aggregated: true,
+              memberNames: names.sort(),
+              requestCount: group.events.length,
+            },
+          });
+        } else {
+          group.events.forEach((event, idx) => {
+            const fullName = event.resource.fullName || event.resource.username || 'User';
+            mobileMonthEvents.push({
+              ...event,
+              id: `mobile-${groupIndex}-${idx}-${event.id}`,
+              title: toShortBannerName(fullName),
+            });
+          });
+        }
+      });
+
+      setEvents(mobileMonthEvents);
+      return;
+    }
     setEvents(calendarEvents);
-  }, [members, providedTeamSettings]);
+  }, [members, providedTeamSettings, isMobile, currentView]);
 
   useEffect(() => {
     // Use provided initialRequests if available (including empty array for filtered results)
@@ -352,8 +419,8 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
         if (reason.includes('religious')) return '#ffc107'; // Yellow
         if (reason.includes('emergency')) return '#dc3545'; // Red
         
-        // Default approved color
-        return '#28a745'; // Green
+        // Default approved color matches vacation color for consistency
+        return '#17a2b8'; // Teal (same as Vacation)
       }
       
       // For rejected events (though they shouldn't show on calendar)
@@ -541,70 +608,11 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
         throw new Error('Failed to fetch leave requests');
       }
       const requests: LeaveRequest[] = await response.json();
-      
-      const calendarEvents: CalendarEvent[] = [];
-      requests.forEach(request => {
-        if (request.status === 'rejected') return;
-        const member = members.find(m => m._id === request.userId);
-        const memberName = member?.fullName || member?.username || 'Unknown';
-        const shiftSchedule = member?.shiftSchedule;
-        // Only mark as emergency if reason exactly matches emergency reason values
-        const isEmergency = request.reason ? isEmergencyReason(request.reason) : false;
-        
-        if (!shiftSchedule) {
-          const eventTitle = isEmergency 
-            ? `[EMERGENCY] ${memberName} - ${request.reason}` 
-            : `${memberName} - ${request.reason}`;
-            
-          calendarEvents.push({
-            id: request._id!,
-            title: eventTitle,
-            start: parseDateSafe(request.startDate),
-            end: parseDateSafe(request.endDate),
-            resource: {
-              status: request.status,
-              userId: request.userId,
-              username: member?.username || 'Unknown',
-              fullName: member?.fullName,
-              isEmergency,
-              requestedBy: request.requestedBy,
-            },
-          });
-        } else {
-          const workingDays = getWorkingDays(
-            parseDateSafe(request.startDate),
-            parseDateSafe(request.endDate),
-            shiftSchedule
-          );
-          
-          workingDays.forEach((workingDay, index) => {
-            const eventTitle = isEmergency 
-              ? `[EMERGENCY] ${memberName} - ${request.reason}` 
-              : `${memberName} - ${request.reason}`;
-              
-            calendarEvents.push({
-              id: `${request._id!}-${index}`,
-              title: eventTitle,
-              start: new Date(workingDay),
-              end: new Date(workingDay),
-              resource: {
-                status: request.status,
-                userId: request.userId,
-                username: member?.username || 'Unknown',
-                fullName: member?.fullName,
-                isEmergency,
-                requestedBy: request.requestedBy,
-              },
-            });
-          });
-        }
-      });
-
-      setEvents(calendarEvents);
+      processRequestsIntoEvents(requests);
     } catch (error) {
       console.error('Error refreshing calendar events:', error);
     }
-  }, [teamId, members]);
+  }, [teamId, processRequestsIntoEvents]);
 
   const handleSubmitLeaveRequest = useCallback(async () => {
     if (!selectedReasonType) {
@@ -978,8 +986,21 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
                   </div>
                   
                   <div className="border-t dark:border-gray-700 pt-4">
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2"><strong>Reason:</strong></p>
-                    <p className="text-gray-900 dark:text-gray-100 mb-4">{selectedEvent.title.split(' - ')[1] || 'N/A'}</p>
+                    {!selectedEvent.resource.aggregated ? (
+                      <>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2"><strong>Reason:</strong></p>
+                        <p className="text-gray-900 dark:text-gray-100 mb-4">{selectedEvent.title.split(' - ')[1] || 'N/A'}</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2"><strong>Members on leave:</strong></p>
+                        <ul className="text-gray-900 dark:text-gray-100 mb-4 list-disc pl-5">
+                          {(selectedEvent.resource.memberNames || []).map((name) => (
+                            <li key={name}>{name}</li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
                     
                     <div className="grid grid-cols-1 gap-3">
                       <div>

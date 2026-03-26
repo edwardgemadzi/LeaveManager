@@ -246,7 +246,8 @@ export default function LeaderLeaveBalancePage() {
       member,
       member.manualLeaveBalance,
       effectiveManualYearToDateUsed,
-      team?.settings.carryoverSettings
+      team?.settings.carryoverSettings,
+      team?.settings.accrual
     );
 
     // Use analytics data if available, otherwise calculate

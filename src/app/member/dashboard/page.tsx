@@ -394,7 +394,8 @@ export default function MemberDashboard() {
       user,
       user.manualLeaveBalance,
       getEffectiveManualYearToDateUsed(user),
-      team.settings.carryoverSettings
+      team.settings.carryoverSettings,
+      team.settings.accrual
     );
     
     const surplus = calculateSurplusBalance(user.manualLeaveBalance, team.settings.maxLeavePerYear);

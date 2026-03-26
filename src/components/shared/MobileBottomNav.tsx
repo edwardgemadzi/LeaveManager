@@ -18,6 +18,7 @@ import {
   QuestionMarkCircleIcon,
   ChatBubbleLeftRightIcon,
   ArrowRightOnRectangleIcon,
+  ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
 import {
   HomeIcon as HomeIconSolid,
@@ -50,6 +51,7 @@ const leaderTabs = [
 ];
 
 const leaderMoreItems = [
+  { href: '/leader/exports', label: 'Export Pack', Icon: ArrowDownTrayIcon },
   { href: '/leader/analytics', label: 'Analytics', Icon: ChartPieIcon },
   { href: '/leader/leave-balance', label: 'Leave Balance', Icon: ScaleIcon },
   { href: '/leader/settings', label: 'Settings', Icon: Cog6ToothIcon },

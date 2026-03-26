@@ -234,6 +234,36 @@ export const schemas = {
       'object.missing': 'Identifier is required',
     }),
 
+  /** Forgot-password: username or email string (same shape as login identifier). */
+  passwordForgot: Joi.object({
+    identifier: Joi.string()
+      .trim()
+      .min(3)
+      .max(320)
+      .required()
+      .messages({
+        'string.min': 'Identifier must be at least 3 characters long',
+        'string.max': 'Identifier must be no more than 320 characters long',
+        'any.required': 'identifier is required',
+      }),
+  }),
+
+  /** Reset-password: new password (same strength rules as registration). */
+  passwordReset: Joi.object({
+    password: Joi.string()
+      .min(8)
+      .max(128)
+      .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+      .required()
+      .messages({
+        'string.min': 'Password must be at least 8 characters long',
+        'string.max': 'Password must be no more than 128 characters long',
+        'string.pattern.base':
+          'Password must contain at least one lowercase letter, one uppercase letter, one number, and one special character',
+        'any.required': 'Password is required',
+      }),
+  }),
+
   // Leave request schema
   leaveRequest: Joi.object({
     startDate: Joi.date()

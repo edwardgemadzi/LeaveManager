@@ -192,7 +192,14 @@ export function calculateLeaveBalance(
   user: User,
   manualLeaveBalance?: number,
   manualYearToDateUsed?: number,
-  carryoverSettings?: { limitedToMonths?: number[] }
+  carryoverSettings?: { limitedToMonths?: number[] },
+  accrualConfig?: {
+    enabled: boolean;
+    cadence: 'monthly' | 'biweekly' | 'yearly';
+    annualEntitlementDays: number;
+    prorateOnJoin: boolean;
+    capDays?: number;
+  }
 ): number;
 // Overload 2: Accepts ShiftSchedule directly (backward compatibility)
 export function calculateLeaveBalance(
@@ -201,7 +208,14 @@ export function calculateLeaveBalance(
   shiftSchedule: ShiftSchedule,
   manualLeaveBalance?: number,
   manualYearToDateUsed?: number,
-  carryoverSettings?: { limitedToMonths?: number[] }
+  carryoverSettings?: { limitedToMonths?: number[] },
+  accrualConfig?: {
+    enabled: boolean;
+    cadence: 'monthly' | 'biweekly' | 'yearly';
+    annualEntitlementDays: number;
+    prorateOnJoin: boolean;
+    capDays?: number;
+  }
 ): number;
 // Implementation
 export function calculateLeaveBalance(
@@ -210,7 +224,14 @@ export function calculateLeaveBalance(
   userOrSchedule: User | ShiftSchedule,
   manualLeaveBalance?: number,
   manualYearToDateUsed?: number,
-  carryoverSettings?: { limitedToMonths?: number[] }
+  carryoverSettings?: { limitedToMonths?: number[] },
+  accrualConfig?: {
+    enabled: boolean;
+    cadence: 'monthly' | 'biweekly' | 'yearly';
+    annualEntitlementDays: number;
+    prorateOnJoin: boolean;
+    capDays?: number;
+  }
 ): number {
   const currentYear = new Date().getFullYear();
   const yearStart = new Date(currentYear, 0, 1);
@@ -255,7 +276,37 @@ export function calculateLeaveBalance(
   // New year base balance logic:
   // - If manualLeaveBalance is set, always use it as base (whether above or below maxLeavePerYear)
   // - If manualLeaveBalance is not set, use maxLeavePerYear
-  const newYearBalance = manualLeaveBalance !== undefined ? manualLeaveBalance : maxLeavePerYear;
+  let computedBaseBalance = maxLeavePerYear;
+  if (accrualConfig?.enabled) {
+    const today = new Date();
+    const yearStartDate = new Date(today.getFullYear(), 0, 1);
+    const entitlement = accrualConfig.annualEntitlementDays || maxLeavePerYear;
+    const eligibleStart =
+      'createdAt' in userOrSchedule && accrualConfig.prorateOnJoin && userOrSchedule.createdAt
+        ? new Date(Math.max(new Date(userOrSchedule.createdAt).getTime(), yearStartDate.getTime()))
+        : yearStartDate;
+    let accrualFactor = 1;
+    if (accrualConfig.cadence === 'monthly') {
+      const monthsEarned = Math.max(
+        0,
+        (today.getFullYear() - eligibleStart.getFullYear()) * 12 +
+          (today.getMonth() - eligibleStart.getMonth()) +
+          1
+      );
+      accrualFactor = Math.min(1, monthsEarned / 12);
+    } else if (accrualConfig.cadence === 'biweekly') {
+      const diffDays = Math.max(0, Math.floor((today.getTime() - eligibleStart.getTime()) / (1000 * 60 * 60 * 24)));
+      const periods = Math.floor(diffDays / 14) + 1;
+      accrualFactor = Math.min(1, periods / 26);
+    } else {
+      accrualFactor = today >= eligibleStart ? 1 : 0;
+    }
+    computedBaseBalance = entitlement * accrualFactor;
+    if (typeof accrualConfig.capDays === 'number') {
+      computedBaseBalance = Math.min(computedBaseBalance, accrualConfig.capDays);
+    }
+  }
+  const newYearBalance = manualLeaveBalance !== undefined ? manualLeaveBalance : computedBaseBalance;
   
   // Get carryover from previous year if exists and not expired
   // Only check if userOrSchedule is a User object (has carryoverFromPreviousYear field)

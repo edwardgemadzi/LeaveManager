@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
         id: user.id,
         username: user.username,
         role: user.role,
+        accessRole: user.accessRole || user.role,
         teamId: user.teamId,
       },
     },

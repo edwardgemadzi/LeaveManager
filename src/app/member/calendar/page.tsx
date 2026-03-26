@@ -190,7 +190,7 @@ export default function MemberCalendarPage() {
 
         <div className="grid lg:grid-cols-12 gap-6 min-w-0">
           <div className="lg:col-span-9 min-w-0">
-            <div className="card rounded-none sm:rounded-2xl relative z-10 border-x-0 sm:border-x shadow-none sm:shadow min-w-0 overflow-x-hidden">
+            <div className="card rounded-none sm:rounded-2xl relative z-10 border-x-0 sm:border-x shadow-none sm:shadow min-w-0 overflow-visible">
               <div className="px-0 sm:px-6 py-2 sm:py-8 relative z-10">
                 {team?._id ? (
                   <TeamCalendar 

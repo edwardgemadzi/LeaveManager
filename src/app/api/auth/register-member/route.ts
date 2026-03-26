@@ -104,6 +104,7 @@ export async function POST(request: NextRequest) {
       workingDaysTag?: string;
       maternityPaternityType?: 'maternity' | 'paternity' | null;
       email?: string;
+      accessRole?: 'leader' | 'member' | 'approver' | 'hr_admin' | 'viewer';
     } = {
       username,
       firstName,
@@ -111,6 +112,7 @@ export async function POST(request: NextRequest) {
       lastName,
       password: hashedPassword,
       role: 'member',
+      accessRole: 'member',
       teamId: team._id,
       shiftSchedule: shiftScheduleCopy,
       ...(normalizedEmail ? { email: normalizedEmail } : {}),
@@ -141,11 +143,13 @@ export async function POST(request: NextRequest) {
       id: string;
       username: string;
       role: 'member';
+      accessRole?: 'leader' | 'member' | 'approver' | 'hr_admin' | 'viewer';
       teamId: string;
     } = {
       id: user._id!,
       username: user.username,
       role: 'member',
+      accessRole: user.accessRole || 'member',
       teamId: team._id,
     };
 
@@ -156,6 +160,7 @@ export async function POST(request: NextRequest) {
         id: user._id,
         username: user.username,
         role: user.role,
+        accessRole: user.accessRole || user.role,
         teamId: team._id,
       },
       team: {

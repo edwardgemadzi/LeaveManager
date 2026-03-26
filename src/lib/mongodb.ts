@@ -38,6 +38,13 @@ export const getDatabaseRaw = async (): Promise<Db> => {
 };
 
 const ensureIndexesInitialized = async (): Promise<void> => {
+  // Dev performance: skip automatic index initialization unless explicitly forced.
+  // Index creation is still enabled in production.
+  const forceDevIndexInit = process.env.FORCE_DEV_INDEX_INIT === 'true';
+  if (process.env.NODE_ENV === 'development' && !forceDevIndexInit) {
+    return;
+  }
+
   if (!indexesInitPromise) {
     indexesInitPromise = initializeDatabaseIndexes().catch((error) => {
       // Keep startup resilient if index creation fails unexpectedly.

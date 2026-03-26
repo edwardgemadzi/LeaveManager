@@ -76,10 +76,6 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
     }
 
-    if (user.role !== 'leader') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
     if (decisionNote.length > 500) {
       return NextResponse.json(
         { error: 'Decision note must be 500 characters or fewer' },
@@ -99,6 +95,11 @@ export async function PATCH(
     }
 
     if (!teamIdsMatch(leaveRequest.teamId, user.teamId)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // Delegated approvals are currently disabled; only leaders can approve/reject.
+    if (user.role !== 'leader') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -132,7 +133,7 @@ export async function PATCH(
           endDate: leaveRequest.endDate.toISOString().split('T')[0],
           reason: leaveRequest.reason,
           decisionNote: decisionNote || undefined,
-        }
+        },
       );
 
       await notifyLeaveDecision({

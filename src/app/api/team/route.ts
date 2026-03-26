@@ -7,6 +7,7 @@ import { broadcastTeamUpdate } from '@/lib/teamEvents';
 import { invalidateAnalyticsCache } from '@/lib/analyticsCache';
 import { error as logError, info } from '@/lib/logger';
 import { internalServerError, unauthorizedError, forbiddenError, badRequestError, notFoundError } from '@/lib/errors';
+import { TeamPolicyVersionModel } from '@/models/TeamPolicyVersion';
 
 export async function GET(request: NextRequest) {
   try {
@@ -337,6 +338,111 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    if (settings.enforceHolidayBlocking !== undefined && typeof settings.enforceHolidayBlocking !== 'boolean') {
+      return badRequestError('enforceHolidayBlocking must be a boolean');
+    }
+
+    if (settings.holidays !== undefined) {
+      if (!Array.isArray(settings.holidays)) {
+        return badRequestError('holidays must be an array');
+      }
+      settings.holidays = settings.holidays.map((holiday: { id?: string; name?: string; date?: string; countryCode?: string }) => {
+        if (!holiday?.name || !holiday?.date) {
+          throw new Error('Invalid holiday');
+        }
+        const parsed = new Date(holiday.date);
+        if (Number.isNaN(parsed.getTime())) {
+          throw new Error('Invalid holiday date');
+        }
+        return {
+          id: holiday.id || `${holiday.name}-${holiday.date}`,
+          name: holiday.name.trim(),
+          date: parsed.toISOString().split('T')[0],
+          countryCode: holiday.countryCode?.trim() || undefined,
+        };
+      });
+    }
+
+    if (settings.blackoutDates !== undefined) {
+      if (!Array.isArray(settings.blackoutDates)) {
+        return badRequestError('blackoutDates must be an array');
+      }
+      settings.blackoutDates = settings.blackoutDates.map(
+        (item: { id?: string; name?: string; startDate?: string; endDate?: string; reason?: string }) => {
+          if (!item?.name || !item?.startDate || !item?.endDate) {
+            throw new Error('Invalid blackout date');
+          }
+          const startDate = new Date(item.startDate);
+          const endDate = new Date(item.endDate);
+          if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate < startDate) {
+            throw new Error('Invalid blackout date range');
+          }
+          return {
+            id: item.id || `${item.name}-${item.startDate}-${item.endDate}`,
+            name: item.name.trim(),
+            startDate: startDate.toISOString().split('T')[0],
+            endDate: endDate.toISOString().split('T')[0],
+            reason: item.reason?.trim() || undefined,
+          };
+        }
+      );
+    }
+
+    if (settings.delegatedApprovers !== undefined) {
+      if (!Array.isArray(settings.delegatedApprovers)) {
+        return badRequestError('delegatedApprovers must be an array');
+      }
+      settings.delegatedApprovers = settings.delegatedApprovers.map((entry: {
+        userId?: string;
+        username?: string;
+        startsAt?: string | Date;
+        endsAt?: string | Date;
+        scope?: 'all' | 'team' | 'member';
+        memberIds?: string[];
+      }) => {
+        if (!entry.userId || !entry.startsAt || !entry.endsAt) {
+          throw new Error('Invalid delegated approver entry');
+        }
+        const startsAt = new Date(entry.startsAt);
+        const endsAt = new Date(entry.endsAt);
+        if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime()) || endsAt < startsAt) {
+          throw new Error('Invalid delegated approver window');
+        }
+        return {
+          userId: entry.userId,
+          username: entry.username,
+          startsAt,
+          endsAt,
+          scope: entry.scope || 'team',
+          memberIds: Array.isArray(entry.memberIds) ? entry.memberIds : undefined,
+          createdAt: new Date(),
+          createdBy: user.id,
+        };
+      });
+    }
+
+    if (settings.accrual !== undefined) {
+      if (typeof settings.accrual !== 'object' || settings.accrual === null || Array.isArray(settings.accrual)) {
+        return badRequestError('accrual must be an object');
+      }
+      const { enabled, cadence, annualEntitlementDays, prorateOnJoin, capDays } = settings.accrual;
+      if (typeof enabled !== 'boolean') {
+        return badRequestError('accrual.enabled must be a boolean');
+      }
+      if (!['monthly', 'biweekly', 'yearly'].includes(cadence)) {
+        return badRequestError('accrual.cadence must be monthly, biweekly, or yearly');
+      }
+      if (typeof annualEntitlementDays !== 'number' || annualEntitlementDays <= 0) {
+        return badRequestError('accrual.annualEntitlementDays must be greater than 0');
+      }
+      if (typeof prorateOnJoin !== 'boolean') {
+        return badRequestError('accrual.prorateOnJoin must be a boolean');
+      }
+      if (capDays !== undefined && (typeof capDays !== 'number' || capDays < 0)) {
+        return badRequestError('accrual.capDays must be a non-negative number');
+      }
+    }
+
     // If subgrouping is enabled, validate subgroups
     if (settings.enableSubgrouping) {
       // Validate subgroups is an array
@@ -385,6 +491,13 @@ export async function PATCH(request: NextRequest) {
     }
 
     await TeamModel.updateSettings(user.teamId, settings);
+    await TeamPolicyVersionModel.create({
+      teamId: user.teamId,
+      effectiveFrom: new Date(),
+      settings,
+      createdBy: user.id,
+      versionLabel: `Auto ${new Date().toISOString().split('T')[0]}`,
+    });
     
     // Verify the update by fetching the updated team
     const updatedTeam = await TeamModel.findById(user.teamId);
@@ -405,7 +518,7 @@ export async function PATCH(request: NextRequest) {
       updatedSettings: updatedTeam.settings,
       updatedBy: user.id,
     });
-    
+
     return NextResponse.json({ 
       success: true,
       settings: updatedTeam.settings // Return updated settings for verification

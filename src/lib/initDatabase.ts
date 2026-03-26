@@ -4,6 +4,8 @@ import { TeamModel } from '@/models/Team';
 import { AuditLogModel } from '@/models/AuditLog';
 import { TelegramLinkTokenModel } from '@/models/TelegramLinkToken';
 import { MagicLinkModel } from '@/models/MagicLink';
+import { PasswordResetTokenModel } from '@/models/PasswordResetToken';
+import { TeamPolicyVersionModel } from '@/models/TeamPolicyVersion';
 
 /**
  * Initialize all database indexes for optimal query performance.
@@ -21,6 +23,8 @@ export async function initializeDatabaseIndexes(): Promise<void> {
       AuditLogModel.createIndexes(),
       TelegramLinkTokenModel.createIndexes(),
       MagicLinkModel.createIndexes(),
+      PasswordResetTokenModel.createIndexes(),
+      TeamPolicyVersionModel.createIndexes(),
     ]);
     
     console.log('Database indexes initialized successfully');

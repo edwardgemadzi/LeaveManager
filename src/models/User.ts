@@ -4,6 +4,10 @@ import { ClientSession, ObjectId } from 'mongodb';
 import { User, ShiftSchedule } from '@/types';
 import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export class UserModel {
   private static normalizeEmail(email?: string | null): string | null {
     if (!email) return null;
@@ -42,7 +46,7 @@ export class UserModel {
 
     // Legacy compatibility: support older records created with mixed-case usernames.
     return await users.findOne({
-      username: { $regex: `^${normalizedUsername}$`, $options: 'i' },
+      username: { $regex: `^${escapeRegExp(normalizedUsername)}$`, $options: 'i' },
     });
   }
 

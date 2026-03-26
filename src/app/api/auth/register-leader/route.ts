@@ -95,6 +95,7 @@ export async function POST(request: NextRequest) {
             lastName,
             password: hashedPassword,
             role: 'leader',
+            accessRole: 'leader',
             teamId: team._id,
             ...(normalizedEmail ? { email: normalizedEmail } : {}),
           },
@@ -147,11 +148,13 @@ export async function POST(request: NextRequest) {
       id: string;
       username: string;
       role: 'leader';
+      accessRole: 'leader';
       teamId: string;
     } = {
       id: transactionResult.userId,
       username: transactionResult.username,
       role: 'leader',
+      accessRole: 'leader',
       teamId: transactionResult.teamId,
     };
 
@@ -162,6 +165,7 @@ export async function POST(request: NextRequest) {
         id: transactionResult.userId,
         username: transactionResult.username,
         role: transactionResult.role,
+        accessRole: 'leader',
         teamId: transactionResult.teamId,
       },
       team: {
