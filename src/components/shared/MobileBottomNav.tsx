@@ -55,6 +55,7 @@ const leaderMoreItems = [
 ];
 
 const memberMoreItems = [
+  { href: '/member/team', label: 'My Team', Icon: UsersIcon },
   { href: '/member/analytics', label: 'Analytics', Icon: ChartBarIcon },
   { href: '/help', label: 'Help Center', Icon: QuestionMarkCircleIcon },
   { href: '/contact', label: 'Contact Developer', Icon: ChatBubbleLeftRightIcon },

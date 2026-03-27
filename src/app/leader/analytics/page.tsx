@@ -291,8 +291,6 @@ export default function LeaderAnalyticsPage() {
   const totalRemainingBalance = analytics.aggregate.totalRemainingLeaveBalance || 0;
   const avgRemainingBalance = analytics.aggregate.averageRemainingBalance || 0;
   const totalRealisticUsableDays = analytics.aggregate.totalRealisticUsableDays || 0;
-  const totalRemainderDays = analytics.aggregate.totalRemainderDays || 0;
-
   // Calculate total surplus balance across all members
   const allMembers = analytics.groups.flatMap(group => group.members);
   const totalSurplus = allMembers.reduce((sum, m) => sum + m.analytics.surplusBalance, 0);
@@ -461,9 +459,9 @@ export default function LeaderAnalyticsPage() {
                     </p>
                     <div className="flex items-center gap-2 mt-1">
                       <p className="text-xs text-gray-500 dark:text-gray-500">Usable days</p>
-                      {totalRemainderDays > 0 && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400">
-                          +{totalRemainderDays} need allocation
+                      {willLose > 0 && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
+                          {Math.round(willLose)}d will be lost
                         </span>
                       )}
                     </div>
@@ -880,10 +878,10 @@ export default function LeaderAnalyticsPage() {
                             <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
                               Avg: {Math.round(group.aggregate.groupAverageRealisticUsableDays)}
                             </p>
-                            {group.aggregate.groupTotalRemainderDays > 0 && (
-                              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 font-medium">
-                                +{group.aggregate.groupTotalRemainderDays} day(s) need allocation
-                        </p>
+                            {group.members.reduce((s, m) => s + (m.analytics.willLose ?? 0), 0) > 0 && (
+                              <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-medium">
+                                {Math.round(group.members.reduce((s, m) => s + (m.analytics.willLose ?? 0), 0))}d will be lost
+                              </p>
                             )}
                       </div>
 

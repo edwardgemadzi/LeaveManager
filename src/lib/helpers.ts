@@ -362,7 +362,8 @@ export function calculateTimeBasedTeamHealthScore(
   totalWillCarryover: number,
   carryoverLimitedToMonths?: number[],
   carryoverMaxDays?: number,
-  carryoverExpiryDate?: Date
+  carryoverExpiryDate?: Date,
+  totalRemainderDays?: number
 ): {
   score: string;
   scoreLabel: string;

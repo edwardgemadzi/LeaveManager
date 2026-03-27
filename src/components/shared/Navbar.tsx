@@ -116,6 +116,7 @@ export default function Navbar() {
     { href: '/member/dashboard', label: 'Dashboard', Icon: HomeIcon },
     { href: '/member/requests', label: 'Requests', Icon: DocumentTextIcon },
     { href: '/member/calendar', label: 'Calendar', Icon: CalendarIcon },
+    { href: '/member/team', label: 'Team', Icon: UsersIcon },
     { href: '/member/analytics', label: 'Analytics', Icon: ChartBarIcon },
     { href: '/member/profile', label: 'Profile', Icon: UserCircleIcon },
   ];

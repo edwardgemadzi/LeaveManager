@@ -28,8 +28,10 @@ import {
   ChartBarIcon,
   ArrowTrendingUpIcon,
   BuildingOffice2Icon,
+  ScaleIcon,
 } from '@heroicons/react/24/outline';
 import DecisionModal, { DecisionType } from '@/components/shared/DecisionModal';
+import AllocationModal from '@/components/shared/AllocationModal';
 
 export default function LeaderDashboard() {
   const { showNotification } = useBrowserNotification();
@@ -47,6 +49,7 @@ export default function LeaderDashboard() {
     type: DecisionType;
     requestId: string | null;
   }>({ open: false, type: 'approve', requestId: null });
+  const [allocationOpen, setAllocationOpen] = useState(false);
   
   // Refs to track notification state and prevent duplicates
   const previousPendingRequestsRef = useRef<LeaveRequest[]>([]);
@@ -305,6 +308,8 @@ export default function LeaderDashboard() {
             const totalWillCarryover = agg.totalWillCarryover ?? 0;
             const totalRealistic = agg.totalRealisticUsableDays ?? 0;
 
+            const totalRemainderDays = agg.totalRemainderDays ?? 0;
+
             const teamHealth = calculateTimeBasedTeamHealthScore(
               memberCount,
               maxLeavePerYear,
@@ -317,7 +322,8 @@ export default function LeaderDashboard() {
               team.settings.carryoverSettings?.maxCarryoverDays,
               team.settings.carryoverSettings?.expiryDate
                 ? new Date(team.settings.carryoverSettings.expiryDate)
-                : undefined
+                : undefined,
+              totalRemainderDays
             );
 
             return (
@@ -333,7 +339,7 @@ export default function LeaderDashboard() {
                       <p className={`text-base italic ${teamHealth.textColor} mt-2 leading-relaxed`}>&ldquo;{teamHealth.quote}&rdquo;</p>
                       <p className="text-sm text-zinc-700 dark:text-zinc-300 mt-2 leading-relaxed">{teamHealth.message}</p>
                       <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-zinc-200/50 dark:border-zinc-700/50">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${teamHealth.badgeColor}`}>
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-black/10 dark:bg-white/15 text-zinc-900 dark:text-white">
                           {utilized}% team utilization
                         </span>
                         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-white/70 dark:bg-zinc-900/50 text-zinc-700 dark:text-zinc-200">
@@ -349,6 +355,16 @@ export default function LeaderDashboard() {
                           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-indigo-100/80 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
                             {Math.round(totalWillCarryover)} days will carry over
                           </span>
+                        )}
+                        {totalWillLose > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setAllocationOpen(true)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-black/10 dark:bg-white/15 text-zinc-900 dark:text-white hover:bg-black/20 dark:hover:bg-white/25 transition-colors"
+                          >
+                            <ScaleIcon className="h-3.5 w-3.5" />
+                            {Math.round(totalWillLose)}d — review allocation
+                          </button>
                         )}
                       </div>
                     </div>
@@ -417,6 +433,35 @@ export default function LeaderDashboard() {
                     </div>
                   </div>
                 </div>
+
+                {/* Allocation nudge — only when members will actually lose days */}
+                {totalWillLose > 0 && analytics.groups && (() => {
+                  const affectedGroups = analytics.groups.filter((g) =>
+                    g.members.some((m) => (m.analytics.willLose ?? 0) > 0)
+                  );
+                  return (
+                    <div className="mb-6 rounded-2xl border border-orange-200 dark:border-orange-900/50 bg-orange-50 dark:bg-orange-950/25 p-4 flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center shrink-0">
+                        <ScaleIcon className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-orange-900 dark:text-orange-100">
+                          {Math.round(totalWillLose)} days at risk of being lost
+                        </p>
+                        <p className="text-xs text-orange-700/80 dark:text-orange-300/80 mt-0.5">
+                          {affectedGroups.length} group{affectedGroups.length !== 1 ? 's' : ''} can&apos;t accommodate everyone&apos;s balance — someone must sacrifice.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setAllocationOpen(true)}
+                        className="shrink-0 btn-secondary text-xs py-1.5 px-3"
+                      >
+                        Review
+                      </button>
+                    </div>
+                  );
+                })()}
               </>
             );
           })()}
@@ -677,6 +722,13 @@ export default function LeaderDashboard() {
         onConfirm={handleDecisionConfirm}
         onCancel={() => setDecisionModal((m) => ({ ...m, open: false }))}
       />
+      {analytics && allocationOpen && (
+        <AllocationModal
+          open={allocationOpen}
+          onClose={() => setAllocationOpen(false)}
+          analytics={analytics}
+        />
+      )}
     </ProtectedRoute>
   );
 }
