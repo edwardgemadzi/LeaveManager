@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { clearStoredUser, setStoredUser } from '@/lib/clientUserStorage';
+import { clearStoredUser } from '@/lib/clientUserStorage';
 
 export default function HomePage() {
   const router = useRouter();
@@ -12,7 +12,7 @@ export default function HomePage() {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const response = await fetch('/api/users/profile', { credentials: 'include' });
+        const response = await fetch('/api/auth/me', { credentials: 'include' });
         if (!response.ok) {
           clearStoredUser();
           return;
@@ -24,7 +24,6 @@ export default function HomePage() {
           return;
         }
 
-        setStoredUser(data.user);
         if (data.user.role === 'leader') {
           router.push('/leader/dashboard');
           return;

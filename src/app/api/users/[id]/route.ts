@@ -46,11 +46,11 @@ export async function PATCH(
 ) {
   try {
     // Apply rate limiting
-    const rateLimitResponse = apiRateLimit(request);
+    const rateLimitResponse = await apiRateLimit(request);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }
-    
+
     // Require leader authentication
     const authResult = requireLeader(request);
     if (authResult instanceof NextResponse) {
@@ -59,7 +59,7 @@ export async function PATCH(
     const user = authResult;
 
     const { id } = await params;
-    
+
     // Validate ObjectId format
     if (!ObjectId.isValid(id)) {
       return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 });
@@ -351,11 +351,11 @@ export async function DELETE(
 ) {
   try {
     // Apply rate limiting
-    const rateLimitResponse = apiRateLimit(request);
+    const rateLimitResponse = await apiRateLimit(request);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }
-    
+
     // Require leader authentication
     const authResult = requireLeader(request);
     if (authResult instanceof NextResponse) {
@@ -364,7 +364,7 @@ export async function DELETE(
     const user = authResult;
 
     const { id } = await params;
-    
+
     // Get safe user data (validates ObjectId and removes password)
     const userDataResult = await requireSafeUserData(id, 'User not found');
     if (userDataResult instanceof NextResponse) {

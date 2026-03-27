@@ -13,6 +13,7 @@ import { isBypassNoticePeriodActive } from '@/lib/noticePeriod';
 import { useTeamData } from '@/hooks/useTeamData';
 import { useRequests } from '@/hooks/useRequests';
 import { setStoredUser } from '@/lib/clientUserStorage';
+import EditRequestModal from '@/components/shared/EditRequestModal';
 
 type LeaveDateConstraintDay = {
   selectable: boolean;
@@ -47,6 +48,7 @@ export default function MemberRequestsPage() {
   const leaveReasons = LEAVE_REASONS;
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [editingRequest, setEditingRequest] = useState<LeaveRequest | null>(null);
   const [availabilityPreview, setAvailabilityPreview] = useState<{ available: boolean; message: string } | null>(null);
   const [dateConstraints, setDateConstraints] = useState<Record<string, LeaveDateConstraintDay>>({});
   const bypassActive = isBypassNoticePeriodActive(teamSettings);
@@ -295,37 +297,19 @@ export default function MemberRequestsPage() {
     }
   };
 
-  const handleEditPending = async (request: LeaveRequest) => {
-    const startDate = prompt(
-      'New start date (YYYY-MM-DD)',
-      request.startDate ? new Date(request.startDate).toISOString().split('T')[0] : ''
-    );
-    if (!startDate) return;
+  const handleEditPending = (request: LeaveRequest) => {
+    setEditingRequest(request);
+  };
 
-    const endDate = prompt(
-      'New end date (YYYY-MM-DD)',
-      request.endDate ? new Date(request.endDate).toISOString().split('T')[0] : ''
-    );
-    if (!endDate) return;
-
-    const reason = prompt('Updated reason', request.reason || '');
-    if (!reason || !reason.trim()) {
-      showInfo('A reason is required to update your request.');
-      return;
-    }
-
+  const handleEditConfirm = async (data: { startDate: string; endDate: string; reason: string }) => {
+    if (!editingRequest) return;
+    setEditingRequest(null);
     try {
-      const response = await fetch(`/api/leave-requests/${request._id}`, {
+      const response = await fetch(`/api/leave-requests/${editingRequest._id}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          startDate,
-          endDate,
-          reason: reason.trim(),
-        }),
+        body: JSON.stringify(data),
       });
 
       if (response.ok) {
@@ -656,6 +640,12 @@ export default function MemberRequestsPage() {
       </div>
     </div>
       )}
+      <EditRequestModal
+        open={!!editingRequest}
+        request={editingRequest}
+        onConfirm={handleEditConfirm}
+        onCancel={() => setEditingRequest(null)}
+      />
     </ProtectedRoute>
   );
 }

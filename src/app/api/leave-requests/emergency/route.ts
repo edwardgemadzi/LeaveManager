@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LeaveRequestModel } from '@/models/LeaveRequest';
 import { UserModel } from '@/models/User';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { emergencyRateLimit } from '@/lib/rateLimit';
 import { validateRequest, schemas } from '@/lib/validation';
 import { teamIdsMatch } from '@/lib/helpers';
@@ -14,7 +14,7 @@ import { invalidateAnalyticsCache } from '@/lib/analyticsCache';
 export async function POST(request: NextRequest) {
   try {
     // Apply rate limiting for emergency requests
-    const rateLimitResponse = emergencyRateLimit(request);
+    const rateLimitResponse = await emergencyRateLimit(request);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }

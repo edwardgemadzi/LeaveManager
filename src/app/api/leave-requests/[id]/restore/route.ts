@@ -16,7 +16,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const rateLimitResponse = apiRateLimit(request);
+    const rateLimitResponse = await apiRateLimit(request);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }

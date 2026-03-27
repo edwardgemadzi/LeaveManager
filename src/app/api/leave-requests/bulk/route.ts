@@ -20,7 +20,7 @@ interface BulkActionRequest {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const rateLimitResponse = apiRateLimit(request);
+    const rateLimitResponse = await apiRateLimit(request);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }

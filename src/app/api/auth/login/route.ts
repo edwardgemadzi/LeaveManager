@@ -18,8 +18,8 @@ import { NO_STORE_JSON_HEADERS } from '@/lib/securityHeaders';
 export async function POST(request: NextRequest) {
   try {
     // Apply rate limiting (skip in test mode)
-    const rateLimitResponse = process.env.NODE_ENV !== 'test' 
-      ? authRateLimit(request)
+    const rateLimitResponse = process.env.NODE_ENV !== 'test'
+      ? await authRateLimit(request)
       : null;
     if (rateLimitResponse) {
       return rateLimitResponse;

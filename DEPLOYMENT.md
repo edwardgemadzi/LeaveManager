@@ -22,8 +22,8 @@ This comprehensive guide will help you deploy the Leave Manager application to V
 
 3. **Configure Network Access**
    - Go to "Network Access" in your Atlas dashboard
-   - Add IP address `0.0.0.0/0` to allow all IPs (required for Vercel)
-   - Or add Vercel's specific IP ranges if you prefer
+   - **Recommended:** Add [Vercel's published IP ranges](https://vercel.com/docs/security/deployment-protection/methods-to-protect-all-deployments/firewall-rules/vercel-firewall-ip-ranges) to allow only Vercel's egress traffic
+   - **Avoid** using `0.0.0.0/0` (allow all IPs) — this exposes your cluster to the entire internet; use it only as a last resort for troubleshooting
 
 4. **Get Connection String**
    - Go to "Clusters" and click "Connect"
@@ -54,8 +54,7 @@ This comprehensive guide will help you deploy the Leave Manager application to V
 |----------|-------|-------------|
 | `MONGODB_URI` | `mongodb+srv://username:password@cluster.mongodb.net/leave-manager` | Your MongoDB Atlas connection string |
    | `JWT_SECRET` | `your-super-secret-jwt-key-at-least-32-characters-long` | A secure random string for JWT signing (generate with: `openssl rand -base64 32`) |
-   | `NEXTAUTH_URL` | `https://your-app-name.vercel.app` | Your Vercel deployment URL (auto-set by Vercel) |
-   | `ADMIN_ENABLED` | `false` | Set to false for production (admin panel is localhost only) |
+      | `ADMIN_ENABLED` | `false` | Set to false for production (admin panel is localhost only) |
 
 3. **Deploy**
    - Click "Deploy" and wait for the build to complete
@@ -89,9 +88,6 @@ MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/leave-manager?re
 
 # JWT Secret (generate a strong, random secret)
 JWT_SECRET=your-super-secret-jwt-key-at-least-32-characters-long
-
-# Next.js Configuration
-NEXTAUTH_URL=https://your-app-name.vercel.app
 ```
 
 ### Optional Variables
@@ -233,7 +229,7 @@ If you need to scale beyond the free plan:
 
 ### 1. Custom Domain (Optional)
 - Add a custom domain in Vercel dashboard
-- Update `NEXTAUTH_URL` environment variable
+- Update `NEXT_PUBLIC_APP_URL` environment variable if you have set it
 - SSL certificate is automatically provided
 
 ### 2. Database Backup

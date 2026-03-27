@@ -10,7 +10,7 @@ import { NO_STORE_JSON_HEADERS } from '@/lib/securityHeaders';
 
 export async function POST(request: NextRequest) {
   try {
-    const limited = passwordRecoveryRateLimit(request);
+    const limited = await passwordRecoveryRateLimit(request);
     if (limited) return limited;
 
     const body = (await request.json()) as { identifier?: string };

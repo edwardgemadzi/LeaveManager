@@ -6,7 +6,7 @@ import { NO_STORE_JSON_HEADERS } from '@/lib/securityHeaders';
 
 export async function GET(request: NextRequest) {
   try {
-    const limited = passwordRecoveryRateLimit(request);
+    const limited = await passwordRecoveryRateLimit(request);
     if (limited) return limited;
 
     const token = request.nextUrl.searchParams.get('token') || '';

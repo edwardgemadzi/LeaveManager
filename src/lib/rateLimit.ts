@@ -2,197 +2,224 @@ import { NextRequest, NextResponse } from 'next/server';
 
 /**
  * Rate Limiting Module
- * 
- * IMPORTANT: This implementation uses in-memory storage and has the following limitations:
- * 1. Rate limits reset on server restart
- * 2. Not shared across multiple server instances (each instance has its own limit)
- * 3. Memory usage grows over time (though cleanup is performed)
- * 
- * For production use with multiple instances or high traffic, consider:
- * - Redis-based rate limiting (e.g., using @upstash/ratelimit)
- * - Distributed rate limiting service
- * - Load balancer with rate limiting
+ *
+ * Supports two modes:
+ *
+ * 1. **Distributed** (recommended for production):
+ *    Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN in your environment.
+ *    Uses @upstash/ratelimit for accurate limits that work across all Vercel
+ *    serverless instances.
+ *
+ * 2. **In-memory fallback** (default, single-instance only):
+ *    Works without additional infrastructure but limits are per-instance.
+ *    Suitable for development and low-traffic deployments on a single server.
  */
 
-// In-memory store for rate limiting
-// Key: IP address, Value: { count, resetTime }
+// ---------------------------------------------------------------------------
+// In-memory store (fallback)
+// ---------------------------------------------------------------------------
 const requestCounts = new Map<string, { count: number; resetTime: number }>();
-
-// Cleanup interval: Remove expired entries every 5 minutes
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 let cleanupInterval: NodeJS.Timeout | null = null;
 
-/**
- * Start periodic cleanup of expired rate limit entries
- * This prevents memory leaks from accumulating old entries
- */
 function startCleanupInterval(): void {
-  if (cleanupInterval) {
-    return; // Already started
-  }
-  
+  if (cleanupInterval) return;
   cleanupInterval = setInterval(() => {
     const now = Date.now();
-    let cleanedCount = 0;
-    
     for (const [key, value] of requestCounts.entries()) {
-      if (value.resetTime < now) {
-        requestCounts.delete(key);
-        cleanedCount++;
-      }
-    }
-    
-    // Log cleanup stats in development
-    if (process.env.NODE_ENV === 'development' && cleanedCount > 0) {
-      console.log(`[RateLimit] Cleaned up ${cleanedCount} expired entries. Active entries: ${requestCounts.size}`);
+      if (value.resetTime < now) requestCounts.delete(key);
     }
   }, CLEANUP_INTERVAL_MS);
 }
 
-// Start cleanup interval on module load
 if (typeof process !== 'undefined') {
   startCleanupInterval();
 }
 
+// ---------------------------------------------------------------------------
+// Upstash distributed limiter factory (lazy-loaded so the import doesn't
+// crash when the env vars are absent)
+// ---------------------------------------------------------------------------
+type UpstashLimiter = { limit: (id: string) => Promise<{ success: boolean; reset: number }> };
+const upstashLimiters = new Map<string, UpstashLimiter>();
+
+function isUpstashConfigured(): boolean {
+  return !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+}
+
+async function getUpstashLimiter(key: string, windowMs: number, maxRequests: number): Promise<UpstashLimiter> {
+  if (upstashLimiters.has(key)) return upstashLimiters.get(key)!;
+
+  const { Ratelimit } = await import('@upstash/ratelimit');
+  const { Redis } = await import('@upstash/redis');
+
+  const redis = new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL!,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+  });
+
+  const limiter = new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(maxRequests, `${windowMs / 1000} s`),
+    prefix: `rl:${key}`,
+  });
+
+  upstashLimiters.set(key, limiter);
+  return limiter;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 interface RateLimitOptions {
-  windowMs: number; // Time window in milliseconds
-  maxRequests: number; // Maximum requests per window
+  windowMs: number;
+  maxRequests: number;
   message?: string;
+  key?: string; // logical name, used as Upstash prefix
 }
 
 function getClientIp(request: NextRequest): string {
-  const isValidIp = (value: string): boolean =>
-    /^(?:\d{1,3}\.){3}\d{1,3}$/.test(value) || value.includes(':');
+  const isValidIp = (v: string) => /^(?:\d{1,3}\.){3}\d{1,3}$/.test(v) || v.includes(':');
 
   const directIp = (request as NextRequest & { ip?: string }).ip;
-  if (directIp && isValidIp(directIp)) {
-    return directIp;
-  }
+  if (directIp && isValidIp(directIp)) return directIp;
 
-  const trustProxy = process.env.TRUST_PROXY_HEADERS === 'true';
-  if (trustProxy) {
-    const forwardedFor = request.headers.get('x-forwarded-for');
-    const forwardedIp = forwardedFor?.split(',')[0]?.trim();
-    if (forwardedIp && isValidIp(forwardedIp)) {
-      return forwardedIp;
-    }
+  if (process.env.TRUST_PROXY_HEADERS === 'true') {
+    const fwd = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+    if (fwd && isValidIp(fwd)) return fwd;
   }
 
   const realIp = request.headers.get('x-real-ip')?.trim();
-  if (realIp && isValidIp(realIp)) {
-    return realIp;
-  }
+  if (realIp && isValidIp(realIp)) return realIp;
 
   return 'unknown';
 }
 
+function inMemoryLimit(
+  ip: string,
+  windowMs: number,
+  maxRequests: number,
+  message: string
+): NextResponse | null {
+  const now = Date.now();
+  let entry = requestCounts.get(ip);
+  if (!entry || entry.resetTime < now) {
+    entry = { count: 0, resetTime: now + windowMs };
+  }
+  entry.count++;
+  requestCounts.set(ip, entry);
+
+  if (entry.count > maxRequests) {
+    return NextResponse.json(
+      { error: message },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': Math.ceil((entry.resetTime - now) / 1000).toString(),
+          'X-RateLimit-Limit': maxRequests.toString(),
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': Math.floor(entry.resetTime / 1000).toString(),
+          'Cache-Control': 'no-store',
+        },
+      }
+    );
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Public API: rateLimit()
+// Returns a function that accepts a NextRequest and returns a promise of
+// NextResponse | null  (null = allowed).
+// ---------------------------------------------------------------------------
 export function rateLimit(options: RateLimitOptions) {
-  const { windowMs, maxRequests, message = 'Too many requests' } = options;
+  const { windowMs, maxRequests, message = 'Too many requests', key = 'default' } = options;
 
-  return (request: NextRequest): NextResponse | null => {
+  return async (request: NextRequest): Promise<NextResponse | null> => {
     const ip = getClientIp(request);
-    
-    const now = Date.now();
+    const identifier = `${key}:${ip}`;
 
-    // Get or create entry for this IP
-    let entry = requestCounts.get(ip);
-    
-    // Reset if entry doesn't exist or window has passed
-    if (!entry || entry.resetTime < now) {
-      entry = { count: 0, resetTime: now + windowMs };
-    }
-
-    // Increment count
-    entry.count++;
-    requestCounts.set(ip, entry);
-
-    // Check if limit exceeded
-    if (entry.count > maxRequests) {
-      return NextResponse.json(
-        { error: message },
-        { 
-          status: 429,
-          headers: {
-            'Retry-After': Math.ceil((entry.resetTime - now) / 1000).toString(),
-            'X-RateLimit-Limit': maxRequests.toString(),
-            'X-RateLimit-Remaining': '0',
-            'X-RateLimit-Reset': Math.floor(entry.resetTime / 1000).toString(), // Unix timestamp in seconds
-            'Cache-Control': 'no-store',
-          }
+    if (isUpstashConfigured()) {
+      try {
+        const limiter = await getUpstashLimiter(key, windowMs, maxRequests);
+        const { success, reset } = await limiter.limit(identifier);
+        if (!success) {
+          return NextResponse.json(
+            { error: message },
+            {
+              status: 429,
+              headers: {
+                'Retry-After': Math.ceil((reset - Date.now()) / 1000).toString(),
+                'X-RateLimit-Limit': maxRequests.toString(),
+                'X-RateLimit-Remaining': '0',
+                'X-RateLimit-Reset': Math.floor(reset / 1000).toString(),
+                'Cache-Control': 'no-store',
+              },
+            }
+          );
         }
-      );
+        return null;
+      } catch (err) {
+        // Fail open: if Upstash is unreachable, fall through to in-memory
+        console.error('[RateLimit] Upstash error, falling back to in-memory:', err);
+      }
     }
 
-    // Return null if no rate limit violation (request should proceed)
-    // Note: Headers could be added here for successful requests, but Next.js doesn't allow
-    // modifying response headers in middleware easily, so we only add them on rate limit
-    return null;
+    return inMemoryLimit(ip, windowMs, maxRequests, message);
   };
 }
 
-// Predefined rate limiters
-const authRateLimitConfig = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  maxRequests: 5, // 5 attempts per 15 minutes
-  message: 'Too many authentication attempts. Please try again later.'
+// ---------------------------------------------------------------------------
+// Predefined limiters
+// ---------------------------------------------------------------------------
+const authRateLimitFn = rateLimit({
+  key: 'auth',
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 5,
+  message: 'Too many authentication attempts. Please try again later.',
 });
 
-/**
- * Authentication rate limiter with test environment support
- * Skips rate limiting in test environment to allow parallel test execution
- * 
- * SECURITY: Only disables rate limiting via server-side environment variables.
- * NEVER disable based on request headers (user-agent, etc.) - these can be spoofed!
- */
-export function authRateLimit(request: NextRequest): NextResponse | null {
-  // Allow disabling only in tests. Production must fail closed.
+export async function authRateLimit(request: NextRequest): Promise<NextResponse | null> {
   if (process.env.NODE_ENV === 'production' && process.env.DISABLE_RATE_LIMIT === 'true') {
     console.error('[SECURITY ERROR] DISABLE_RATE_LIMIT is not allowed in production.');
   }
-
   const shouldDisable =
     process.env.NODE_ENV === 'test' ||
     process.env.DISABLE_RATE_LIMIT === 'true' ||
     process.env.CI === 'true';
-
-  if (shouldDisable) {
-    return null;
-  }
-  
-  return authRateLimitConfig(request);
+  if (shouldDisable) return null;
+  return authRateLimitFn(request);
 }
 
 export const apiRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  maxRequests: 100, // 100 requests per 15 minutes
-  message: 'Too many API requests. Please slow down.'
+  key: 'api',
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 100,
+  message: 'Too many API requests. Please slow down.',
 });
 
-const authMeRateLimitConfig = rateLimit({
+const authMeRateLimitFn = rateLimit({
+  key: 'auth-me',
   windowMs: 15 * 60 * 1000,
   maxRequests: 200,
   message: 'Too many session checks. Please try again later.',
 });
 
-/**
- * Limits polling of GET /api/auth/me (abuse / token probing) while allowing normal multi-tab SPA use.
- */
-export function authMeRateLimit(request: NextRequest): NextResponse | null {
-  if (process.env.NODE_ENV === 'test') {
-    return null;
-  }
-  return authMeRateLimitConfig(request);
+export async function authMeRateLimit(request: NextRequest): Promise<NextResponse | null> {
+  if (process.env.NODE_ENV === 'test') return null;
+  return authMeRateLimitFn(request);
 }
 
 export const emergencyRateLimit = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  maxRequests: 3, // 3 emergency requests per hour
-  message: 'Too many emergency requests. Please contact support if this is urgent.'
+  key: 'emergency',
+  windowMs: 60 * 60 * 1000,
+  maxRequests: 3,
+  message: 'Too many emergency requests. Please contact support if this is urgent.',
 });
 
-/** Unauthenticated password recovery (forgot / validate / reset) — abuse protection. */
 export const passwordRecoveryRateLimit = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
+  key: 'password-recovery',
+  windowMs: 60 * 60 * 1000,
   maxRequests: 15,
   message: 'Too many password reset attempts. Please try again later.',
 });

@@ -15,11 +15,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Apply rate limiting
-    const rateLimitResponse = apiRateLimit(request);
+    const rateLimitResponse = await apiRateLimit(request);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }
-    
+
     const token = getTokenFromRequest(request);
     if (!token) {
       return unauthorizedError();

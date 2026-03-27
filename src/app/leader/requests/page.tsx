@@ -12,6 +12,7 @@ import { useTeamEvents } from '@/hooks/useTeamEvents';
 import { useTeamData } from '@/hooks/useTeamData';
 import { useRequests } from '@/hooks/useRequests';
 import { parseDateSafe, formatDateSafe } from '@/lib/dateUtils';
+import DecisionModal, { DecisionType } from '@/components/shared/DecisionModal';
 
 export default function LeaderRequestsPage() {
   const { showSuccess, showError, showInfo } = useNotification();
@@ -67,6 +68,16 @@ export default function LeaderRequestsPage() {
   const [selectedRequestIds, setSelectedRequestIds] = useState<string[]>([]);
   const [sortMode, setSortMode] = useState<'default' | 'oldestPending' | 'startDateSoonest'>('default');
 
+  // Decision modal state
+  const [decisionModal, setDecisionModal] = useState<{
+    open: boolean;
+    type: DecisionType;
+    requestId: string | null;
+    isBulk: boolean;
+  }>({ open: false, type: 'approve', requestId: null, isBulk: false });
+  // Pending bulk action — resolved when modal confirms
+  const pendingBulkActionRef = useRef<'approve' | 'reject' | null>(null);
+
   const { data: teamData, mutate: mutateTeam, isLoading: teamLoading } = useTeamData({ members: 'full' });
   const { data: requestsData, mutate: mutateRequests, isLoading: requestsLoading } = useRequests({
     teamId,
@@ -116,54 +127,41 @@ export default function LeaderRequestsPage() {
     },
   });
 
-  const handleApprove = async (requestId: string) => {
-    const decisionNote = prompt('Optional approval note (leave blank to skip):') || '';
+  const handleApprove = (requestId: string) => {
+    setDecisionModal({ open: true, type: 'approve', requestId, isBulk: false });
+  };
+
+  const handleReject = (requestId: string) => {
+    setDecisionModal({ open: true, type: 'reject', requestId, isBulk: false });
+  };
+
+  const submitDecision = async (requestId: string, status: 'approved' | 'rejected', decisionNote: string) => {
     try {
       const response = await fetch(`/api/leave-requests/${requestId}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ status: 'approved', decisionNote }),
+        body: JSON.stringify({ status, decisionNote }),
       });
-
       if (response.ok) {
         await mutateRequests();
       } else {
         const error = await response.json();
-        showError(error.error || 'Failed to approve request');
+        showError(error.error || `Failed to ${status === 'approved' ? 'approve' : 'reject'} request`);
       }
     } catch (err) {
-      console.error('Error approving request:', err);
+      console.error('Error processing request:', err);
     }
   };
 
-  const handleReject = async (requestId: string) => {
-    const decisionNote = prompt('Rejection reason (required):') || '';
-    if (!decisionNote.trim()) {
-      showInfo('A rejection reason is required.');
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/leave-requests/${requestId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ status: 'rejected', decisionNote: decisionNote.trim() }),
-      });
-
-      if (response.ok) {
-        await mutateRequests();
-      } else {
-        const error = await response.json();
-        showError(error.error || 'Failed to reject request');
-      }
-    } catch (err) {
-      console.error('Error rejecting request:', err);
+  const handleDecisionConfirm = async (note: string) => {
+    const { type, requestId, isBulk } = decisionModal;
+    setDecisionModal((m) => ({ ...m, open: false }));
+    if (isBulk) {
+      await executeBulkAction(pendingBulkActionRef.current!, note);
+      pendingBulkActionRef.current = null;
+    } else if (requestId) {
+      await submitDecision(requestId, type === 'approve' ? 'approved' : 'rejected', note);
     }
   };
 
@@ -440,29 +438,20 @@ export default function LeaderRequestsPage() {
 
   const clearSelection = () => setSelectedRequestIds([]);
 
-  const runBulkAction = async (action: 'approve' | 'reject') => {
+  const runBulkAction = (action: 'approve' | 'reject') => {
     if (selectedRequestIds.length === 0) {
       showInfo('Select at least one pending request for bulk review.');
       return;
     }
+    pendingBulkActionRef.current = action;
+    setDecisionModal({ open: true, type: action, requestId: null, isBulk: true });
+  };
 
-    const decisionNote = prompt(
-      action === 'reject'
-        ? 'Rejection reason for selected requests (required):'
-        : 'Optional approval note for selected requests:'
-    ) || '';
-
-    if (action === 'reject' && !decisionNote.trim()) {
-      showInfo('A rejection reason is required for bulk rejection.');
-      return;
-    }
-
+  const executeBulkAction = async (action: 'approve' | 'reject', decisionNote: string) => {
     try {
       const response = await fetch('/api/leave-requests/bulk', {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           action,
@@ -1043,6 +1032,16 @@ export default function LeaderRequestsPage() {
       </div>
     </div>
       )}
+      <DecisionModal
+        open={decisionModal.open}
+        type={decisionModal.type}
+        isBulk={decisionModal.isBulk}
+        onConfirm={handleDecisionConfirm}
+        onCancel={() => {
+          pendingBulkActionRef.current = null;
+          setDecisionModal((m) => ({ ...m, open: false }));
+        }}
+      />
     </ProtectedRoute>
   );
 }

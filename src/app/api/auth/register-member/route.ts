@@ -13,7 +13,7 @@ import { resolveUserTimeZone } from '@/lib/timezone';
 
 export async function POST(request: NextRequest) {
   try {
-    const rateLimitResponse = process.env.NODE_ENV !== 'test' ? authRateLimit(request) : null;
+    const rateLimitResponse = process.env.NODE_ENV !== 'test' ? await authRateLimit(request) : null;
     if (rateLimitResponse) {
       return rateLimitResponse;
     }

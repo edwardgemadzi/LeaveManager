@@ -15,7 +15,7 @@ import { TelegramLinkTokenModel } from '@/models/TelegramLinkToken';
  */
 export async function POST(request: NextRequest) {
   try {
-    const rateLimitResponse = apiRateLimit(request);
+    const rateLimitResponse = await apiRateLimit(request);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }

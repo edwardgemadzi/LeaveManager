@@ -7,7 +7,7 @@ import { apiRateLimit } from '@/lib/rateLimit';
 
 export async function GET(request: NextRequest) {
   try {
-    const rateLimitResponse = apiRateLimit(request);
+    const rateLimitResponse = await apiRateLimit(request);
     if (rateLimitResponse) {
       return rateLimitResponse;
     }

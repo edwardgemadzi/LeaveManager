@@ -10,11 +10,6 @@ const nextConfig = {
   images: {
     domains: [],
   },
-  typescript: {
-    // Next's generated route-type stubs can reference .js modules that don't exist in src/app setups.
-    // We keep `strict` in dev via editor/CI; this only unblocks `next build`.
-    ignoreBuildErrors: true,
-  },
   // Security headers
   async headers() {
     return [
@@ -68,6 +63,22 @@ const nextConfig = {
         // Apply security headers to all pages
         source: '/(.*)',
         headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              // Next.js requires unsafe-inline for styles and inline scripts (__NEXT_DATA__)
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: blob:",
+              "font-src 'self'",
+              "connect-src 'self' https://va.vercel-scripts.com",
+              "object-src 'none'",
+              "frame-ancestors 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+            ].join('; '),
+          },
           {
             key: 'X-Content-Type-Options',
             value: 'nosniff',

@@ -20,15 +20,16 @@ import { calculateTimeBasedTeamHealthScore } from '@/lib/helpers';
 import { ProgressRing } from '@/components/shared/ProgressRing';
 import { Sparkline } from '@/components/shared/Sparkline';
 import { Timeline } from '@/components/shared/Timeline';
-import { 
-  UsersIcon, 
-  ClockIcon, 
+import {
+  UsersIcon,
+  ClockIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
   ChartBarIcon,
   ArrowTrendingUpIcon,
   BuildingOffice2Icon,
 } from '@heroicons/react/24/outline';
+import DecisionModal, { DecisionType } from '@/components/shared/DecisionModal';
 
 export default function LeaderDashboard() {
   const { showNotification } = useBrowserNotification();
@@ -39,6 +40,13 @@ export default function LeaderDashboard() {
   const [loading, setLoading] = useState(true);
   const [processingRequest, setProcessingRequest] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<GroupedTeamAnalytics | null>(null);
+
+  // Decision modal state
+  const [decisionModal, setDecisionModal] = useState<{
+    open: boolean;
+    type: DecisionType;
+    requestId: string | null;
+  }>({ open: false, type: 'approve', requestId: null });
   
   // Refs to track notification state and prevent duplicates
   const previousPendingRequestsRef = useRef<LeaveRequest[]>([]);
@@ -49,52 +57,31 @@ export default function LeaderDashboard() {
     requestFields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'decisionNote', 'decisionAt', 'decisionByUsername', 'createdAt', 'requestedBy'],
   });
 
-  const handleApprove = async (requestId: string) => {
-    setProcessingRequest(requestId);
-    const decisionNote = prompt('Optional approval note (leave blank to skip):') || '';
-    try {
-      const response = await fetch(`/api/leave-requests/${requestId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ status: 'approved', decisionNote }),
-      });
-
-      if (response.ok) {
-        // Refetch all data to update balances
-        await refetchData();
-      }
-    } catch (error) {
-      console.error('Error approving request:', error);
-    } finally {
-      setProcessingRequest(null);
-    }
+  const handleApprove = (requestId: string) => {
+    setDecisionModal({ open: true, type: 'approve', requestId });
   };
 
-  const handleReject = async (requestId: string) => {
-    const decisionNote = prompt('Rejection reason (required):') || '';
-    if (!decisionNote.trim()) {
-      return;
-    }
+  const handleReject = (requestId: string) => {
+    setDecisionModal({ open: true, type: 'reject', requestId });
+  };
+
+  const handleDecisionConfirm = async (note: string) => {
+    const { type, requestId } = decisionModal;
+    setDecisionModal((m) => ({ ...m, open: false }));
+    if (!requestId) return;
     setProcessingRequest(requestId);
     try {
       const response = await fetch(`/api/leave-requests/${requestId}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ status: 'rejected', decisionNote: decisionNote.trim() }),
+        body: JSON.stringify({ status: type === 'approve' ? 'approved' : 'rejected', decisionNote: note }),
       });
-
       if (response.ok) {
-        // Refetch all data to update balances
         await refetchData();
       }
     } catch (error) {
-      console.error('Error rejecting request:', error);
+      console.error('Error processing request:', error);
     } finally {
       setProcessingRequest(null);
     }
@@ -684,6 +671,12 @@ export default function LeaderDashboard() {
         </div>
       </div>
       )}
+      <DecisionModal
+        open={decisionModal.open}
+        type={decisionModal.type}
+        onConfirm={handleDecisionConfirm}
+        onCancel={() => setDecisionModal((m) => ({ ...m, open: false }))}
+      />
     </ProtectedRoute>
   );
 }

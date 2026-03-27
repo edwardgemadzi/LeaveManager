@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       TeamModel.findById(user.teamId),
       UserModel.findByTeamId(user.teamId),
       LeaveRequestModel.findByTeamId(user.teamId),
-      AuditLogModel.findByTeamId(user.teamId, 10000),
+      AuditLogModel.findByTeamId(user.teamId, 500),
     ]);
 
     const filteredRequests = requests.filter((r) => {

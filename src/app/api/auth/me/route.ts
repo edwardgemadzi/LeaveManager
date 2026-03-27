@@ -8,7 +8,7 @@ import { NO_STORE_JSON_HEADERS } from '@/lib/securityHeaders';
  * Rate-limited and non-cacheable to reduce abuse and shared-cache leakage.
  */
 export async function GET(request: NextRequest) {
-  const limited = authMeRateLimit(request);
+  const limited = await authMeRateLimit(request);
   if (limited) {
     return limited;
   }
