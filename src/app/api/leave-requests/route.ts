@@ -102,6 +102,7 @@ export async function POST(request: NextRequest) {
       }
 
       const { createdRequests, failedSegments } = batchResult.data;
+      invalidateAnalyticsCache(user.teamId!);
       for (const leaveRequest of createdRequests) {
         const eventData = {
           requestId: (leaveRequest._id || '').toString(),
@@ -120,7 +121,6 @@ export async function POST(request: NextRequest) {
         info(`[LeaveRequest] Broadcasting leaveRequestCreated event for team ${user.teamId}:`, eventData);
         broadcastTeamUpdate(user.teamId!, 'leaveRequestCreated', eventData);
       }
-      invalidateAnalyticsCache(user.teamId!);
 
       const memberUser = await UserModel.findById(createdRequests[0].userId.toString());
       const team = await TeamModel.findById(user.teamId!);
