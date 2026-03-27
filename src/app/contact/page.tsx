@@ -1,13 +1,15 @@
 'use client';
 
 import Navbar from '@/components/shared/Navbar';
+import MobileBottomNav from '@/components/shared/MobileBottomNav';
 import Link from 'next/link';
 import { EnvelopeIcon, ChatBubbleLeftRightIcon, PaperAirplaneIcon, PhoneIcon } from '@heroicons/react/24/outline';
 
 export default function ContactPage() {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20 lg:pb-0">
       <Navbar />
+      <MobileBottomNav />
       <div className="container mx-auto px-4 py-8 pt-24 max-w-3xl">
         <div className="mb-8 text-center">
           <div className="flex justify-center mb-4">

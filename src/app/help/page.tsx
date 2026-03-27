@@ -2,12 +2,14 @@
 
 import Link from 'next/link';
 import Navbar from '@/components/shared/Navbar';
+import MobileBottomNav from '@/components/shared/MobileBottomNav';
 import { BookOpenIcon, ChartBarIcon, LifebuoyIcon } from '@heroicons/react/24/outline';
 
 export default function HelpCenterPage() {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20 lg:pb-0">
       <Navbar />
+      <MobileBottomNav />
       <div className="container mx-auto px-4 py-8 pt-24 max-w-5xl">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Help Center</h1>

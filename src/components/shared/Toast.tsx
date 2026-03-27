@@ -95,7 +95,7 @@ export default function ToastContainer({ toasts, onDismiss }: ToastContainerProp
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-50 pointer-events-none">
+    <div className="fixed top-4 right-4 z-[200] pointer-events-none">
       <div className="pointer-events-auto">
         {toasts.map((toast) => (
           <ToastItem
