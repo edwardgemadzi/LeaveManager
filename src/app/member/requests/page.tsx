@@ -597,6 +597,11 @@ export default function MemberRequestsPage() {
                             <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${getStatusColor(request.status)}`}>
                               {request.status}
                             </span>
+                            {request.isHistoricalSubmission && (
+                              <span className="text-xs px-2 py-0.5 rounded-md font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
+                                historical
+                              </span>
+                            )}
                           </div>
                           <p className="text-sm text-zinc-600 dark:text-zinc-300 mt-1 line-clamp-2">{request.reason}</p>
                           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
