@@ -10,6 +10,7 @@ import { error as logError } from '@/lib/logger';
 import { internalServerError, badRequestError } from '@/lib/errors';
 import { validateRequest, schemas } from '@/lib/validation';
 import { authRateLimit } from '@/lib/rateLimit';
+import { resolveUserTimeZone } from '@/lib/timezone';
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,14 +27,16 @@ export async function POST(request: NextRequest) {
 
     const username = validation.data.username.toLowerCase();
     const teamUsername = validation.data.teamUsername.toLowerCase();
-    const { firstName, middleName, lastName, password, teamName, email } = validation.data as unknown as {
+    const { firstName, middleName, lastName, password, teamName, email, timezone } = validation.data as unknown as {
       firstName: string;
       middleName?: string | null;
       lastName: string;
       password: string;
       teamName: string;
       email?: string | null;
+      timezone?: string | null;
     };
+    const normalizedTimezone = resolveUserTimeZone(timezone || undefined);
 
     if (!username || !firstName || !lastName || !password || !teamName || !teamUsername) {
       return badRequestError('All fields are required');
@@ -98,6 +101,7 @@ export async function POST(request: NextRequest) {
             accessRole: 'leader',
             teamId: team._id,
             ...(normalizedEmail ? { email: normalizedEmail } : {}),
+            timezone: normalizedTimezone,
           },
           session
         );
@@ -167,6 +171,7 @@ export async function POST(request: NextRequest) {
         role: transactionResult.role,
         accessRole: 'leader',
         teamId: transactionResult.teamId,
+        timezone: normalizedTimezone,
       },
       team: {
         id: transactionResult.teamId,

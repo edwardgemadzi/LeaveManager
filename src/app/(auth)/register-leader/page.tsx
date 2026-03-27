@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { SunIcon, MoonIcon } from '@heroicons/react/24/outline';
 import { useTheme } from '@/contexts/ThemeContext';
 import { setStoredUser } from '@/lib/clientUserStorage';
+import TimezoneSelect from '@/components/profile/TimezoneSelect';
 
 export default function RegisterLeaderPage() {
   const [formData, setFormData] = useState({
@@ -18,11 +19,19 @@ export default function RegisterLeaderPage() {
     confirmPassword: '',
     teamName: '',
     teamUsername: '',
+    timezone: 'UTC',
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
+
+  useEffect(() => {
+    const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (detected) {
+      setFormData((prev) => ({ ...prev, timezone: detected }));
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,6 +59,7 @@ export default function RegisterLeaderPage() {
           password: formData.password,
           teamName: formData.teamName,
           teamUsername: formData.teamUsername,
+          timezone: formData.timezone || 'UTC',
         }),
       });
 
@@ -121,6 +131,16 @@ export default function RegisterLeaderPage() {
               <input id="email" name="email" type="email" className={inputCls} placeholder="you@company.com"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value.toLowerCase() })} />
+            </div>
+
+            <div>
+              <label htmlFor="timezone" className={labelCls}>Timezone (optional)</label>
+              <TimezoneSelect
+                id="timezone"
+                value={formData.timezone}
+                onChange={(timezone) => setFormData({ ...formData, timezone })}
+                className={inputCls}
+              />
             </div>
 
             <div>

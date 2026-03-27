@@ -211,6 +211,7 @@ export interface RegisterLeaderRequest {
   teamName: string;
   teamUsername: string;
   email?: string | null;
+  timezone?: string | null;
 }
 
 export interface RegisterMemberRequest {
@@ -221,6 +222,7 @@ export interface RegisterMemberRequest {
   shiftSchedule: ShiftSchedule;
   maternityPaternityType?: 'maternity' | 'paternity' | null;
   email?: string | null;
+  timezone?: string | null;
 }
 
 export interface CreateLeaveRequest {

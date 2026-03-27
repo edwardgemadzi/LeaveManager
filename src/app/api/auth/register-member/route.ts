@@ -9,6 +9,7 @@ import { error as logError } from '@/lib/logger';
 import { internalServerError, badRequestError, notFoundError } from '@/lib/errors';
 import { validateRequest, schemas } from '@/lib/validation';
 import { authRateLimit } from '@/lib/rateLimit';
+import { resolveUserTimeZone } from '@/lib/timezone';
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,13 +26,14 @@ export async function POST(request: NextRequest) {
 
     const username = validation.data.username.toLowerCase();
     const teamUsername = validation.data.teamUsername.toLowerCase();
-    const { firstName, middleName, lastName, password, shiftSchedule, email } = validation.data as unknown as {
+    const { firstName, middleName, lastName, password, shiftSchedule, email, timezone } = validation.data as unknown as {
       firstName: string;
       middleName?: string | null;
       lastName: string;
       password: string;
       shiftSchedule: ShiftSchedule;
       email?: string | null;
+      timezone?: string | null;
     };
     const { maternityPaternityType } = body;
 
@@ -57,6 +59,8 @@ export async function POST(request: NextRequest) {
     if (!team) {
       return notFoundError('Team not found');
     }
+    const leader = team.leaderId ? await UserModel.findById(team.leaderId) : null;
+    const normalizedTimezone = resolveUserTimeZone(timezone || leader?.timezone || undefined);
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
@@ -104,6 +108,7 @@ export async function POST(request: NextRequest) {
       workingDaysTag?: string;
       maternityPaternityType?: 'maternity' | 'paternity' | null;
       email?: string;
+      timezone?: string;
       accessRole?: 'leader' | 'member' | 'approver' | 'hr_admin' | 'viewer';
     } = {
       username,
@@ -116,6 +121,7 @@ export async function POST(request: NextRequest) {
       teamId: team._id,
       shiftSchedule: shiftScheduleCopy,
       ...(normalizedEmail ? { email: normalizedEmail } : {}),
+      timezone: normalizedTimezone,
     };
 
     // Add maternityPaternityType if provided
@@ -162,6 +168,7 @@ export async function POST(request: NextRequest) {
         role: user.role,
         accessRole: user.accessRole || user.role,
         teamId: team._id,
+        timezone: user.timezone || normalizedTimezone,
       },
       team: {
         id: team._id,

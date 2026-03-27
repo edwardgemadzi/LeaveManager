@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { SunIcon, MoonIcon } from '@heroicons/react/24/outline';
@@ -8,6 +8,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import ShiftScheduleBuilder from '@/components/ShiftScheduleBuilder';
 import { ShiftSchedule } from '@/types';
 import { setStoredUser } from '@/lib/clientUserStorage';
+import TimezoneSelect from '@/components/profile/TimezoneSelect';
 
 export default function RegisterMemberPage() {
   const [formData, setFormData] = useState({
@@ -20,6 +21,7 @@ export default function RegisterMemberPage() {
     confirmPassword: '',
     teamUsername: '',
     maternityPaternityType: '' as '' | 'maternity' | 'paternity',
+    timezone: 'UTC',
   });
   const [shiftSchedule, setShiftSchedule] = useState<ShiftSchedule>({
     pattern: [true, true, false, false],
@@ -30,6 +32,13 @@ export default function RegisterMemberPage() {
   const [error, setError] = useState('');
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
+
+  useEffect(() => {
+    const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (detected) {
+      setFormData((prev) => ({ ...prev, timezone: detected }));
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,6 +67,7 @@ export default function RegisterMemberPage() {
           teamUsername: formData.teamUsername,
           shiftSchedule,
           maternityPaternityType: formData.maternityPaternityType || null,
+          timezone: formData.timezone || 'UTC',
         }),
       });
 
@@ -128,6 +138,16 @@ export default function RegisterMemberPage() {
               <input id="email" name="email" type="email" className={inputCls} placeholder="you@company.com"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value.toLowerCase() })} />
+            </div>
+
+            <div>
+              <label htmlFor="timezone" className={labelCls}>Timezone (optional)</label>
+              <TimezoneSelect
+                id="timezone"
+                value={formData.timezone}
+                onChange={(timezone) => setFormData({ ...formData, timezone })}
+                className={inputCls}
+              />
             </div>
 
             <div>
