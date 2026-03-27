@@ -7,7 +7,7 @@ import { EnvelopeIcon, ChatBubbleLeftRightIcon, PaperAirplaneIcon, PhoneIcon } f
 
 export default function ContactPage() {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20 lg:pb-0">
+    <div className="min-h-screen bg-white dark:bg-zinc-950 pb-20 lg:pb-0">
       <Navbar />
       <MobileBottomNav />
       <div className="container mx-auto px-4 py-8 pt-24 max-w-3xl">
@@ -17,10 +17,10 @@ export default function ContactPage() {
               <ChatBubbleLeftRightIcon className="h-12 w-12 text-indigo-600 dark:text-indigo-400" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+          <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">
             Contact Developer
           </h1>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p className="text-zinc-600 dark:text-zinc-400">
             Have a question, found a bug, or have a feature request? Reach out directly via email or Telegram!
           </p>
         </div>
@@ -43,24 +43,24 @@ export default function ContactPage() {
         <div className="space-y-4">
           <a
             href="mailto:edwardgemadzi@rocketmail.com?subject=Leave Manager Inquiry"
-            className="block p-6 bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-200 dark:border-gray-700 hover:border-indigo-500 dark:hover:border-indigo-500 transition-all hover:shadow-lg group"
+            className="block p-6 bg-white dark:bg-zinc-900 rounded-lg border-2 border-zinc-200 dark:border-zinc-800 hover:border-indigo-500 dark:hover:border-indigo-500 transition-all hover:shadow-lg group"
           >
             <div className="flex items-center gap-4">
               <div className="bg-indigo-100 dark:bg-indigo-900/30 rounded-full p-4 group-hover:bg-indigo-200 dark:group-hover:bg-indigo-900/50 transition-colors">
                 <EnvelopeIcon className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                   Send Email
                 </h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-2">
                   Click to open your email client
                 </p>
                 <p className="text-base font-medium text-indigo-600 dark:text-indigo-400">
                   edwardgemadzi@rocketmail.com
                 </p>
               </div>
-              <PaperAirplaneIcon className="h-6 w-6 text-gray-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors" />
+              <PaperAirplaneIcon className="h-6 w-6 text-zinc-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors" />
             </div>
           </a>
 
@@ -68,24 +68,24 @@ export default function ContactPage() {
             href="https://t.me/edgemadzi"
             target="_blank"
             rel="noopener noreferrer"
-            className="block p-6 bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-200 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 transition-all hover:shadow-lg group"
+            className="block p-6 bg-white dark:bg-zinc-900 rounded-lg border-2 border-zinc-200 dark:border-zinc-800 hover:border-blue-500 dark:hover:border-blue-500 transition-all hover:shadow-lg group"
           >
             <div className="flex items-center gap-4">
               <div className="bg-blue-100 dark:bg-blue-900/30 rounded-full p-4 group-hover:bg-blue-200 dark:group-hover:bg-blue-900/50 transition-colors">
                 <PhoneIcon className="h-8 w-8 text-blue-600 dark:text-blue-400" />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                   Message on Telegram
                 </h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-2">
                   Click to open Telegram and start a conversation
                 </p>
                 <p className="text-base font-medium text-blue-600 dark:text-blue-400">
                   @edgemadzi
                 </p>
               </div>
-              <PaperAirplaneIcon className="h-6 w-6 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
+              <PaperAirplaneIcon className="h-6 w-6 text-zinc-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
             </div>
           </a>
         </div>
@@ -101,7 +101,7 @@ export default function ContactPage() {
           </div>
         </div>
 
-        <div className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+        <div className="mt-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
           <p>Choose your preferred contact method above to get in touch.</p>
         </div>
       </div>

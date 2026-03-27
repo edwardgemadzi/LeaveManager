@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -28,13 +28,7 @@ import {
   UsersIcon as UsersIconSolid,
   InboxStackIcon as InboxStackIconSolid,
 } from '@heroicons/react/24/solid';
-import { clearStoredUser } from '@/lib/clientUserStorage';
-
-interface NavUser {
-  id: string;
-  username: string;
-  role: 'leader' | 'member';
-}
+import { useAuth } from '@/contexts/AuthContext';
 
 const memberTabs = [
   { href: '/member/dashboard', label: 'Home', Icon: HomeIcon, IconSolid: HomeIconSolid },
@@ -67,26 +61,16 @@ const memberMoreItems = [
 ];
 
 export default function MobileBottomNav() {
-  const [user, setUser] = useState<NavUser | null>(null);
+  const { user, logout: authLogout } = useAuth();
   const [moreOpen, setMoreOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
-  useEffect(() => {
-    const raw = localStorage.getItem('user');
-    if (raw) {
-      try { setUser(JSON.parse(raw)); } catch { /* ignore */ }
-    }
-  }, []);
-
   const handleLogout = useCallback(async () => {
     setMoreOpen(false);
-    try {
-      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-    } catch { /* best-effort */ }
-    clearStoredUser();
+    await authLogout();
     router.push('/login');
-  }, [router]);
+  }, [authLogout, router]);
 
   if (!user) return null;
 

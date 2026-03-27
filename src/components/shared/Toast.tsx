@@ -20,7 +20,7 @@ function ToastItem({ toast, onDismiss }: ToastItemProps) {
   useEffect(() => {
     const timer = setTimeout(() => {
       onDismiss(toast.id);
-    }, 2000);
+    }, 4000);
 
     return () => clearTimeout(timer);
   }, [toast.id, onDismiss]);
@@ -95,7 +95,7 @@ export default function ToastContainer({ toasts, onDismiss }: ToastContainerProp
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-[200] pointer-events-none">
+    <div className="fixed top-16 right-4 z-[200] pointer-events-none">
       <div className="pointer-events-auto">
         {toasts.map((toast) => (
           <ToastItem

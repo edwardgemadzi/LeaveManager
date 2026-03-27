@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { SunIcon, MoonIcon } from '@heroicons/react/24/outline';
 import { useTheme } from '@/contexts/ThemeContext';
 import { setStoredUser } from '@/lib/clientUserStorage';
+import { useAuth } from '@/contexts/AuthContext';
 import TimezoneSelect from '@/components/profile/TimezoneSelect';
 
 export default function RegisterLeaderPage() {
@@ -25,6 +26,7 @@ export default function RegisterLeaderPage() {
   const [error, setError] = useState('');
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
+  const { refresh: refreshAuth } = useAuth();
 
   useEffect(() => {
     const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -67,6 +69,7 @@ export default function RegisterLeaderPage() {
 
       if (response.ok) {
         setStoredUser(data.user);
+        await refreshAuth();
         router.push('/leader/dashboard');
       } else {
         setError(data.error || 'Registration failed');

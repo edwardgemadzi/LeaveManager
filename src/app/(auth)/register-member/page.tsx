@@ -8,6 +8,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import ShiftScheduleBuilder from '@/components/ShiftScheduleBuilder';
 import { ShiftSchedule } from '@/types';
 import { setStoredUser } from '@/lib/clientUserStorage';
+import { useAuth } from '@/contexts/AuthContext';
 import TimezoneSelect from '@/components/profile/TimezoneSelect';
 
 export default function RegisterMemberPage() {
@@ -32,6 +33,7 @@ export default function RegisterMemberPage() {
   const [error, setError] = useState('');
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
+  const { refresh: refreshAuth } = useAuth();
 
   useEffect(() => {
     const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -75,6 +77,7 @@ export default function RegisterMemberPage() {
 
       if (response.ok) {
         setStoredUser(data.user);
+        await refreshAuth();
         router.push('/member/dashboard');
       } else {
         setError(data.error || 'Registration failed');

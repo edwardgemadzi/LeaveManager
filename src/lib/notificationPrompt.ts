@@ -7,9 +7,9 @@ export function computeNeedsNotificationSetup(u: {
   email?: string | null;
   notificationPromptVersionSeen?: number;
 }): boolean {
-  if (!String(u.email || '').trim()) {
-    return true;
-  }
   const seen = u.notificationPromptVersionSeen ?? 0;
-  return seen < getNotificationPromptVersion();
+  // Always respect a dismiss — if the user has acknowledged the current version, don't show.
+  if (seen >= getNotificationPromptVersion()) return false;
+  // Show only if no email is set (primary goal of the banner).
+  return !String(u.email || '').trim();
 }

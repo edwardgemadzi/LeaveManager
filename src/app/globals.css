@@ -694,9 +694,9 @@ p {
     font-size: 14px;
   }
 
-  /* More breathing room per row */
+  /* More breathing room per row — keep below 525px/6≈87px so 6-row months don't clip */
   .rbc-month-row {
-    min-height: 108px;
+    min-height: 80px;
   }
 
   /* Prevent clipping of stacked events / +more anchor in tight rows */

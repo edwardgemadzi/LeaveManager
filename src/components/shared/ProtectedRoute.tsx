@@ -122,7 +122,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
 
   return (
     <>
-      <div className="pb-28">{children}</div>
+      <div className="pb-40 lg:pb-28">{children}</div>
       <NotificationPromptBanner />
     </>
   );

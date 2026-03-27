@@ -54,7 +54,7 @@ export default function NotificationPromptBanner() {
 
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-indigo-200 dark:border-indigo-900 bg-indigo-50 dark:bg-indigo-950/95 text-gray-900 dark:text-gray-100 px-4 py-3 shadow-lg"
+      className="fixed bottom-16 lg:bottom-0 left-0 right-0 z-50 border-t border-indigo-200 dark:border-indigo-900 bg-indigo-50 dark:bg-indigo-950/95 text-zinc-900 dark:text-zinc-100 px-4 py-3 shadow-lg"
       role="region"
       aria-label="Notification setup"
     >
