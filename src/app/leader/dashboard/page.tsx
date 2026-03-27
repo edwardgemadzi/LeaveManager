@@ -29,9 +29,11 @@ import {
   ArrowTrendingUpIcon,
   BuildingOffice2Icon,
   ScaleIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import DecisionModal, { DecisionType } from '@/components/shared/DecisionModal';
 import AllocationModal from '@/components/shared/AllocationModal';
+import AutoFillModal from '@/components/shared/AutoFillModal';
 
 export default function LeaderDashboard() {
   const { showNotification } = useBrowserNotification();
@@ -50,6 +52,7 @@ export default function LeaderDashboard() {
     requestId: string | null;
   }>({ open: false, type: 'approve', requestId: null });
   const [allocationOpen, setAllocationOpen] = useState(false);
+  const [autoFillOpen, setAutoFillOpen] = useState(false);
   
   // Refs to track notification state and prevent duplicates
   const previousPendingRequestsRef = useRef<LeaveRequest[]>([]);
@@ -452,13 +455,23 @@ export default function LeaderDashboard() {
                           {affectedGroups.length} group{affectedGroups.length !== 1 ? 's' : ''} can&apos;t accommodate everyone&apos;s balance — someone must sacrifice.
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setAllocationOpen(true)}
-                        className="shrink-0 btn-secondary text-xs py-1.5 px-3"
-                      >
-                        Review
-                      </button>
+                      <div className="shrink-0 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setAllocationOpen(true)}
+                          className="btn-secondary text-xs py-1.5 px-3"
+                        >
+                          Review
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAutoFillOpen(true)}
+                          className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5"
+                        >
+                          <SparklesIcon className="h-3.5 w-3.5" />
+                          Auto-fill
+                        </button>
+                      </div>
                     </div>
                   );
                 })()}
@@ -727,6 +740,17 @@ export default function LeaderDashboard() {
           open={allocationOpen}
           onClose={() => setAllocationOpen(false)}
           analytics={analytics}
+        />
+      )}
+      {analytics && team && autoFillOpen && (
+        <AutoFillModal
+          open={autoFillOpen}
+          onClose={() => setAutoFillOpen(false)}
+          analytics={analytics}
+          members={members}
+          allRequests={allRequests}
+          team={team}
+          onApplied={() => mutateDashboard()}
         />
       )}
     </ProtectedRoute>
