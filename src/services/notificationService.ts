@@ -638,3 +638,88 @@ export async function notifyLeaveRemoved(params: {
 
   await Promise.allSettled(tasks);
 }
+
+export async function notifyLeaveRemovedBulk(params: {
+  member: User;
+  leader: User | null;
+  teamName: string;
+  ranges: string[];
+}): Promise<void> {
+  const { member, leader, teamName, ranges } = params;
+  if (ranges.length === 0) return;
+
+  const base = appBaseUrl();
+  const memberMagic = await createSingleUseMagicLinkToken({
+    userId: String(member._id),
+    nextPath: '/member/requests',
+  });
+  const memberLink = `${base}/api/auth/magic?token=${encodeURIComponent(memberMagic)}`;
+  const rangeList = ranges.map((r) => `<li style="margin:0 0 4px;">${escapeForHtml(r)}</li>`).join('');
+  const rangeText = ranges.join(', ');
+  const summary = `${ranges.length} pending leave request${ranges.length !== 1 ? 's' : ''} cancelled`;
+
+  const tasks: Promise<unknown>[] = [];
+
+  const memberBody = `
+    <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Hi ${escapeForHtml(greetingName(member))},</p>
+    <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">You cancelled <strong>${ranges.length}</strong> pending leave request${ranges.length !== 1 ? 's' : ''}:</p>
+    <ul style="margin:0 0 16px;padding-left:20px;font-size:14px;line-height:1.6;color:#334155;">${rangeList}</ul>
+    <p style="margin:0;font-size:14px;line-height:1.5;color:#64748b;">Team: ${escapeForHtml(teamName)}</p>
+    <p style="margin:20px 0 0;">
+      <a href="${memberLink}" style="display:inline-block;background:#4f46e5;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:14px;">View requests</a>
+    </p>
+  `;
+  if (wantsEmail(member)) {
+    tasks.push(
+      sendHtmlEmail({
+        to: member.email!.trim(),
+        subject: `${summary} — ${teamName}`,
+        html: shell(memberBody, { title: 'Requests cancelled', preheader: summary }),
+      })
+    );
+  }
+  if (wantsTelegram(member)) {
+    tasks.push(
+      sendTelegramMessage({
+        chatId: member.telegramUserId!,
+        text: `${summary}\nDates: ${rangeText}\nTeam: ${teamName}`,
+      })
+    );
+  }
+
+  if (leader && leader._id && String(leader._id) !== String(member._id)) {
+    const memberLabel = displayName(member);
+    const leaderMagic = await createSingleUseMagicLinkToken({
+      userId: String(leader._id),
+      nextPath: '/leader/requests',
+    });
+    const leaderLink = `${base}/api/auth/magic?token=${encodeURIComponent(leaderMagic)}`;
+    const leaderBody = `
+      <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;"><strong>${escapeForHtml(memberLabel)}</strong> cancelled ${ranges.length} pending leave request${ranges.length !== 1 ? 's' : ''}:</p>
+      <ul style="margin:0 0 16px;padding-left:20px;font-size:14px;line-height:1.6;color:#334155;">${rangeList}</ul>
+      <p style="margin:0;font-size:14px;line-height:1.5;color:#64748b;">Team: ${escapeForHtml(teamName)}</p>
+      <p style="margin:20px 0 0;">
+        <a href="${leaderLink}" style="display:inline-block;background:#4f46e5;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:14px;">Review requests</a>
+      </p>
+    `;
+    if (wantsEmail(leader)) {
+      tasks.push(
+        sendHtmlEmail({
+          to: leader.email!.trim(),
+          subject: `${memberLabel} cancelled ${ranges.length} pending request${ranges.length !== 1 ? 's' : ''} — ${teamName}`,
+          html: shell(leaderBody, { title: 'Requests cancelled', preheader: `${memberLabel} · ${summary}` }),
+        })
+      );
+    }
+    if (wantsTelegram(leader)) {
+      tasks.push(
+        sendTelegramMessage({
+          chatId: leader.telegramUserId!,
+          text: `${memberLabel} cancelled ${ranges.length} pending leave request${ranges.length !== 1 ? 's' : ''}\nDates: ${rangeText}\nTeam: ${teamName}`,
+        })
+      );
+    }
+  }
+
+  await Promise.allSettled(tasks);
+}

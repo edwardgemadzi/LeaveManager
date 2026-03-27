@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTokenFromRequest, shouldRejectCsrf, verifyToken } from '@/lib/auth';
 import { LeaveRequestModel } from '@/models/LeaveRequest';
 import { AuditLogModel } from '@/models/AuditLog';
-import { notifyLeaveDecision } from '@/services/notificationService';
+import { notifyLeaveDecision, notifyLeaveRemovedBulk } from '@/services/notificationService';
+import { TeamModel } from '@/models/Team';
 import { UserModel } from '@/models/User';
 import { teamIdsMatch } from '@/lib/helpers';
 import { invalidateAnalyticsCache } from '@/lib/analyticsCache';
@@ -172,6 +173,110 @@ export async function PATCH(request: NextRequest) {
     });
   } catch (error) {
     logError('Bulk action error:', error);
+    return internalServerError();
+  }
+}
+
+// DELETE /api/leave-requests/bulk — member bulk cancel their own pending requests
+export async function DELETE(request: NextRequest) {
+  try {
+    const rateLimitResponse = await apiRateLimit(request);
+    if (rateLimitResponse) return rateLimitResponse;
+
+    if (shouldRejectCsrf(request)) return forbiddenError('Invalid request origin');
+
+    const token = getTokenFromRequest(request);
+    if (!token) return unauthorizedError();
+
+    const user = verifyToken(token);
+    if (!user) return forbiddenError();
+
+    const body = await request.json();
+    const { requestIds } = body as { requestIds: string[] };
+
+    if (!requestIds || !Array.isArray(requestIds) || requestIds.length === 0) {
+      return badRequestError('requestIds array is required');
+    }
+    if (requestIds.length > 100) {
+      return badRequestError('A maximum of 100 requests can be cancelled at once');
+    }
+
+    const dedupedIds = [...new Set(requestIds.map((id) => String(id).trim()))];
+    if (dedupedIds.some((id) => !ObjectId.isValid(id))) {
+      return badRequestError('All request IDs must be valid');
+    }
+
+    const cancelled: string[] = [];
+    const failed: { id: string; error: string }[] = [];
+    const cancelledRanges: string[] = [];
+
+    for (const id of dedupedIds) {
+      try {
+        const leaveRequest = await LeaveRequestModel.findById(id);
+        if (!leaveRequest) { failed.push({ id, error: 'Not found' }); continue; }
+        if (!teamIdsMatch(leaveRequest.teamId, user.teamId)) { failed.push({ id, error: 'Forbidden' }); continue; }
+        if (String(leaveRequest.userId) !== String(user.id)) { failed.push({ id, error: 'Not your request' }); continue; }
+        if (leaveRequest.status !== 'pending') { failed.push({ id, error: 'Only pending requests can be cancelled' }); continue; }
+
+        const deleted = await LeaveRequestModel.delete(id, user.id);
+        if (!deleted) { failed.push({ id, error: 'Delete failed' }); continue; }
+
+        const start = leaveRequest.startDate.toISOString().split('T')[0];
+        const end = leaveRequest.endDate.toISOString().split('T')[0];
+        cancelledRanges.push(start === end ? start : `${start} – ${end}`);
+
+        await AuditLogModel.logLeaveAction(
+          'leave_deleted',
+          user.id,
+          user.username || user.id,
+          user.role,
+          user.teamId!,
+          leaveRequest.userId,
+          user.username || user.id,
+          id,
+          { startDate: start, endDate: end, reason: leaveRequest.reason, status: leaveRequest.status }
+        );
+
+        cancelled.push(id);
+      } catch (err) {
+        logError(`Error cancelling request ${id}:`, err);
+        failed.push({ id, error: 'Internal error' });
+      }
+    }
+
+    if (cancelled.length > 0) {
+      invalidateAnalyticsCache(user.teamId!);
+      broadcastTeamUpdate(user.teamId!, 'leaveRequestDeleted', {
+        requestIds: cancelled,
+        userId: user.id,
+        deletedBy: user.id,
+      });
+
+      // Send one notification for the whole batch
+      try {
+        const memberUser = await UserModel.findById(user.id);
+        const team = await TeamModel.findById(user.teamId!);
+        if (memberUser && team) {
+          const leader = team.leaderId ? await UserModel.findById(String(team.leaderId)) : null;
+          await notifyLeaveRemovedBulk({
+            member: memberUser,
+            leader,
+            teamName: team.name,
+            ranges: cancelledRanges,
+          });
+        }
+      } catch (notifyErr) {
+        logError('Bulk cancel notification error:', notifyErr);
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      cancelled: cancelled.length,
+      failed,
+    });
+  } catch (error) {
+    logError('Bulk delete error:', error);
     return internalServerError();
   }
 }

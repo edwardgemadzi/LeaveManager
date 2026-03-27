@@ -5,7 +5,7 @@ import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import { LeaveRequest } from '@/types';
 import { LEAVE_REASONS } from '@/lib/leaveReasons';
-import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { ExclamationTriangleIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useNotification } from '@/hooks/useNotification';
 import { useBrowserNotification } from '@/hooks/useBrowserNotification';
 import { parseDateSafe } from '@/lib/dateUtils';
@@ -14,6 +14,10 @@ import { useTeamData } from '@/hooks/useTeamData';
 import { useRequests } from '@/hooks/useRequests';
 import { setStoredUser } from '@/lib/clientUserStorage';
 import EditRequestModal from '@/components/shared/EditRequestModal';
+import MemberAutoFillModal from '@/components/shared/MemberAutoFillModal';
+import { SparklesIcon } from '@heroicons/react/24/outline';
+import { calculateLeaveBalance } from '@/lib/leaveCalculations';
+import { getEffectiveManualYearToDateUsed } from '@/lib/yearOverrides';
 
 type LeaveDateConstraintDay = {
   selectable: boolean;
@@ -49,6 +53,10 @@ export default function MemberRequestsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [editingRequest, setEditingRequest] = useState<LeaveRequest | null>(null);
+  const [autoFillOpen, setAutoFillOpen] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [availabilityPreview, setAvailabilityPreview] = useState<{ available: boolean; message: string } | null>(null);
   const [dateConstraints, setDateConstraints] = useState<Record<string, LeaveDateConstraintDay>>({});
   const bypassActive = isBypassNoticePeriodActive(teamSettings);
@@ -86,7 +94,7 @@ export default function MemberRequestsPage() {
     return formData.reason;
   };
 
-  const { data: teamData, isLoading: teamLoading } = useTeamData({ members: 'none' });
+  const { data: teamData, isLoading: teamLoading } = useTeamData({ members: 'summary' });
   const { data: allRequests, mutate: mutateRequests, isLoading: requestsLoading } = useRequests({
     fields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'decisionNote', 'decisionAt', 'decisionByUsername', 'createdAt'],
   });
@@ -325,6 +333,83 @@ export default function MemberRequestsPage() {
     }
   };
 
+  const pendingRequests = myRequests.filter((r) => r.status === 'pending');
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    const pendingIds = pendingRequests.map((r) => r._id!);
+    if (pendingIds.every((id) => selectedIds.has(id))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(pendingIds));
+    }
+  }
+
+  function exitSelectionMode() {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  }
+
+  const handleBulkCancel = async () => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    const confirmed = confirm(
+      `Cancel ${ids.length} pending request${ids.length !== 1 ? 's' : ''}? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setBulkDeleting(true);
+    try {
+      const res = await fetch('/api/leave-requests/bulk', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ requestIds: ids }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await mutateRequests();
+        exitSelectionMode();
+        showSuccess(
+          `${data.cancelled} request${data.cancelled !== 1 ? 's' : ''} cancelled successfully.`
+        );
+      } else {
+        showError(data.error || 'Failed to cancel requests');
+      }
+    } catch {
+      showError('Network error. Please try again.');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  // Compute remaining balance for the auto-fill modal default
+  const remainingBalance = (() => {
+    const team = teamData?.team;
+    const currentUser = teamData?.currentUser;
+    if (!team || !currentUser || !allRequests) return 0;
+    const approved = (allRequests as LeaveRequest[])
+      .filter((r) => r.status === 'approved' && String(r.userId) === String(currentUser._id))
+      .map((r) => ({ startDate: parseDateSafe(r.startDate), endDate: parseDateSafe(r.endDate), reason: r.reason }));
+    return calculateLeaveBalance(
+      team.settings.maxLeavePerYear,
+      approved,
+      currentUser,
+      currentUser.manualLeaveBalance,
+      getEffectiveManualYearToDateUsed(currentUser),
+      team.settings.carryoverSettings,
+      team.settings.accrual,
+    );
+  })();
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400';
@@ -351,12 +436,38 @@ export default function MemberRequestsPage() {
             <h1 className="app-page-heading text-base font-semibold text-zinc-900 dark:text-zinc-100">My Leave Requests</h1>
             <p className="app-page-subheading text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Manage and track your leave</p>
           </div>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className={showForm ? 'btn-secondary' : 'btn-primary'}
-          >
-            {showForm ? 'Cancel' : 'New Request'}
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {pendingRequests.length > 0 && !selectionMode && (
+              <button
+                onClick={() => { setSelectionMode(true); setShowForm(false); }}
+                className="btn-secondary text-xs py-1.5 px-3"
+              >
+                Select
+              </button>
+            )}
+            {selectionMode && (
+              <button onClick={exitSelectionMode} className="btn-secondary text-xs py-1.5 px-3">
+                Done
+              </button>
+            )}
+            {!selectionMode && (
+              <>
+                <button
+                  onClick={() => setAutoFillOpen(true)}
+                  className="btn-secondary flex items-center gap-1.5"
+                >
+                  <SparklesIcon className="h-4 w-4" />
+                  Auto-fill
+                </button>
+                <button
+                  onClick={() => setShowForm(!showForm)}
+                  className={showForm ? 'btn-secondary' : 'btn-primary'}
+                >
+                  {showForm ? 'Cancel' : 'New Request'}
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {teamSettings.allowMemberHistoricalSubmissions && (
@@ -568,7 +679,17 @@ export default function MemberRequestsPage() {
               <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Requests</p>
               <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mt-1">History and status</p>
             </div>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400">{myRequests.length} total</span>
+            {selectionMode ? (
+              <button
+                type="button"
+                onClick={toggleSelectAll}
+                className="text-xs text-indigo-600 dark:text-indigo-400 font-medium hover:underline"
+              >
+                {pendingRequests.every((r) => selectedIds.has(r._id!)) ? 'Deselect all' : 'Select all'}
+              </button>
+            ) : (
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">{myRequests.length} total</span>
+            )}
           </div>
           <div className="p-0 lg:h-[calc(100vh-280px)] lg:overflow-auto">
             {myRequests.length === 0 ? (
@@ -585,9 +706,23 @@ export default function MemberRequestsPage() {
                         ? 'bg-red-500'
                         : 'bg-amber-500';
 
+                  const isPending = request.status === 'pending';
+                  const isSelected = selectedIds.has(request._id!);
+
                   return (
-                    <div key={request._id} className="px-5 sm:px-6 py-4">
+                    <div
+                      key={request._id}
+                      className={`px-5 sm:px-6 py-4 transition-colors ${selectionMode && isPending ? 'cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50' : ''} ${isSelected ? 'bg-indigo-50/60 dark:bg-indigo-950/20' : ''}`}
+                      onClick={selectionMode && isPending ? () => toggleSelect(request._id!) : undefined}
+                    >
                       <div className="flex items-start justify-between gap-3">
+                        {selectionMode && isPending && (
+                          <div className="shrink-0 mt-0.5">
+                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900'}`}>
+                              {isSelected && <CheckIcon className="h-3 w-3 text-white" />}
+                            </div>
+                          </div>
+                        )}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <span className={`h-2.5 w-2.5 rounded-full ${statusTone}`} aria-hidden="true" />
@@ -620,7 +755,7 @@ export default function MemberRequestsPage() {
                           ) : null}
                         </div>
 
-                        {request.status === 'pending' ? (
+                        {isPending && !selectionMode ? (
                           <div className="shrink-0 flex items-center gap-2">
                             <button onClick={() => handleEditPending(request)} className="btn-secondary text-xs py-1.5 px-2.5">
                               Edit
@@ -645,12 +780,48 @@ export default function MemberRequestsPage() {
       </div>
     </div>
       )}
+      {/* Bulk cancel floating bar */}
+      {selectionMode && selectedIds.size > 0 && (
+        <div className="fixed bottom-20 lg:bottom-6 inset-x-0 flex justify-center px-4 z-40 pointer-events-none">
+          <div className="pointer-events-auto flex items-center gap-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-2xl shadow-2xl px-4 py-3">
+            <span className="text-sm font-semibold">
+              {selectedIds.size} selected
+            </span>
+            <button
+              onClick={handleBulkCancel}
+              disabled={bulkDeleting}
+              className="flex items-center gap-1.5 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white text-sm font-semibold px-3 py-1.5 rounded-xl transition-colors"
+            >
+              {bulkDeleting ? (
+                'Cancelling…'
+              ) : (
+                <>
+                  <XMarkIcon className="h-4 w-4" />
+                  Cancel {selectedIds.size} request{selectedIds.size !== 1 ? 's' : ''}
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
       <EditRequestModal
         open={!!editingRequest}
         request={editingRequest}
         onConfirm={handleEditConfirm}
         onCancel={() => setEditingRequest(null)}
       />
+      {teamData?.currentUser && teamData?.team && allRequests && (
+        <MemberAutoFillModal
+          open={autoFillOpen}
+          onClose={() => setAutoFillOpen(false)}
+          currentUser={teamData.currentUser}
+          team={teamData.team}
+          allRequests={allRequests as LeaveRequest[]}
+          teamMembers={teamData.members ?? []}
+          remainingBalance={remainingBalance}
+          onApplied={() => mutateRequests()}
+        />
+      )}
     </ProtectedRoute>
   );
 }

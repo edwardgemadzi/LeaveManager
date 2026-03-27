@@ -24,17 +24,19 @@ import { Sparkline } from '@/components/shared/Sparkline';
 import { ProgressRing } from '@/components/shared/ProgressRing';
 import { Timeline } from '@/components/shared/Timeline';
 import { ActivityFeed } from '@/components/shared/ActivityFeed';
-import { 
-  ClockIcon, 
-  CalendarIcon, 
-  CheckCircleIcon, 
-  ChartBarIcon, 
-  ArrowTrendingUpIcon, 
-  UsersIcon, 
+import {
+  ClockIcon,
+  CalendarIcon,
+  CheckCircleIcon,
+  ChartBarIcon,
+  ArrowTrendingUpIcon,
+  UsersIcon,
   ExclamationTriangleIcon,
   DocumentTextIcon,
   BuildingOffice2Icon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
+import MemberAutoFillModal from '@/components/shared/MemberAutoFillModal';
 
 export default function MemberDashboard() {
   const { showNotification } = useBrowserNotification();
@@ -44,7 +46,8 @@ export default function MemberDashboard() {
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState<MemberAnalytics | null>(null);
   const [teamMembers, setTeamMembers] = useState<User[]>([]);
-  
+  const [autoFillOpen, setAutoFillOpen] = useState(false);
+
   // Refs to track notification state and prevent duplicates
   const previousRequestsRef = useRef<LeaveRequest[]>([]);
   const highCompetitionNotifiedRef = useRef(false);
@@ -756,11 +759,32 @@ export default function MemberDashboard() {
                         className="text-indigo-600 dark:text-indigo-400 min-w-0 max-w-full"
                       />
                     </div>
-                    <div className="mt-5 flex flex-wrap gap-2">
+                    {(analytics?.willLose ?? 0) > 0 && (
+                      <div className="mt-4 rounded-xl bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800/50 px-3 py-2.5 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <ExclamationTriangleIcon className="h-4 w-4 text-orange-500 shrink-0" />
+                          <p className="text-xs text-orange-700 dark:text-orange-300 font-medium truncate">
+                            {Math.round(analytics!.willLose)}d at risk — auto-fill can help
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setAutoFillOpen(true)}
+                          className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-600 text-white hover:bg-orange-700 transition-colors"
+                        >
+                          <SparklesIcon className="h-3.5 w-3.5" />
+                          Auto-fill
+                        </button>
+                      </div>
+                    )}
+                    <div className="mt-4 flex flex-wrap gap-2">
                       <Link href="/member/requests" className="btn-primary">
                         <DocumentTextIcon className="h-4 w-4" />
                         Request leave
                       </Link>
+                      <button onClick={() => setAutoFillOpen(true)} className="btn-secondary flex items-center gap-1.5">
+                        <SparklesIcon className="h-4 w-4" />
+                        Auto-fill
+                      </button>
                       <Link href="/member/calendar" className="btn-secondary">
                         <CalendarIcon className="h-4 w-4" />
                         Calendar
@@ -1138,6 +1162,18 @@ export default function MemberDashboard() {
 
         </div>
       </div>
+      )}
+      {user && team && (
+        <MemberAutoFillModal
+          open={autoFillOpen}
+          onClose={() => setAutoFillOpen(false)}
+          currentUser={user}
+          team={team}
+          allRequests={teamLeaveRequests ?? []}
+          teamMembers={teamMembers}
+          remainingBalance={analytics?.remainingLeaveBalance ?? leaveBalance.balance}
+          onApplied={() => mutateDashboard()}
+        />
       )}
     </ProtectedRoute>
   );
