@@ -82,7 +82,7 @@ export default function LeaderRequestsPage() {
   const { data: requestsData, mutate: mutateRequests, isLoading: requestsLoading } = useRequests({
     teamId,
     includeDeleted: true,
-    fields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'decisionNote', 'decisionAt', 'decisionByUsername', 'createdAt', 'updatedAt', 'deletedAt', 'deletedBy', 'requestedBy', 'isHistoricalSubmission', 'submittedByMember'],
+    fields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'decisionNote', 'decisionAt', 'decisionByUsername', 'createdAt', 'updatedAt', 'deletedAt', 'deletedBy', 'requestedBy', 'isHistoricalSubmission', 'submittedByMember', 'requiresMemberConsent', 'memberConsentStatus'],
   });
 
   useEffect(() => {
@@ -911,6 +911,19 @@ export default function LeaderRequestsPage() {
                                 deleted
                               </span>
                             )}
+                            {request.requiresMemberConsent && (
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                                request.memberConsentStatus === 'pending'
+                                  ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300'
+                                  : request.memberConsentStatus === 'accepted'
+                                  ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300'
+                                  : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                              }`}>
+                                {request.memberConsentStatus === 'pending' ? 'Awaiting consent'
+                                  : request.memberConsentStatus === 'accepted' ? 'Member accepted'
+                                  : 'Member declined'}
+                              </span>
+                            )}
                           </div>
                           <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400 mb-2">
                             {parseDateSafe(request.startDate).toLocaleDateString()} - {parseDateSafe(request.endDate).toLocaleDateString()}
@@ -933,7 +946,7 @@ export default function LeaderRequestsPage() {
                           )}
                           <div className="flex items-center flex-wrap gap-2">
                             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                              Requested on {new Date(request.createdAt).toLocaleDateString()}
+                              Requested on {request.createdAt ? new Date(request.createdAt).toLocaleDateString() : '—'}
                             </p>
                             {request.decisionAt && (
                               <p className="text-xs text-zinc-500 dark:text-zinc-400">

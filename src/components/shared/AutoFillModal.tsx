@@ -353,7 +353,7 @@ export default function AutoFillModal({
                 </p>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                   {result.failed === 0
-                    ? 'All leave requests created and approved. Members will be notified.'
+                    ? 'Leave blocks sent to members for consent. They will need to accept before the days are confirmed.'
                     : `${result.failed} failed — they may already have leave or a policy conflict. Check manually.`}
                 </p>
               </div>

@@ -96,8 +96,9 @@ export default function MemberRequestsPage() {
 
   const { data: teamData, isLoading: teamLoading } = useTeamData({ members: 'summary' });
   const { data: allRequests, mutate: mutateRequests, isLoading: requestsLoading } = useRequests({
-    fields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'decisionNote', 'decisionAt', 'decisionByUsername', 'createdAt'],
+    fields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'decisionNote', 'decisionAt', 'decisionByUsername', 'createdAt', 'requestedBy', 'requiresMemberConsent', 'memberConsentStatus'],
   });
+  const [consentLoading, setConsentLoading] = useState<string | null>(null);
 
   useEffect(() => {
     const run = async () => {
@@ -419,6 +420,32 @@ export default function MemberRequestsPage() {
     }
   };
 
+  async function handleConsent(requestId: string, action: 'accept' | 'decline') {
+    setConsentLoading(requestId);
+    try {
+      const res = await fetch(`/api/leave-requests/${requestId}/consent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      if (res.ok) {
+        showSuccess(action === 'accept' ? 'Leave accepted' : 'Leave declined');
+        mutateRequests();
+      } else {
+        const data = await res.json();
+        showError(data.error || 'Failed to update consent');
+      }
+    } catch {
+      showError('Network error');
+    } finally {
+      setConsentLoading(null);
+    }
+  }
+
+  const consentPendingRequests = myRequests.filter(
+    (r) => r.requiresMemberConsent && r.memberConsentStatus === 'pending'
+  );
+
   return (
     <ProtectedRoute requiredRole="member">
       {loading ? (
@@ -672,6 +699,53 @@ export default function MemberRequestsPage() {
           </div>
         )}
 
+        {/* Action Required — consent pending section */}
+        {consentPendingRequests.length > 0 && (
+          <div className="mb-6 rounded-2xl border-2 border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/20 overflow-hidden">
+            <div className="px-4 py-3 border-b border-amber-200 dark:border-amber-800/50 flex items-center gap-2">
+              <ExclamationTriangleIcon className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                Action Required — {consentPendingRequests.length} leave request{consentPendingRequests.length !== 1 ? 's' : ''} need your consent
+              </p>
+            </div>
+            <div className="divide-y divide-amber-100 dark:divide-amber-900/40">
+              {consentPendingRequests.map((req) => (
+                <div key={req._id} className="px-4 py-3 flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                      {parseDateSafe(req.startDate).toLocaleDateString()} – {parseDateSafe(req.endDate).toLocaleDateString()}
+                    </p>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 truncate">{req.reason} · Scheduled by your leader</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => handleConsent(req._id!, 'accept')}
+                      disabled={consentLoading === req._id}
+                      className="btn-success text-xs px-3 py-1.5 disabled:opacity-50 flex items-center gap-1"
+                    >
+                      <CheckIcon className="h-3.5 w-3.5" />
+                      Accept
+                    </button>
+                    <button
+                      onClick={() => handleConsent(req._id!, 'decline')}
+                      disabled={consentLoading === req._id}
+                      className="btn-danger text-xs px-3 py-1.5 disabled:opacity-50 flex items-center gap-1"
+                    >
+                      <XMarkIcon className="h-3.5 w-3.5" />
+                      Decline
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="px-4 py-2.5 bg-amber-50/80 dark:bg-amber-950/30 border-t border-amber-100 dark:border-amber-900/40">
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                Your leader has scheduled these leave days on your behalf. Accept to confirm or decline if you&apos;re unavailable.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Requests list */}
         <div className="rounded-[32px] border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden lg:h-[calc(100vh-220px)] lg:overflow-hidden">
           <div className="p-5 sm:p-6 border-b border-zinc-200/70 dark:border-zinc-800/70 flex items-center justify-between gap-3">
@@ -740,7 +814,7 @@ export default function MemberRequestsPage() {
                           </div>
                           <p className="text-sm text-zinc-600 dark:text-zinc-300 mt-1 line-clamp-2">{request.reason}</p>
                           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-                            <span>Requested {new Date(request.createdAt).toLocaleDateString()}</span>
+                            <span>Requested {request.createdAt ? new Date(request.createdAt).toLocaleDateString() : '—'}</span>
                             {request.decisionAt ? (
                               <span>
                                 · Decided {new Date(request.decisionAt).toLocaleDateString()}

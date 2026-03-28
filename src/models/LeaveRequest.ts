@@ -340,6 +340,26 @@ export class LeaveRequestModel {
     );
   }
 
+  static async updateConsentStatus(
+    id: string,
+    action: 'accepted' | 'declined',
+  ): Promise<void> {
+    const db = await getDatabase();
+    const requests = db.collection<LeaveRequest>('leaveRequests');
+    const objectId = new ObjectId(id);
+    await requests.updateOne(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { _id: objectId } as any,
+      {
+        $set: {
+          memberConsentStatus: action,
+          status: action === 'accepted' ? 'approved' : 'rejected',
+          updatedAt: new Date(),
+        },
+      }
+    );
+  }
+
   static async createIndexes(): Promise<void> {
     const db = await getDatabaseRaw();
     const requests = db.collection<LeaveRequest>('leaveRequests');

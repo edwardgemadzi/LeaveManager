@@ -39,6 +39,29 @@ function toShortBannerName(name: string): string {
   return `${trimmed.slice(0, 4)}...`;
 }
 
+function buildPreviewEvents(previewDates: Array<{ startDate: string; endDate: string }> | null | undefined): CalendarEvent[] {
+  if (!previewDates || previewDates.length === 0) return [];
+  const events: CalendarEvent[] = [];
+  previewDates.forEach((block, idx) => {
+    const start = new Date(block.startDate + 'T00:00:00');
+    const end = new Date(block.endDate + 'T00:00:00');
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      events.push({
+        id: `preview-${idx}-${d.toISOString().split('T')[0]}`,
+        title: 'Preview',
+        start: new Date(d),
+        end: new Date(d),
+        resource: {
+          status: 'preview',
+          userId: 'preview',
+          username: 'Preview',
+        },
+      });
+    }
+  });
+  return events;
+}
+
 type LeaveDateConstraintDay = {
   selectable: boolean;
   codes: string[];
@@ -49,7 +72,7 @@ interface CalendarProps {
   teamId: string;
   members: User[];
   currentUser?: User; // Current logged-in user (for highlighting working days)
-  teamSettings?: { 
+  teamSettings?: {
     minimumNoticePeriod: number;
     bypassNoticePeriod?: { enabled: boolean; startDate?: Date | string; endDate?: Date | string };
     maternityLeave?: { countingMethod?: 'calendar' | 'working' };
@@ -57,9 +80,10 @@ interface CalendarProps {
   }; // Optional: team settings (if provided, skip fetching)
   initialRequests?: LeaveRequest[]; // Optional: initial requests (if provided, skip fetching)
   onMemberSelectionChange?: (summary: { selectionMode: boolean; selectedCount: number; clearSelection: () => void }) => void;
+  previewDates?: Array<{ startDate: string; endDate: string }>;
 }
 
-export default function TeamCalendar({ teamId, members, currentUser, teamSettings: providedTeamSettings, initialRequests, onMemberSelectionChange }: CalendarProps) {
+export default function TeamCalendar({ teamId, members, currentUser, teamSettings: providedTeamSettings, initialRequests, onMemberSelectionChange, previewDates }: CalendarProps) {
   const { showSuccess, showError, showInfo } = useNotification();
   const { showNotification: showBrowserNotification } = useBrowserNotification();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -75,6 +99,8 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const selectionForEventsRef = useRef({ selectionMode: false, selectedDates: [] as Date[] });
   selectionForEventsRef.current = { selectionMode, selectedDates };
+  const previewDatesRef = useRef(previewDates);
+  previewDatesRef.current = previewDates;
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [teamSettings, setTeamSettings] = useState<{
     minimumNoticePeriod: number;
@@ -331,11 +357,40 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
         }
       });
 
-      setEvents(mobileMonthEvents);
+      const previewEvts = buildPreviewEvents(previewDatesRef.current);
+      setEvents([...mobileMonthEvents, ...previewEvts]);
       return;
     }
-    setEvents(calendarEvents);
+    const previewEvts = buildPreviewEvents(previewDatesRef.current);
+    setEvents([...calendarEvents, ...previewEvts]);
   }, [members, providedTeamSettings, isMobile, currentView]);
+
+  // Merge preview dates into events
+  useEffect(() => {
+    if (!previewDates || previewDates.length === 0) return;
+    const previewEvents: CalendarEvent[] = [];
+    previewDates.forEach((block, idx) => {
+      const start = new Date(block.startDate + 'T00:00:00');
+      const end = new Date(block.endDate + 'T00:00:00');
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        previewEvents.push({
+          id: `preview-${idx}-${d.toISOString().split('T')[0]}`,
+          title: 'Preview',
+          start: new Date(d),
+          end: new Date(d),
+          resource: {
+            status: 'preview',
+            userId: 'preview',
+            username: 'Preview',
+          },
+        });
+      }
+    });
+    setEvents((prev) => {
+      const nonPreview = prev.filter((e) => e.resource.status !== 'preview');
+      return [...nonPreview, ...previewEvents];
+    });
+  }, [previewDates]);
 
   useEffect(() => {
     // Use provided initialRequests if available (including empty array for filtered results)
@@ -431,6 +486,19 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
       // Fallback
       return '#3174ad'; // Default blue
     };
+
+    if (event.resource.status === 'preview') {
+      return {
+        style: {
+          backgroundColor: '#e6f9ed',
+          borderRadius: '5px',
+          opacity: 0.9,
+          color: '#166534',
+          border: '2px dashed #166534',
+          display: 'block',
+        },
+      };
+    }
 
     const backgroundColor = getEventColor(reason, event.resource.isEmergency || false, event.resource.status);
 

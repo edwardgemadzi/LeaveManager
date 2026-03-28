@@ -56,7 +56,7 @@ export default function MemberDashboard() {
 
   const { data: dashboardData, mutate: mutateDashboard, isLoading: dashboardLoading } = useDashboardData({
     include: ['team', 'requests', 'analytics', 'currentUser', 'members'],
-    requestFields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'decisionNote', 'decisionAt', 'decisionByUsername', 'createdAt'],
+    requestFields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'decisionNote', 'decisionAt', 'decisionByUsername', 'createdAt', 'updatedAt'],
   });
 
   const { data: teamLeaveRequests } = useRequests({
@@ -650,16 +650,21 @@ export default function MemberDashboard() {
 
             const recentActivity = myRequests
               .slice()
-              .sort((a, b) => parseDateSafe(b.updatedAt).getTime() - parseDateSafe(a.updatedAt).getTime())
+              .sort((a, b) => {
+                const tA = (a.updatedAt || a.createdAt) ? parseDateSafe(a.updatedAt || a.createdAt).getTime() : 0;
+                const tB = (b.updatedAt || b.createdAt) ? parseDateSafe(b.updatedAt || b.createdAt).getTime() : 0;
+                return tB - tA;
+              })
               .slice(0, 6)
               .map((r) => {
                 const tone: 'success' | 'danger' | 'warning' =
                   r.status === 'approved' ? 'success' : r.status === 'rejected' ? 'danger' : 'warning';
+                const activityDate = r.updatedAt || r.createdAt;
                 return {
                   id: r._id || `${r.userId}-${r.status}`,
                   title: `${r.status[0].toUpperCase()}${r.status.slice(1)} request`,
                   description: `${parseDateSafe(r.startDate).toLocaleDateString()} \u2013 ${parseDateSafe(r.endDate).toLocaleDateString()}${r.reason ? ` \u00b7 ${r.reason}` : ''}`,
-                  time: parseDateSafe(r.updatedAt).toLocaleDateString(),
+                  time: activityDate ? parseDateSafe(activityDate).toLocaleDateString() : '—',
                   tone,
                 };
               });

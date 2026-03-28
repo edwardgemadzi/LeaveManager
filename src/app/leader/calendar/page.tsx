@@ -209,7 +209,7 @@ export default function LeaderCalendarPage() {
     <div className="min-h-screen bg-white dark:bg-zinc-950">
       <Navbar />
       
-      <div className="w-full px-0 sm:px-6 pt-16 lg:pt-20 lg:pl-24 pb-6 lg:h-[calc(100vh-5rem)] app-page-shell">
+      <div className="w-full px-0 sm:px-6 pt-16 lg:pt-20 lg:pl-24 pb-24 lg:pb-6 lg:h-[calc(100vh-5rem)] app-page-shell">
         {/* Page header */}
         <div className="flex items-center justify-between py-5 border-b border-zinc-200 dark:border-zinc-800 mb-6 px-4 sm:px-0">
           <div>

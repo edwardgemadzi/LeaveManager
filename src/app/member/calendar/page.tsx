@@ -5,12 +5,17 @@ import Link from 'next/link';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import TeamCalendar from '@/components/shared/Calendar';
+import MemberAutoFillModal from '@/components/shared/MemberAutoFillModal';
 import { Team, User, LeaveRequest } from '@/types';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
 import { useTeamData } from '@/hooks/useTeamData';
 import { useRequests } from '@/hooks/useRequests';
 import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
-import { FunnelIcon } from '@heroicons/react/24/outline';
+import { calculateLeaveBalance } from '@/lib/leaveCalculations';
+import { parseDateSafe } from '@/lib/dateUtils';
+import { getEffectiveManualYearToDateUsed } from '@/lib/yearOverrides';
+import { LEAVE_REASONS } from '@/lib/leaveReasons';
+import { FunnelIcon, SparklesIcon, CheckCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 type CalendarFilter = 'all' | 'my-leave' | 'same-working-days';
 
@@ -22,6 +27,10 @@ export default function MemberCalendarPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<CalendarFilter>('all');
   const [localUser, setLocalUser] = useState<User | null>(null);
+  const [previewDates, setPreviewDates] = useState<Array<{ startDate: string; endDate: string }> | null>(null);
+  const [autoFillOpen, setAutoFillOpen] = useState(false);
+  const [previewReason, setPreviewReason] = useState('Annual leave');
+  const [previewSubmitting, setPreviewSubmitting] = useState(false);
 
   const [allRequests, setAllRequests] = useState<LeaveRequest[]>([]);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -38,6 +47,15 @@ export default function MemberCalendarPage() {
   useEffect(() => {
     const userData = JSON.parse(localStorage.getItem('user') || '{}');
     setLocalUser(userData);
+
+    const preview = localStorage.getItem('autofill_preview');
+    if (preview) {
+      try {
+        setPreviewDates(JSON.parse(preview));
+      } catch {
+        // ignore malformed data
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -149,6 +167,46 @@ export default function MemberCalendarPage() {
     });
   }, [members, filteredRequests, filter, user]);
 
+  const remainingBalance = useMemo(() => {
+    const t = teamData?.team;
+    const cu = teamData?.currentUser || user;
+    if (!t || !cu || !allRequests) return 0;
+    const approved = allRequests
+      .filter((r) => r.status === 'approved' && String(r.userId) === String(cu._id))
+      .map((r) => ({ startDate: parseDateSafe(r.startDate), endDate: parseDateSafe(r.endDate), reason: r.reason }));
+    return calculateLeaveBalance(
+      t.settings.maxLeavePerYear,
+      approved,
+      cu,
+      cu.manualLeaveBalance,
+      getEffectiveManualYearToDateUsed(cu),
+      t.settings.carryoverSettings,
+      t.settings.accrual,
+    );
+  }, [teamData, user, allRequests]);
+
+  async function handlePreviewSubmit() {
+    if (!previewDates?.length || !previewReason) return;
+    setPreviewSubmitting(true);
+    try {
+      const res = await fetch('/api/leave-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reason: previewReason,
+          segments: previewDates,
+        }),
+      });
+      if (res.ok) {
+        localStorage.removeItem('autofill_preview');
+        setPreviewDates(null);
+        mutateRequests();
+      }
+    } finally {
+      setPreviewSubmitting(false);
+    }
+  }
+
   return (
     <ProtectedRoute requiredRole="member">
       {loading ? (
@@ -159,7 +217,7 @@ export default function MemberCalendarPage() {
     <div className="min-h-screen bg-white dark:bg-zinc-950">
       <Navbar />
       
-      <div className="w-full px-0 sm:px-6 pt-16 lg:pt-20 lg:pl-24 pb-6 lg:h-[calc(100vh-5rem)] app-page-shell">
+      <div className="w-full px-0 sm:px-6 pt-16 lg:pt-20 lg:pl-24 pb-24 lg:pb-6 lg:h-[calc(100vh-5rem)] app-page-shell">
         {/* Page header */}
         <div className="flex items-center justify-between py-5 border-b border-zinc-200 dark:border-zinc-800 mb-6 px-4 sm:px-0">
           <div>
@@ -175,6 +233,14 @@ export default function MemberCalendarPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setAutoFillOpen(true)}
+              className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1.5"
+            >
+              <SparklesIcon className="h-3.5 w-3.5" />
+              Auto-fill
+            </button>
             <FunnelIcon className="h-4 w-4 text-zinc-400 dark:text-zinc-500" />
             <select
               value={filter}
@@ -192,12 +258,60 @@ export default function MemberCalendarPage() {
           <div className="lg:col-span-9 min-w-0">
             <div className="card rounded-none sm:rounded-2xl relative z-10 border-x-0 sm:border-x shadow-none sm:shadow min-w-0 overflow-visible">
               <div className="px-0 sm:px-6 py-2 sm:py-8 relative z-10">
+                {previewDates && previewDates.length > 0 && (
+                  <div className="mb-4 rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/20 overflow-hidden">
+                    {/* Banner header */}
+                    <div className="px-4 py-3 flex items-center justify-between gap-3 border-b border-emerald-100 dark:border-emerald-900/40">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <SparklesIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+                          {previewDates.length} autofill block{previewDates.length !== 1 ? 's' : ''} ready to submit
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => { localStorage.removeItem('autofill_preview'); setPreviewDates(null); }}
+                        className="p-1 rounded text-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-200 shrink-0"
+                        aria-label="Dismiss preview"
+                      >
+                        <XMarkIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                    {/* Reason + submit */}
+                    <div className="px-4 py-3 flex flex-wrap items-center gap-3">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <label className="text-xs font-medium text-emerald-700 dark:text-emerald-400 shrink-0">Reason</label>
+                        <select
+                          value={previewReason}
+                          onChange={(e) => setPreviewReason(e.target.value)}
+                          className="input-modern py-1 text-sm flex-1 min-w-0"
+                        >
+                          {LEAVE_REASONS.map((r) => (
+                            <option key={r.value} value={r.label}>{r.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handlePreviewSubmit}
+                        disabled={previewSubmitting}
+                        className="btn-primary text-sm px-4 py-1.5 shrink-0 flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        {previewSubmitting ? (
+                          <span className="h-3.5 w-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin inline-block" />
+                        ) : (
+                          <CheckCircleIcon className="h-3.5 w-3.5" />
+                        )}
+                        {previewSubmitting ? 'Submitting…' : 'Submit leave'}
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {team?._id ? (
-                  <TeamCalendar 
-                    teamId={team._id} 
-                    members={filteredMembers} 
+                  <TeamCalendar
+                    teamId={team._id}
+                    members={filteredMembers}
                     currentUser={user || undefined}
-                    teamSettings={team?.settings ? { 
+                    teamSettings={team?.settings ? {
                       minimumNoticePeriod: team.settings.minimumNoticePeriod || 1,
                       bypassNoticePeriod: team.settings.bypassNoticePeriod,
                       maternityLeave: team.settings.maternityLeave,
@@ -205,6 +319,7 @@ export default function MemberCalendarPage() {
                     } : undefined}
                     initialRequests={filteredRequests}
                     onMemberSelectionChange={setSelectionSummary}
+                    previewDates={previewDates || undefined}
                   />
                 ) : (
                   <div className="flex items-center justify-center h-64">
@@ -306,6 +421,22 @@ export default function MemberCalendarPage() {
         ) : null}
       </div>
     </div>
+      )}
+      {teamData?.currentUser && teamData?.team && allRequests && (
+        <MemberAutoFillModal
+          open={autoFillOpen}
+          onClose={() => setAutoFillOpen(false)}
+          currentUser={teamData.currentUser}
+          team={teamData.team}
+          allRequests={allRequests as LeaveRequest[]}
+          teamMembers={teamData.members ?? []}
+          remainingBalance={remainingBalance}
+          onApplied={() => mutateRequests()}
+          onPreview={(blocks) => {
+            setPreviewDates(blocks);
+            setAutoFillOpen(false);
+          }}
+        />
       )}
     </ProtectedRoute>
   );

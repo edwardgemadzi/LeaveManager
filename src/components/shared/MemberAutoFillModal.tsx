@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { isWorkingDay } from '@/lib/leaveCalculations';
 import { LeaveRequest, Team, User } from '@/types';
 import {
@@ -47,6 +48,8 @@ export interface MemberAutoFillModalProps {
   teamMembers: User[];
   remainingBalance: number;
   onApplied: () => void;
+  /** If provided, "View in Calendar" calls this instead of navigating away */
+  onPreview?: (blocks: Array<{ startDate: string; endDate: string }>) => void;
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -342,6 +345,7 @@ export default function MemberAutoFillModal({
   teamMembers,
   remainingBalance,
   onApplied,
+  onPreview,
 }: MemberAutoFillModalProps) {
   const noticePeriod = team.settings.minimumNoticePeriod || 0;
   const today = new Date();
@@ -362,6 +366,7 @@ export default function MemberAutoFillModal({
     excludedDays: [],
   };
 
+  const router = useRouter();
   const [step, setStep] = useState<Step>('customise');
   const [opts, setOpts] = useState<AutoFillOptions>(defaultOpts);
   const [blocks, setBlocks] = useState<Block[]>([]);
@@ -838,6 +843,22 @@ export default function MemberAutoFillModal({
             <>
               <button onClick={() => setStep('customise')} className="btn-secondary text-sm px-4 py-2">
                 Back
+              </button>
+              <button
+                onClick={() => {
+                  const selectedBlocks = blocks.filter((b) => b.selected).map((b) => ({ startDate: b.startDate, endDate: b.endDate }));
+                  if (onPreview) {
+                    onPreview(selectedBlocks);
+                    handleClose();
+                  } else {
+                    localStorage.setItem('autofill_preview', JSON.stringify(selectedBlocks));
+                    router.push('/member/calendar');
+                  }
+                }}
+                disabled={selectedDays === 0}
+                className="btn-secondary text-sm px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                View in Calendar
               </button>
               <button
                 onClick={apply}

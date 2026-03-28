@@ -3,9 +3,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
-import { User, Team } from '@/types';
+import { User, Team, LeaveRequest } from '@/types';
 import { detectPartialOverlap, generateWorkingDaysTag } from '@/lib/analyticsCalculations';
 import { isWorkingDay } from '@/lib/leaveCalculations';
+import { useRequests } from '@/hooks/useRequests';
 import {
   UsersIcon,
   SunIcon,
@@ -110,28 +111,74 @@ function displayName(m: User) {
   return m.fullName || m.username;
 }
 
-// Mini pattern visualization — blocks for rotating, day chips for fixed
+// ─── leave status helper ──────────────────────────────────────────────────────
+
+type LeaveStatus = 'on_leave' | 'soon' | null;
+
+function getLeaveStatus(memberId: string, requests: LeaveRequest[]): { status: LeaveStatus; startDate?: Date } {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  endOfMonth.setHours(23, 59, 59, 999);
+
+  let soonest: Date | null = null;
+
+  for (const req of requests) {
+    if (req.status !== 'approved') continue;
+    if (String(req.userId) !== String(memberId)) continue;
+    const start = new Date(req.startDate);
+    const end = new Date(req.endDate);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    // Currently on leave
+    if (start <= today && end >= today) return { status: 'on_leave', startDate: start };
+    // Leave starting within this calendar month
+    if (start > today && start <= endOfMonth) {
+      if (!soonest || start < soonest) soonest = start;
+    }
+  }
+  if (soonest) return { status: 'soon', startDate: soonest };
+  return { status: null };
+}
+
+// Mini pattern visualization — shows today + next 3 days for any schedule type
 function MiniPattern({ member }: { member: User }) {
   const s = member.shiftSchedule;
   const meta = shiftTagMeta(member.shiftTag);
   if (!s) return <span className="text-[10px] text-zinc-400">No schedule</span>;
 
-  if (s.type === 'rotating') {
-    return (
-      <div className="flex items-center gap-0.5">
-        {s.pattern.map((on, i) => (
-          <span
-            key={i}
-            className={`w-2.5 h-4 rounded-sm ${on ? meta.activeDay : meta.inactiveDay}`}
-          />
-        ))}
-      </div>
-    );
-  }
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
 
-  const days = s.pattern.slice(0, 7).map((on, i) => on ? DAY_SHORT[i] : null).filter(Boolean);
+  const blocks = [0, 1, 2, 3, 4, 5, 6].map((offset) => {
+    const d = new Date(now);
+    d.setDate(now.getDate() + offset);
+
+    let on: boolean;
+    if (s.type === 'rotating') {
+      const cycleStart = new Date(s.startDate);
+      cycleStart.setHours(0, 0, 0, 0);
+      const daysSince = Math.floor((d.getTime() - cycleStart.getTime()) / 86400000);
+      const idx = ((daysSince % s.pattern.length) + s.pattern.length) % s.pattern.length;
+      on = s.pattern[idx] ?? false;
+    } else {
+      const jsDay = d.getDay();
+      const patIdx = jsDay === 0 ? 6 : jsDay - 1;
+      on = s.pattern[patIdx] ?? false;
+    }
+
+    return { on, isToday: offset === 0 };
+  });
+
   return (
-    <span className={`text-[10px] font-medium ${meta.muted}`}>{days.join(' · ')}</span>
+    <div className="flex items-center gap-0.5">
+      {blocks.map(({ on, isToday }, i) => (
+        <span
+          key={i}
+          className={`rounded-sm transition-all ${on ? meta.activeDay : meta.inactiveDay} ${isToday ? 'w-2.5 h-5' : 'w-2 h-3.5'}`}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -161,40 +208,73 @@ function ScheduleHero({ user }: { user: User }) {
           </div>
         </div>
 
-        {/* Visual pattern */}
+        {/* Visual pattern — always shows today + next 3 days */}
         <div className="flex-1">
-          {s?.type === 'fixed' && (
-            <div className="flex gap-1.5">
-              {DAY_SHORT.map((day, i) => {
-                const on = s.pattern[i] ?? false;
-                return (
-                  <div key={day} className="flex-1 flex flex-col items-center gap-1">
-                    <span className={`text-[10px] font-semibold ${on ? meta.color : 'text-zinc-400 dark:text-zinc-600'}`}>
-                      {day}
-                    </span>
-                    <span className={`w-full h-2 rounded-full ${on ? meta.activeDay : meta.inactiveDay}`} />
+          {s && (() => {
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+
+            // For each offset 0-3, determine if that day is a working day
+            const upcoming = [0, 1, 2, 3, 4, 5, 6].map((offset) => {
+              const d = new Date(now);
+              d.setDate(now.getDate() + offset);
+
+              let on: boolean;
+              if (s.type === 'rotating') {
+                const cycleStart = new Date(s.startDate);
+                cycleStart.setHours(0, 0, 0, 0);
+                const daysSince = Math.floor((d.getTime() - cycleStart.getTime()) / 86400000);
+                const idx = ((daysSince % s.pattern.length) + s.pattern.length) % s.pattern.length;
+                on = s.pattern[idx] ?? false;
+              } else {
+                // fixed: pattern[0]=Mon … pattern[6]=Sun
+                const jsDay = d.getDay(); // 0=Sun
+                const patIdx = jsDay === 0 ? 6 : jsDay - 1;
+                on = s.pattern[patIdx] ?? false;
+              }
+
+              const label = offset === 0
+                ? 'Today'
+                : d.toLocaleDateString(undefined, { weekday: 'short' });
+
+              return { on, label, offset };
+            });
+
+            return (
+              <div className="flex items-end gap-3">
+                {/* 4-day blocks */}
+                <div className="flex gap-2 items-end">
+                  {upcoming.map(({ on, label, offset }) => (
+                    <div key={offset} className="flex flex-col items-center gap-1">
+                      <span className={`text-[10px] font-bold leading-none ${offset === 0 ? meta.color : 'text-zinc-400 dark:text-zinc-600'}`}>
+                        {label}
+                      </span>
+                      <span
+                        className={`rounded-md transition-all ${on ? meta.activeDay : meta.inactiveDay} ${offset === 0 ? 'w-6 h-10' : 'w-5 h-7'}`}
+                      />
+                      {/* dot under today */}
+                      {offset === 0
+                        ? <span className={`w-1.5 h-1.5 rounded-full ${meta.activeDay}`} />
+                        : <span className="w-1.5 h-1.5" />
+                      }
+                    </div>
+                  ))}
+                </div>
+
+                {/* Cycle stats (rotating only) */}
+                {s.type === 'rotating' && (
+                  <div className="mb-2">
+                    <p className={`text-sm font-semibold leading-tight ${meta.color}`}>
+                      {s.pattern.filter(Boolean).length} on · {s.pattern.filter(b => !b).length} off
+                    </p>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                      {s.pattern.length}-day cycle
+                    </p>
                   </div>
-                );
-              })}
-            </div>
-          )}
-          {s?.type === 'rotating' && (
-            <div className="flex items-center gap-3">
-              <div className="flex gap-1">
-                {s.pattern.map((on, i) => (
-                  <span key={i} className={`w-5 h-7 rounded-md ${on ? meta.activeDay : meta.inactiveDay}`} />
-                ))}
+                )}
               </div>
-              <div>
-                <p className={`text-sm font-semibold ${meta.color}`}>
-                  {s.pattern.filter(Boolean).length} on · {s.pattern.filter(b => !b).length} off
-                </p>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                  {s.pattern.length}-day cycle
-                </p>
-              </div>
-            </div>
-          )}
+            );
+          })()}
           {!s && <p className="text-sm text-zinc-400 dark:text-zinc-500 italic">No schedule assigned</p>}
         </div>
 
@@ -223,7 +303,24 @@ function ScheduleHero({ user }: { user: User }) {
 
 // ─── member card (colleague grid) ────────────────────────────────────────────
 
-function MemberCard({ member }: { member: User }) {
+function LeavePill({ status, startDate }: { status: LeaveStatus; startDate?: Date }) {
+  if (!status) return null;
+  if (status === 'on_leave') return (
+    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-400">
+      On leave
+    </span>
+  );
+  const label = startDate
+    ? `Leave ${startDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+    : 'Leave soon';
+  return (
+    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 text-amber-700 dark:text-amber-400">
+      {label}
+    </span>
+  );
+}
+
+function MemberCard({ member, leaveStatus, leaveDate }: { member: User; leaveStatus: LeaveStatus; leaveDate?: Date }) {
   const meta = shiftTagMeta(member.shiftTag);
   const Icon = meta.Icon;
   return (
@@ -237,8 +334,9 @@ function MemberCard({ member }: { member: User }) {
         <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate leading-tight">
           {displayName(member)}
         </p>
-        <div className="mt-1">
+        <div className="mt-1 flex items-center gap-1.5 flex-wrap">
           <MiniPattern member={member} />
+          <LeavePill status={leaveStatus} startDate={leaveDate} />
         </div>
       </div>
       {/* Shift badge */}
@@ -251,7 +349,7 @@ function MemberCard({ member }: { member: User }) {
 
 // ─── swap candidate row (richer) ─────────────────────────────────────────────
 
-function SwapRow({ member, bestMatch }: { member: User; bestMatch?: boolean }) {
+function SwapRow({ member, bestMatch, leaveStatus, leaveDate }: { member: User; bestMatch?: boolean; leaveStatus: LeaveStatus; leaveDate?: Date }) {
   const meta = shiftTagMeta(member.shiftTag);
   const Icon = meta.Icon;
   return (
@@ -263,8 +361,9 @@ function SwapRow({ member, bestMatch }: { member: User; bestMatch?: boolean }) {
         <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate leading-tight">
           {displayName(member)}
         </p>
-        <div className="mt-0.5">
+        <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
           <MiniPattern member={member} />
+          <LeavePill status={leaveStatus} startDate={leaveDate} />
         </div>
       </div>
       <div className="shrink-0 flex flex-col items-end gap-1">
@@ -289,6 +388,10 @@ export default function MemberTeamPage() {
   const [team,        setTeam]        = useState<Team | null>(null);
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState<string | null>(null);
+
+  const { data: teamRequests } = useRequests({
+    fields: ['_id', 'userId', 'startDate', 'endDate', 'status'],
+  });
 
   useEffect(() => {
     async function load() {
@@ -337,11 +440,11 @@ export default function MemberTeamPage() {
   return (
     <ProtectedRoute requiredRole="member">
       <Navbar />
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 lg:pl-24">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-20 pb-28 lg:pt-8 lg:pb-10 space-y-4">
+      <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-zinc-50 dark:bg-zinc-950 lg:pl-24">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-20 pb-28 lg:pt-8 lg:pb-6 space-y-4 lg:space-y-0 lg:flex lg:flex-col lg:h-full lg:gap-4">
 
           {/* Page header */}
-          <div className="flex items-baseline justify-between">
+          <div className="flex items-baseline justify-between lg:shrink-0">
             <div>
               <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">My Team</h1>
               <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">Your schedule and who you work with</p>
@@ -355,7 +458,7 @@ export default function MemberTeamPage() {
 
           {/* Loading skeletons */}
           {loading && (
-            <div className="space-y-4">
+            <div className="space-y-4 lg:shrink-0">
               <div className="h-20 rounded-2xl bg-zinc-200 dark:bg-zinc-800 animate-pulse" />
               <div className="grid lg:grid-cols-3 gap-4">
                 {[1,2,3].map(i => <div key={i} className="h-48 rounded-2xl bg-zinc-200 dark:bg-zinc-800 animate-pulse" />)}
@@ -374,14 +477,16 @@ export default function MemberTeamPage() {
           {!loading && !error && currentUser && (
             <>
               {/* Schedule hero — full width */}
-              <ScheduleHero user={currentUser} />
+              <div className="lg:shrink-0">
+                <ScheduleHero user={currentUser} />
+              </div>
 
               {/* Three-panel row */}
-              <div className="grid lg:grid-cols-3 gap-4 lg:items-start">
+              <div className="grid lg:grid-cols-3 gap-4 lg:items-start lg:flex-1 lg:min-h-0">
 
                 {/* ── Colleagues ── */}
-                <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden">
-                  <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden flex flex-col max-h-[420px] lg:max-h-none lg:h-full">
+                  <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-2">
                       <UsersIcon className="h-4 w-4 text-zinc-400 dark:text-zinc-500" />
                       <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">Working With You</p>
@@ -393,15 +498,18 @@ export default function MemberTeamPage() {
                   {colleagues.length === 0 ? (
                     <p className="px-4 py-6 text-sm text-center text-zinc-400 dark:text-zinc-500">No one shares your exact schedule.</p>
                   ) : (
-                    <div className="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2">
-                      {colleagues.map((m) => <MemberCard key={String(m._id)} member={m} />)}
+                    <div className="flex-1 overflow-y-auto overscroll-contain divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                      {colleagues.map((m) => {
+                        const { status, startDate } = getLeaveStatus(String(m._id), teamRequests ?? []);
+                        return <SwapRow key={String(m._id)} member={m} leaveStatus={status} leaveDate={startDate} />;
+                      })}
                     </div>
                   )}
                 </div>
 
                 {/* ── Opposite schedule (best match) ── */}
-                <div className="rounded-2xl border border-emerald-200 dark:border-emerald-900/50 bg-white dark:bg-zinc-900 overflow-hidden">
-                  <div className="px-4 py-3 border-b border-emerald-100 dark:border-emerald-900/40 bg-emerald-50/50 dark:bg-emerald-950/20 flex items-center justify-between">
+                <div className="rounded-2xl border border-emerald-200 dark:border-emerald-900/50 bg-white dark:bg-zinc-900 overflow-hidden flex flex-col max-h-[420px] lg:max-h-none lg:h-full">
+                  <div className="px-4 py-3 border-b border-emerald-100 dark:border-emerald-900/40 bg-emerald-50/50 dark:bg-emerald-950/20 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-2">
                       <ArrowsRightLeftIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                       <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">Opposite Schedule</p>
@@ -413,15 +521,18 @@ export default function MemberTeamPage() {
                   {complementary.length === 0 ? (
                     <p className="px-4 py-6 text-sm text-center text-zinc-400 dark:text-zinc-500">No one works your exact off days.</p>
                   ) : (
-                    <div className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
-                      {complementary.map((m) => <SwapRow key={String(m._id)} member={m} bestMatch />)}
+                    <div className="flex-1 overflow-y-auto overscroll-contain divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                      {complementary.map((m) => {
+                        const { status, startDate } = getLeaveStatus(String(m._id), teamRequests ?? []);
+                        return <SwapRow key={String(m._id)} member={m} bestMatch leaveStatus={status} leaveDate={startDate} />;
+                      })}
                     </div>
                   )}
                 </div>
 
                 {/* ── Shared days ── */}
-                <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden">
-                  <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+                <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden flex flex-col max-h-[420px] lg:max-h-none lg:h-full">
+                  <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-2">
                       <ArrowsRightLeftIcon className="h-4 w-4 text-zinc-400 dark:text-zinc-500" />
                       <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">Shared Days</p>
@@ -433,8 +544,11 @@ export default function MemberTeamPage() {
                   {partialOverlap.length === 0 ? (
                     <p className="px-4 py-6 text-sm text-center text-zinc-400 dark:text-zinc-500">No one shares working days with you.</p>
                   ) : (
-                    <div className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
-                      {partialOverlap.map((m) => <SwapRow key={String(m._id)} member={m} />)}
+                    <div className="flex-1 overflow-y-auto overscroll-contain divide-y divide-zinc-100 dark:divide-zinc-800/60">
+                      {partialOverlap.map((m) => {
+                        const { status, startDate } = getLeaveStatus(String(m._id), teamRequests ?? []);
+                        return <SwapRow key={String(m._id)} member={m} leaveStatus={status} leaveDate={startDate} />;
+                      })}
                     </div>
                   )}
                 </div>

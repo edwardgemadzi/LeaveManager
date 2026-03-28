@@ -76,6 +76,8 @@ export async function getLeaveRequests(
     'deletedBy',
     'isHistoricalSubmission',
     'submittedByMember',
+    'requiresMemberConsent',
+    'memberConsentStatus',
   ]);
   const fields = fieldsParam
     ? fieldsParam
@@ -434,6 +436,8 @@ export async function createLeaveRequest(params: {
             reason,
             status: 'pending',
             requestedBy: requestedFor ? user.id : undefined,
+            requiresMemberConsent: requestedFor ? true : undefined,
+            memberConsentStatus: requestedFor ? 'pending' : undefined,
           },
           session
         );

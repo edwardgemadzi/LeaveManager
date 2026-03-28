@@ -178,6 +178,8 @@ export interface LeaveRequest {
   reminderLeaderOffsetsSent?: number[];
   isHistoricalSubmission?: boolean;
   submittedByMember?: boolean;
+  requiresMemberConsent?: boolean;
+  memberConsentStatus?: 'pending' | 'accepted' | 'declined';
   createdAt: Date;
   updatedAt: Date;
 }

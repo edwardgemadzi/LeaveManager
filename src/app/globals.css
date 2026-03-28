@@ -595,12 +595,23 @@ p {
 }
 
 .dark .rbc-today {
-  background: rgba(79,70,229,0.08);
+  background: rgba(99, 102, 241, 0.18);
+  border-top: 2px solid rgba(129, 140, 248, 0.7) !important;
 }
 
 .rbc-today .rbc-date-cell {
   color: var(--primary-700);
   font-weight: 700;
+}
+
+.dark .rbc-today .rbc-date-cell {
+  color: #a5b4fc;
+  font-weight: 800;
+}
+
+.dark .rbc-today .rbc-date-cell a,
+.dark .rbc-today .rbc-date-cell button {
+  color: #a5b4fc;
 }
 
 .rbc-off-range {
