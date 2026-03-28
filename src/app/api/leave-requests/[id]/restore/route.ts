@@ -56,6 +56,22 @@ export async function POST(
       return NextResponse.json({ error: 'Request is not deleted' }, { status: 400 });
     }
 
+    // Guard against restoring into a date range that now has another active request
+    const start = new Date(leaveRequest.startDate);
+    const end = new Date(leaveRequest.endDate);
+    const duplicates = await LeaveRequestModel.findActiveOverlappingRequestsForUser(
+      String(leaveRequest.userId),
+      start,
+      end,
+      id // exclude the request being restored itself
+    );
+    if (duplicates.length > 0) {
+      return NextResponse.json(
+        { error: 'Cannot restore: the member already has an active leave request covering these dates.' },
+        { status: 409 }
+      );
+    }
+
     const restored = await LeaveRequestModel.restore(id);
     if (!restored) {
       return NextResponse.json(

@@ -215,6 +215,46 @@ export class LeaveRequestModel {
     return await requests.find(query, options).toArray();
   }
 
+  /**
+   * Finds any active (pending OR approved) leave requests for a specific user
+   * that overlap with the given date range. Used to prevent duplicate submissions
+   * across all creation paths (normal, historical, emergency, restore).
+   */
+  static async findActiveOverlappingRequestsForUser(
+    userId: string,
+    startDate: Date,
+    endDate: Date,
+    excludeId?: string,
+    session?: ClientSession
+  ): Promise<LeaveRequest[]> {
+    const db = await getDatabase();
+    const requests = db.collection<LeaveRequest>('leaveRequests');
+
+    const userQuery = LeaveRequestModel.buildIdQuery('userId', userId);
+    const query: Record<string, unknown> = {
+      $and: [
+        userQuery,
+        { status: { $in: ['pending', 'approved'] } },
+        LeaveRequestModel.buildNotDeletedQuery(),
+        {
+          startDate: { $lte: endDate },
+          endDate: { $gte: startDate },
+        },
+      ],
+    };
+
+    if (excludeId) {
+      if (ObjectId.isValid(excludeId)) {
+        (query.$and as Record<string, unknown>[]).push({ _id: { $ne: new ObjectId(excludeId) } });
+      } else {
+        (query.$and as Record<string, unknown>[]).push({ _id: { $ne: excludeId } });
+      }
+    }
+
+    const options = session ? { session } : {};
+    return await requests.find(query, options).toArray();
+  }
+
   static async softDelete(id: string, deletedBy: string, session?: ClientSession): Promise<boolean> {
     const db = await getDatabase();
     const requests = db.collection<LeaveRequest>('leaveRequests');

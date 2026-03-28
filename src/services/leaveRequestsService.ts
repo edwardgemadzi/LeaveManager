@@ -331,17 +331,17 @@ export async function createLeaveRequest(params: {
 
     try {
       await session.withTransaction(async () => {
-        const pendingOverlaps =
-          await LeaveRequestModel.findPendingOverlappingRequestsForUser(
+        const activeOverlaps =
+          await LeaveRequestModel.findActiveOverlappingRequestsForUser(
             requestUserId,
             start,
             end,
             undefined,
             session
           );
-        if (pendingOverlaps.length > 0) {
+        if (activeOverlaps.length > 0) {
           throw new Error(
-            'DUPLICATE_PENDING_REQUEST: You already have a pending leave request for one or more of the selected dates.'
+            'DUPLICATE_PENDING_REQUEST: You already have a leave request for one or more of the selected dates.'
           );
         }
 
@@ -474,6 +474,24 @@ export async function createLeaveRequest(params: {
       await session.endSession();
     }
   } else {
+    // Historical path — no transaction, but still guard against duplicates
+    const historicalOverlaps =
+      await LeaveRequestModel.findActiveOverlappingRequestsForUser(
+        requestUserId,
+        start,
+        end
+      );
+    if (historicalOverlaps.length > 0) {
+      return {
+        error: {
+          status: 409,
+          body: {
+            error: 'You already have a leave request for one or more of the selected dates.',
+          },
+        },
+      };
+    }
+
     leaveRequest = await LeaveRequestModel.create({
       userId: requestUserId,
       teamId: user.teamId!,
@@ -624,18 +642,18 @@ export async function updateMemberPendingLeaveRequest(params: {
     };
   }
 
-  const pendingOverlaps = await LeaveRequestModel.findPendingOverlappingRequestsForUser(
+  const activeOverlaps = await LeaveRequestModel.findActiveOverlappingRequestsForUser(
     user.id,
     start,
     end,
-    requestId
+    requestId // exclude the request being edited
   );
-  if (pendingOverlaps.length > 0) {
+  if (activeOverlaps.length > 0) {
     return {
       error: {
         status: 409,
         body: {
-          error: 'You already have another pending leave request for one or more of these dates.',
+          error: 'You already have a leave request covering one or more of these dates.',
         },
       },
     };

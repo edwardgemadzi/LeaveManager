@@ -66,6 +66,16 @@ export async function POST(request: NextRequest) {
       return badRequestError('Start date must be before end date');
     }
 
+    // Guard against duplicate dates (pending or approved) for this member
+    const duplicates = await LeaveRequestModel.findActiveOverlappingRequestsForUser(
+      memberId,
+      start,
+      end
+    );
+    if (duplicates.length > 0) {
+      return badRequestError('This member already has a leave request covering one or more of the selected dates.');
+    }
+
     // Create the emergency leave request (automatically approved)
     const emergencyRequest = await LeaveRequestModel.create({
       userId: memberId,
