@@ -168,6 +168,9 @@ backups/
 # Cursor workspace artifacts
 .cursor/
 
+# Claude Code
+.claude/
+
 # OS generated files
 .DS_Store
 .DS_Store?

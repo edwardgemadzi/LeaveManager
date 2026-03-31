@@ -375,6 +375,20 @@ export function calculateTimeBasedTeamHealthScore(
   quote: string;
   message: string;
 } {
+  if (totalMembers === 0) {
+    return {
+      score: 'no-members',
+      scoreLabel: 'No Members',
+      gradientColors: 'from-zinc-400 via-slate-400 to-gray-400',
+      bgGradient: 'bg-gradient-to-br from-zinc-100 to-slate-100 dark:from-zinc-900/40 dark:to-slate-900/40',
+      borderColor: 'border-zinc-300 dark:border-zinc-600',
+      textColor: 'text-zinc-600 dark:text-zinc-400',
+      badgeColor: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400',
+      quote: 'Add members to start tracking team leave health.',
+      message: 'No members are assigned to this team yet. Invite members to begin managing leave.',
+    };
+  }
+
   const currentYear = new Date().getFullYear();
   const yearStart = new Date(currentYear, 0, 1);
   const yearEnd = new Date(currentYear, 11, 31);
