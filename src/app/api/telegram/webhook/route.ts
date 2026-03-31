@@ -7,6 +7,7 @@ import {
   normalizeTelegramUserChatId,
   sendTelegramMessageWithOutcome,
 } from '@/lib/telegram';
+import { runLeaveApproachingReminders } from '@/services/leaveReminderService';
 
 type TelegramUpdate = {
   message?: {
@@ -52,9 +53,43 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  const payload = parseStartDeepLinkPayload(msg.text);
+  const text = msg.text?.trim() ?? '';
+
+  // /reminders command — admin-only trigger for leave approaching reminders
+  if (text === '/reminders' || text.startsWith('/reminders ') || text.startsWith('/reminders@')) {
+    const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID?.trim();
+    if (!adminChatId || String(chatId) !== adminChatId) {
+      await sendTelegramMessageWithOutcome({
+        chatId: String(chatId),
+        text: 'Unauthorized.',
+      });
+      return NextResponse.json({ ok: true });
+    }
+    try {
+      const result = await runLeaveApproachingReminders();
+      await sendTelegramMessageWithOutcome({
+        chatId: String(chatId),
+        text:
+          `✅ Reminders run complete.\n` +
+          `• Processed: ${result.processed}\n` +
+          `• Member notifications sent: ${result.sentMember}\n` +
+          `• Leader notifications sent: ${result.sentLeader}\n` +
+          `• Skipped (already sent): ${result.skipped}\n` +
+          `• Failed: ${result.failed}`,
+      });
+    } catch (err) {
+      logError('[telegram webhook] /reminders run failed:', err);
+      await sendTelegramMessageWithOutcome({
+        chatId: String(chatId),
+        text: '❌ Reminders run failed. Check server logs.',
+      });
+    }
+    return NextResponse.json({ ok: true });
+  }
+
+  const payload = parseStartDeepLinkPayload(text);
   if (!payload) {
-    if (msg.text?.trim().startsWith('/start')) {
+    if (text.startsWith('/start')) {
       const out = await sendTelegramMessageWithOutcome({
         chatId: String(chatId),
         text:

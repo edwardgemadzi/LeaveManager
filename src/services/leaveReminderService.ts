@@ -13,6 +13,18 @@ import {
   memberOffsetsAlreadySent,
 } from '@/lib/leaveReminderPrefs';
 
+/** Parse "HH:MM" → hour (0-23). Falls back to 9. */
+function preferredHour(timeLocal: string | null | undefined): number {
+  if (!timeLocal) return 9;
+  const h = parseInt(timeLocal.split(':')[0], 10);
+  return Number.isFinite(h) && h >= 0 && h <= 23 ? h : 9;
+}
+
+/** True if the cron is running within the user's preferred reminder hour. */
+function isUsersReminderHour(user: { timezone?: string | null; leaveReminderTimeLocal?: string | null }, now: Date): boolean {
+  return hourInZone(now, user.timezone) === preferredHour(user.leaveReminderTimeLocal);
+}
+
 export type LeaveReminderRunResult = {
   processed: number;
   sentMember: number;
@@ -33,15 +45,12 @@ export async function runLeaveApproachingReminders(now = new Date()): Promise<Le
     failed: 0,
   };
 
+  // Cron runs hourly (via external trigger e.g. cron-job.org → /api/cron/leave-reminders).
+  // Each user's reminder fires only during their preferred local hour (leaveReminderTimeLocal,
+  // default 09:00 in their timezone). Idempotency is handled by reminderMemberOffsetsSent /
+  // reminderLeaderOffsetsSent on each leave request, so duplicate hits within the same hour
+  // are safe.
   const candidates = await LeaveRequestModel.findApprovedForReminderScan(now);
-
-  const shouldSendToUserNow = (u: { timezone?: string | null; leaveReminderTimeLocal?: string | null }) => {
-    const raw = typeof u.leaveReminderTimeLocal === 'string' ? u.leaveReminderTimeLocal.trim() : '';
-    const time = raw || '09:00';
-    const hh = Number(time.split(':')[0] ?? '9');
-    if (!Number.isFinite(hh) || hh < 0 || hh > 23) return false;
-    return hourInZone(now, u.timezone) === hh;
-  };
 
   for (const req of candidates) {
     if (!req._id) continue;
@@ -64,10 +73,9 @@ export async function runLeaveApproachingReminders(now = new Date()): Promise<Le
     const leaderSent = leaderOffsetsAlreadySent(req);
 
     const memberOffsets = effectiveMemberReminderDays(member);
-    const needMember =
-      shouldSendToUserNow(member)
-        ? memberOffsets.filter((d) => d === days && !memberSent.has(d))
-        : [];
+    const needMember = isUsersReminderHour(member, now)
+      ? memberOffsets.filter((d) => d === days && !memberSent.has(d))
+      : [];
 
     let leader: Awaited<ReturnType<typeof UserModel.findById>> = null;
     let leaderOffsets: number[] = [];
@@ -82,7 +90,7 @@ export async function runLeaveApproachingReminders(now = new Date()): Promise<Le
       }
     }
     const needLeader =
-      leader && shouldSendToUserNow(leader)
+      leader && isUsersReminderHour(leader, now)
         ? leaderOffsets.filter((d) => d === days && !leaderSent.has(d))
         : [];
 

@@ -12,19 +12,9 @@ import TelegramStartHint from '@/components/profile/TelegramStartHint';
 import TelegramDeepLinkPanel from '@/components/profile/TelegramDeepLinkPanel';
 import LeaveReminderDayChips from '@/components/profile/LeaveReminderDayChips';
 import TelegramLocalDevHint from '@/components/profile/TelegramLocalDevHint';
-import ProfilePageFeedback from '@/components/profile/ProfilePageFeedback';
 import { isTelegramLinked } from '@/lib/telegramLinked';
 import { setStoredUser } from '@/lib/clientUserStorage';
-
-function scrollToProfileFeedback() {
-  if (typeof window === 'undefined') return;
-  requestAnimationFrame(() => {
-    document.getElementById('profile-page-feedback')?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    });
-  });
-}
+import { useNotification } from '@/hooks/useNotification';
 
 export default function MemberProfilePage() {
   const [user, setUser] = useState<User | null>(null);
@@ -48,8 +38,9 @@ export default function MemberProfilePage() {
     leaveReminderDaysBefore: [5, 1] as number[],
     leaveReminderTimeLocal: '09:00',
   });
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const { showSuccess, showError } = useNotification();
+  const showMsg = (msg: string) => { if (msg) showSuccess(msg); };
+  const showErr = (msg: string) => { if (msg) showError(msg); };
   const [testTelegramLoading, setTestTelegramLoading] = useState(false);
   const [testEmailLoading, setTestEmailLoading] = useState(false);
   const [telegramUnlinking, setTelegramUnlinking] = useState(false);
@@ -113,23 +104,20 @@ export default function MemberProfilePage() {
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setMessage('');
-
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setError('New passwords do not match');
+      showError('New passwords do not match');
       return;
     }
 
     // Validate password matches backend requirements
     if (passwordForm.newPassword.length < 8) {
-      setError('New password must be at least 8 characters long');
+      showError('New password must be at least 8 characters long');
       return;
     }
 
     const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
     if (!passwordPattern.test(passwordForm.newPassword)) {
-      setError('New password must contain at least one lowercase letter, one uppercase letter, one number, and one special character');
+      showError('New password must contain at least one lowercase letter, one uppercase letter, one number, and one special character');
       return;
     }
 
@@ -151,33 +139,28 @@ export default function MemberProfilePage() {
       const data = await response.json();
 
       if (response.ok) {
-        setMessage('Password changed successfully!');
+        showSuccess('Password changed successfully!');
         setPasswordForm({
           currentPassword: '',
           newPassword: '',
           confirmPassword: '',
         });
-        window.setTimeout(() => scrollToProfileFeedback(), 80);
       } else {
         // Show validation details if available, otherwise show error message
         const errorMessage = data.details && data.details.length > 0
           ? data.details.join(', ')
           : (data.error || 'Failed to change password');
-        setError(errorMessage);
-        window.setTimeout(() => scrollToProfileFeedback(), 80);
+        showError(errorMessage);
       }
     } catch (error) {
       console.error('Error changing password:', error);
-      setError('Network error. Please try again.');
-      window.setTimeout(() => scrollToProfileFeedback(), 80);
+      showError('Network error. Please try again.');
     } finally {
       setChangingPassword(false);
     }
   };
 
   const handleTestEmail = async () => {
-    setError('');
-    setMessage('');
     setTestEmailLoading(true);
     try {
       const res = await fetch('/api/users/profile/test-email', {
@@ -186,16 +169,15 @@ export default function MemberProfilePage() {
       });
       const data = await res.json();
       if (res.ok && data.delivered) {
-        setMessage(data.message || 'Test email sent.');
+        showSuccess(data.message || 'Test email sent.');
       } else {
         const parts = [data.message, data.smtpError].filter(Boolean);
-        setError(parts.join(' — ') || data.error || 'Test email failed');
+        showError(parts.join(' — ') || data.error || 'Test email failed');
       }
     } catch {
-      setError('Network error sending test email');
+      showError('Network error sending test email');
     } finally {
       setTestEmailLoading(false);
-      window.setTimeout(() => scrollToProfileFeedback(), 80);
     }
   };
 
@@ -207,8 +189,6 @@ export default function MemberProfilePage() {
     ) {
       return;
     }
-    setError('');
-    setMessage('');
     setTelegramUnlinking(true);
     try {
       const res = await fetch('/api/users/telegram/unlink', {
@@ -219,26 +199,20 @@ export default function MemberProfilePage() {
       if (res.ok && data.user) {
         setUser(data.user);
         setStoredUser(data.user);
-        setMessage(
-          data.message ||
-            'Telegram disconnected. Scroll to Notifications and use “Log in with Telegram” to link again.'
+        showSuccess(
+          data.message || 'Telegram disconnected. Use “Log in with Telegram” to link again.'
         );
-        window.setTimeout(() => scrollToProfileFeedback(), 80);
       } else {
-        setError(data.error || 'Failed to disconnect Telegram');
-        window.setTimeout(() => scrollToProfileFeedback(), 80);
+        showError(data.error || 'Failed to disconnect Telegram');
       }
     } catch {
-      setError('Network error disconnecting Telegram');
-      window.setTimeout(() => scrollToProfileFeedback(), 80);
+      showError('Network error disconnecting Telegram');
     } finally {
       setTelegramUnlinking(false);
     }
   };
 
   const handleTestTelegram = async () => {
-    setError('');
-    setMessage('');
     setTestTelegramLoading(true);
     try {
       const res = await fetch('/api/users/telegram/test', {
@@ -247,26 +221,23 @@ export default function MemberProfilePage() {
       });
       const data = await res.json();
       if (res.ok && data.delivered) {
-        setMessage(data.message || 'Test message sent. Check Telegram.');
+        showSuccess(data.message || 'Test message sent. Check Telegram.');
       } else {
         const parts = [data.message, data.telegramDescription].filter(Boolean);
-        setError(parts.join(' — ') || data.error || 'Test failed');
+        showError(parts.join(' — ') || data.error || 'Test failed');
       }
     } catch {
-      setError('Network error sending test message');
+      showError('Network error sending test message');
     } finally {
       setTestTelegramLoading(false);
-      window.setTimeout(() => scrollToProfileFeedback(), 80);
     }
   };
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setMessage('');
 
     if (!profileForm.firstName.trim() || !profileForm.lastName.trim()) {
-      setError('First and last name are required');
+      showError('First and last name are required');
       return;
     }
 
@@ -317,28 +288,21 @@ export default function MemberProfilePage() {
               : prev.leaveReminderTimeLocal,
         }));
         if (data.emailConfirmationSent === true) {
-          setMessage(
-            'Profile updated successfully! A short confirmation was sent to your email (check spam).'
-          );
+          showSuccess('Profile updated! A short confirmation was sent to your email (check spam).');
         } else {
-          setMessage('Profile updated successfully!');
+          showSuccess('Profile updated successfully!');
         }
         if (data.emailConfirmationError) {
-          setError(
-            `Profile saved, but confirmation email was not sent: ${String(data.emailConfirmationError)}`
-          );
+          showError(`Profile saved, but confirmation email was not sent: ${String(data.emailConfirmationError)}`);
         }
         // Update localStorage with new data
         setStoredUser(data.user);
-        window.setTimeout(() => scrollToProfileFeedback(), 80);
       } else {
-        setError(data.error || 'Failed to update profile');
-        window.setTimeout(() => scrollToProfileFeedback(), 80);
+        showError(data.error || 'Failed to update profile');
       }
     } catch (error) {
       console.error('Error updating profile:', error);
-      setError('Network error. Please try again.');
-      window.setTimeout(() => scrollToProfileFeedback(), 80);
+      showError('Network error. Please try again.');
     } finally {
       setUpdatingProfile(false);
     }
@@ -362,7 +326,6 @@ export default function MemberProfilePage() {
             </div>
           </div>
 
-          <ProfilePageFeedback error={error} message={message} />
           {nameReviewRequired ? (
             <div className="mb-6 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
               <p className="font-semibold">Please review your name</p>
@@ -634,9 +597,9 @@ export default function MemberProfilePage() {
                           <TelegramDeepLinkPanel
                             botUsername={process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME}
                             onLinked={(u) => setUser(u)}
-                            onFeedback={() => window.setTimeout(() => scrollToProfileFeedback(), 80)}
-                            setError={setError}
-                            setMessage={setMessage}
+                            onFeedback={() => {}}
+                            setError={showErr}
+                            setMessage={showMsg}
                           />
                         )}
                         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">

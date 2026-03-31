@@ -3,11 +3,13 @@ import { runLeaveApproachingReminders } from '@/services/leaveReminderService';
 import { info, error as logError } from '@/lib/logger';
 
 /**
- * Daily cron: upcoming approved leave — reminders to the member (per their profile offsets) and
+ * Hourly cron: upcoming approved leave — reminders to the member (per their profile offsets) and
  * to the team leader about teammates’ leave (per leader profile offsets). Defaults include 5 and 1 days before.
+ * Each reminder fires only during the recipient’s preferred local hour (leaveReminderTimeLocal, default 09:00).
  *
- * Vercel Cron: set CRON_SECRET in project env; Vercel sends `Authorization: Bearer <CRON_SECRET>`.
- * Manual: curl -H "Authorization: Bearer $CRON_SECRET" https://your-app/api/cron/leave-reminders
+ * Trigger hourly via cron-job.org (or similar) — bypasses Vercel Hobby 1-cron-per-day limit.
+ * Set CRON_SECRET in Vercel env vars; pass as: Authorization: Bearer <CRON_SECRET>
+ * URL: https://your-app.vercel.app/api/cron/leave-reminders
  */
 export async function GET(request: NextRequest) {
   try {
