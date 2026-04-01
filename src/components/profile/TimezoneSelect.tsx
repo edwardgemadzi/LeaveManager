@@ -11,7 +11,20 @@ type Props = {
 };
 
 function labelForZone(zone: string): string {
-  return zone === 'UTC' ? 'UTC' : zone.replace(/_/g, ' ');
+  if (zone === 'UTC') return '(UTC+0) UTC';
+  try {
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat('en', {
+      timeZone: zone,
+      timeZoneName: 'shortOffset',
+    }).formatToParts(now);
+    const offsetStr = parts.find((p) => p.type === 'timeZoneName')?.value ?? '';
+    const offset = offsetStr.replace('GMT', 'UTC') || 'UTC';
+    const city = zone.split('/').pop()?.replace(/_/g, ' ') ?? zone;
+    return `(${offset}) ${city}`;
+  } catch {
+    return zone.replace(/_/g, ' ');
+  }
 }
 
 export default function TimezoneSelect({ id, value, onChange, disabled, className }: Props) {
