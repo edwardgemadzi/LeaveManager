@@ -126,8 +126,9 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
 
     const updateHeight = () => {
       const width = container.offsetWidth;
-      // Use viewport height minus offset, clamped between 480px and 900px
-      const vh = window.innerHeight;
+      // Use visualViewport height when available (accounts for mobile browser chrome
+      // appearing/disappearing), falling back to window.innerHeight.
+      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
       const isMobileWidth = width < 768;
       const height = isMobileWidth
         ? Math.max(480, Math.min(600, vh * 0.65))
@@ -140,10 +141,12 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
     const observer = new ResizeObserver(updateHeight);
     observer.observe(container);
     window.addEventListener('resize', updateHeight);
+    window.visualViewport?.addEventListener('resize', updateHeight);
 
     return () => {
       observer.disconnect();
       window.removeEventListener('resize', updateHeight);
+      window.visualViewport?.removeEventListener('resize', updateHeight);
     };
   }, []);
 
