@@ -89,7 +89,6 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [currentView, setCurrentView] = useState<View>(Views.MONTH);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [calendarHeight, setCalendarHeight] = useState(600);
   const calendarContainerRef = useRef<HTMLDivElement>(null);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -119,36 +118,6 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
   
   const leaveReasons = useMemo(() => LEAVE_REASONS, []);
 
-  // Responsive calendar height using ResizeObserver for smooth resize handling
-  useEffect(() => {
-    const container = calendarContainerRef.current;
-    if (!container) return;
-
-    const updateHeight = () => {
-      const width = container.offsetWidth;
-      // Use visualViewport height when available (accounts for mobile browser chrome
-      // appearing/disappearing), falling back to window.innerHeight.
-      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-      const isMobileWidth = width < 768;
-      const height = isMobileWidth
-        ? Math.max(480, Math.min(600, vh * 0.65))
-        : Math.max(500, Math.min(900, vh * 0.72));
-      setCalendarHeight(Math.round(height));
-    };
-
-    updateHeight();
-
-    const observer = new ResizeObserver(updateHeight);
-    observer.observe(container);
-    window.addEventListener('resize', updateHeight);
-    window.visualViewport?.addEventListener('resize', updateHeight);
-
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', updateHeight);
-      window.visualViewport?.removeEventListener('resize', updateHeight);
-    };
-  }, []);
 
   useEffect(() => {
     const update = () => setIsMobile(window.innerWidth < 768);
@@ -855,7 +824,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
           events={events}
           startAccessor="start"
           endAccessor="end"
-          style={{ height: `${calendarHeight}px` }}
+          style={{ height: '600px' }}
           eventPropGetter={eventStyleGetter}
           dayPropGetter={dayPropGetter}
           views={[Views.MONTH, Views.WEEK]}
