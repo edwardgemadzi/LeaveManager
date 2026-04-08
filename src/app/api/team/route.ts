@@ -9,6 +9,21 @@ import { error as logError, info } from '@/lib/logger';
 import { internalServerError, unauthorizedError, forbiddenError, badRequestError, notFoundError } from '@/lib/errors';
 import { TeamPolicyVersionModel } from '@/models/TeamPolicyVersion';
 
+function resolveFullName(user: {
+  fullName?: string;
+  firstName?: string;
+  middleName?: string | null;
+  lastName?: string;
+}): string {
+  if (user.fullName?.trim()) {
+    return user.fullName.trim();
+  }
+  const parts = [user.firstName, user.middleName, user.lastName]
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part));
+  return parts.join(' ');
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl;
@@ -54,7 +69,7 @@ export async function GET(request: NextRequest) {
         currentUser: currentUser ? {
           _id: currentUser._id,
           username: currentUser.username,
-          fullName: currentUser.fullName,
+          fullName: resolveFullName(currentUser),
           role: currentUser.role,
           shiftSchedule: currentUser.shiftSchedule,
           shiftHistory: currentUser.shiftHistory, // Include shift history for historical schedule support
@@ -77,7 +92,7 @@ export async function GET(request: NextRequest) {
           const baseMember = {
             _id: member._id,
             username: member.username,
-            fullName: member.fullName,
+            fullName: resolveFullName(member),
             role: member.role,
             shiftSchedule: member.shiftSchedule,
             shiftHistory: membersMode === 'full' ? member.shiftHistory : undefined,
