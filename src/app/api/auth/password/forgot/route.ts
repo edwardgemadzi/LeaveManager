@@ -36,7 +36,12 @@ export async function POST(request: NextRequest) {
       expiresAt: new Date(Date.now() + 30 * 60 * 1000),
     });
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const appUrl = (
+      process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+      process.env.APP_URL?.trim() ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL.trim()}` : null) ||
+      'http://localhost:3000'
+    ).replace(/\/$/, '');
     const resetUrl = `${appUrl}/reset-password?token=${encodeURIComponent(rawToken)}`;
     const html = shell(
       `<p style="margin:0 0 16px;">Reset your password using the secure link below:</p>
