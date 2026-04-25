@@ -1,4 +1,4 @@
-import { TeamSettings } from '@/types';
+import type { TeamSettings } from '@/types';
 
 /**
  * Get the display name for a working days group.
@@ -97,6 +97,76 @@ export function tagToFixedPattern(tag: string): boolean[] | null {
   return pattern;
 }
 
+type LeaveBand = 'excellent' | 'good' | 'fair' | 'needs-attention' | 'critical';
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function buildLeaveBandTheme(band: LeaveBand): {
+  scoreLabel: string;
+  gradientColors: string;
+  bgGradient: string;
+  borderColor: string;
+  textColor: string;
+  badgeColor: string;
+  quote: string;
+} {
+  switch (band) {
+    case 'excellent':
+      return {
+        scoreLabel: 'Excellent',
+        gradientColors: 'from-green-500 via-emerald-500 to-teal-500',
+        bgGradient: 'bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/40 dark:to-emerald-900/40',
+        borderColor: 'border-green-400 dark:border-green-600',
+        textColor: 'text-green-700 dark:text-green-300',
+        badgeColor: 'bg-green-100 dark:bg-green-900 text-green-900 dark:text-white',
+        quote: 'Excellent planning keeps your leave flexible and stress-free.',
+      };
+    case 'good':
+      return {
+        scoreLabel: 'Good',
+        gradientColors: 'from-blue-500 via-indigo-500 to-purple-500',
+        bgGradient: 'bg-gradient-to-br from-blue-200 to-indigo-200 dark:from-blue-900/50 dark:to-indigo-900/50',
+        borderColor: 'border-blue-500 dark:border-blue-500',
+        textColor: 'text-blue-700 dark:text-blue-300',
+        badgeColor: 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-white',
+        quote: 'You are in a good spot - a little planning keeps it that way.',
+      };
+    case 'fair':
+      return {
+        scoreLabel: 'Fair',
+        gradientColors: 'from-yellow-500 via-amber-500 to-orange-500',
+        bgGradient: 'bg-gradient-to-br from-yellow-200 to-amber-200 dark:from-yellow-900/50 dark:to-amber-900/50',
+        borderColor: 'border-yellow-500 dark:border-yellow-500',
+        textColor: 'text-yellow-700 dark:text-yellow-300',
+        badgeColor: 'bg-yellow-100 dark:bg-yellow-900 text-yellow-900 dark:text-white',
+        quote: 'You can still make this work with early coordination.',
+      };
+    case 'needs-attention':
+      return {
+        scoreLabel: 'Needs Attention',
+        gradientColors: 'from-orange-500 via-red-500 to-pink-500',
+        bgGradient: 'bg-gradient-to-br from-orange-200 to-red-200 dark:from-orange-900/50 dark:to-red-900/50',
+        borderColor: 'border-orange-500 dark:border-orange-500',
+        textColor: 'text-orange-700 dark:text-orange-300',
+        badgeColor: 'bg-orange-100 dark:bg-orange-900 text-orange-900 dark:text-white',
+        quote: 'A small plan now prevents bigger problems later.',
+      };
+    case 'critical':
+    default:
+      return {
+        scoreLabel: 'Requires Planning',
+        gradientColors: 'from-red-600 via-rose-600 to-pink-600',
+        bgGradient: 'bg-gradient-to-br from-red-200 to-rose-200 dark:from-red-900/50 dark:to-rose-900/50',
+        borderColor: 'border-red-500 dark:border-red-500',
+        textColor: 'text-red-700 dark:text-red-300',
+        badgeColor: 'bg-red-100 dark:bg-red-900 text-red-900 dark:text-white',
+        quote: 'Act now to protect your remaining leave options.',
+      };
+  }
+}
+
 /**
  * Calculate time-based leave health score considering:
  * - How far into the year we are
@@ -124,7 +194,10 @@ export function calculateTimeBasedLeaveScore(
   hasManualBalance: boolean = false,
   carryoverLimitedToMonths?: number[],
   carryoverMaxDays?: number,
-  carryoverExpiryDate?: Date
+  carryoverExpiryDate?: Date,
+  approvedFutureDays: number = 0,
+  pendingFutureDays: number = 0,
+  asOfDate?: Date
 ): {
   score: string;
   scoreLabel: string;
@@ -138,200 +211,169 @@ export function calculateTimeBasedLeaveScore(
 } {
   const currentYear = new Date().getFullYear();
   const yearStart = new Date(currentYear, 0, 1);
-  const yearEnd = new Date(currentYear, 11, 31);
-  const today = new Date();
-  
-  // Calculate how far into the year we are (0.0 to 1.0)
-  const totalDaysInYear = Math.floor((yearEnd.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24));
+  const nextYearStart = new Date(currentYear + 1, 0, 1);
+  const today = asOfDate ? new Date(asOfDate) : new Date();
+  const totalDaysInYear = Math.max(1, Math.floor((nextYearStart.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24)));
   const daysElapsed = Math.floor((today.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24));
-  const yearProgress = Math.min(1.0, Math.max(0.0, daysElapsed / totalDaysInYear));
-  
-  // Calculate expected usage based on time of year
-  // If we're 50% through the year, we'd expect ~50% usage for balanced usage
-  const usagePercentage = baseBalance > 0 ? (used / baseBalance) * 100 : 0;
-  const expectedUsagePercentage = yearProgress * 100;
-  
-  // Calculate usage deviation from expected
-  const usageDeviation = usagePercentage - expectedUsagePercentage;
-  
-  // Determine if they used too much too early (bad) or saved appropriately (good)
-  const isOverUsedEarly = usageDeviation > 20; // Used 20%+ more than expected for this time of year
-  const isUnderUsed = usageDeviation < -10; // Used 10%+ less than expected (saved appropriately)
-  
-  // Score logic considering time of year and usage patterns
-  let score = 'excellent';
-  let gradientColors = 'from-green-500 via-emerald-500 to-teal-500';
-  let bgGradient = 'bg-gradient-to-br from-green-200 to-emerald-200 dark:from-green-900/50 dark:to-emerald-900/50';
-  let borderColor = 'border-green-500 dark:border-green-500';
-  let textColor = 'text-green-700 dark:text-green-300';
-  let badgeColor = 'bg-green-100 dark:bg-green-900 text-green-900 dark:text-white';
-  let quote = '';
+  const yearProgress = clamp(daysElapsed / totalDaysInYear, 0, 1);
+  const usagePct = baseBalance > 0 ? (used / baseBalance) * 100 : 0;
+  const expectedPct = yearProgress * 100;
+  const deviation = Math.abs(usagePct - expectedPct);
+
+  const normalizedApprovedFutureDays = Math.max(0, approvedFutureDays);
+  const normalizedPendingFutureDays = Math.max(0, pendingFutureDays);
+  const approvalCertainty =
+    normalizedApprovedFutureDays /
+    Math.max(1, normalizedApprovedFutureDays + normalizedPendingFutureDays);
+  const confidencePenalty = approvalCertainty >= 0.8 ? 0 : approvalCertainty >= 0.5 ? -5 : -10;
+
+  const lossRiskSignal =
+    100 -
+    Math.min(
+      100,
+      (Math.max(0, willLose) / Math.max(1, Math.max(0, remainingBalance) + Math.max(0, willLose))) * 120
+    );
+  const pacingSignal = Math.max(0, 100 - deviation * 2.5);
+  const accessSignal =
+    remainingBalance <= 0
+      ? 100
+      : clamp((Math.max(0, realisticUsableDays) / Math.max(1, remainingBalance)) * 100, 0, 100);
+
+  const baseline = clamp(
+    0.45 * lossRiskSignal + 0.3 * pacingSignal + 0.25 * accessSignal + confidencePenalty,
+    0,
+    100
+  );
+
+  let band: LeaveBand =
+    baseline >= 85 ? 'excellent' : baseline >= 70 ? 'good' : baseline >= 50 ? 'fair' : baseline >= 30 ? 'needs-attention' : 'critical';
+
   let message = '';
-  let scoreLabel = 'Excellent';
-  
-  // Priority 0: Handle zero balance case (especially when manually set)
+
   if (remainingBalance === 0) {
-    if (hasManualBalance) {
-      // Manually set to 0 - needs coordination
-      score = 'needs-attention';
-      gradientColors = 'from-orange-500 via-red-500 to-pink-500';
-      bgGradient = 'bg-gradient-to-br from-orange-200 to-red-200 dark:from-orange-900/50 dark:to-red-900/50';
-      borderColor = 'border-orange-500 dark:border-orange-500';
-      textColor = 'text-orange-700 dark:text-orange-300';
-      badgeColor = 'bg-orange-100 dark:bg-orange-900 text-orange-900 dark:text-white';
-      quote = 'Your leave balance has been adjusted.';
-      message = `Your leave balance has been manually set to 0 by your team leader. You currently have no remaining leave days available. Please coordinate with your team leader to discuss your leave allocation and any adjustments that may be needed.`;
-      scoreLabel = 'No Leave Available';
+    const totalAllocated = used + normalizedApprovedFutureDays;
+    const coverageTarget = Math.max(3, baseBalance * 0.15);
+    const isMostlyAllocated =
+      baseBalance > 0 &&
+      normalizedApprovedFutureDays > 0 &&
+      used < baseBalance &&
+      totalAllocated >= baseBalance * 0.9;
+    const isPlannedZero = !hasManualBalance && (normalizedApprovedFutureDays >= coverageTarget || isMostlyAllocated);
+
+    if (isPlannedZero) {
+      band = pacingSignal >= 85 ? 'excellent' : 'good';
+      message = `You have fully allocated your leave for this year, and no days are left unplanned. ${
+        pacingSignal >= 85
+          ? 'Your leave pacing is well-aligned with the calendar.'
+          : 'Your plan is solid, but keep an eye on how leave is spread across the remaining months.'
+      }`;
+    } else if (hasManualBalance) {
+      band = 'needs-attention';
+      message =
+        'Your leave balance has been manually set to zero. Please coordinate with your team leader if you need adjustments or clarification.';
     } else {
-      // Used all leave naturally
-      score = 'critical';
-      gradientColors = 'from-red-600 via-rose-600 to-pink-600';
-      bgGradient = 'bg-gradient-to-br from-red-200 to-rose-200 dark:from-red-900/50 dark:to-red-900/50';
-      borderColor = 'border-red-500 dark:border-red-500';
-      textColor = 'text-red-700 dark:text-red-300';
-      badgeColor = 'bg-red-100 dark:bg-red-900 text-red-900 dark:text-white';
-      quote = 'Remember: Taking breaks is essential for productivity and well-being.';
-      message = `You have no remaining leave days available. All ${Math.round(baseBalance)} days have been used this year. Consider discussing leave options with your team leader for better planning next year.`;
-      scoreLabel = 'No Leave Available';
+      band = 'critical';
+      message =
+        'You have no remaining leave balance and no clear approved future allocation coverage. Coordinate with your team leader to discuss options.';
+    }
+  } else if (realisticUsableDays <= 0) {
+    band = yearProgress >= 0.5 ? 'critical' : 'needs-attention';
+    message = `All realistically usable leave windows are currently blocked (${Math.round(remainingBalance)} days remaining, 0 realistically usable). Prioritize early coordination to unblock dates.`;
+  } else {
+    message = `Your leave profile combines loss risk (${Math.round(lossRiskSignal)}), pacing (${Math.round(
+      pacingSignal
+    )}), and access (${Math.round(accessSignal)}).`;
+  }
+
+  const phase: 'early' | 'mid' | 'late' =
+    yearProgress < 0.5 ? 'early' : yearProgress <= 0.8 ? 'mid' : 'late';
+  const bandRank: Record<LeaveBand, number> = {
+    excellent: 4,
+    good: 3,
+    fair: 2,
+    'needs-attention': 1,
+    critical: 0,
+  };
+
+  if (willLose > 0 && remainingBalance > 0) {
+    const maxBandForPhase: LeaveBand =
+      phase === 'early' ? 'fair' : phase === 'mid' ? 'needs-attention' : 'critical';
+    if (bandRank[band] > bandRank[maxBandForPhase]) {
+      band = maxBandForPhase;
+    }
+
+    if (willLose > 5) {
+      band = phase === 'early' ? 'needs-attention' : 'critical';
+    } else if (willLose > 2 && phase !== 'early' && bandRank[band] > bandRank['needs-attention']) {
+      band = 'needs-attention';
     }
   }
-  // Priority 1: Check if they can use all remaining days (excellent availability)
-  else if (realisticUsableDays >= remainingBalance && remainingBalance > 0) {
-    if (isOverUsedEarly) {
-      // Used too much too early - warn about future availability
-      score = 'good';
-      gradientColors = 'from-blue-500 via-indigo-500 to-purple-500';
-      bgGradient = 'bg-gradient-to-br from-blue-200 to-indigo-200 dark:from-blue-900/50 dark:to-indigo-900/50';
-      borderColor = 'border-blue-500 dark:border-blue-500';
-      textColor = 'text-blue-700 dark:text-blue-300';
-      badgeColor = 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-white';
-      quote = 'Plan ahead - you\'ve used more leave early in the year.';
-      message = `Good availability! You can use all your remaining ${Math.round(remainingBalance)} days. However, you've used ${Math.round(usagePercentage)}% of your leave while we're only ${Math.round(yearProgress * 100)}% through the year. Make sure to save some days for unexpected needs later in the year.`;
-      scoreLabel = 'Good - Plan Ahead';
-    } else if (isUnderUsed) {
-      // Saved appropriately - excellent
-      score = 'excellent';
-      gradientColors = 'from-green-500 via-emerald-500 to-teal-500';
-      bgGradient = 'bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/40 dark:to-emerald-900/40';
-      borderColor = 'border-green-400 dark:border-green-600';
-      textColor = 'text-green-700 dark:text-green-300';
-      badgeColor = 'bg-green-100 dark:bg-green-900 text-green-900 dark:text-white';
-      quote = 'Excellent planning! You\'ve saved leave appropriately.';
-      message = `Excellent! You can use all your remaining ${Math.round(remainingBalance)} days, and you've saved appropriately for this time of year (${Math.round(usagePercentage)}% used vs ${Math.round(yearProgress * 100)}% through the year). This gives you flexibility for unexpected needs.`;
-      scoreLabel = 'Excellent';
-    } else {
-      // On track - excellent
-      score = 'excellent';
-      gradientColors = 'from-green-500 via-emerald-500 to-teal-500';
-      bgGradient = 'bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/40 dark:to-emerald-900/40';
-      borderColor = 'border-green-400 dark:border-green-600';
-      textColor = 'text-green-700 dark:text-green-300';
-      badgeColor = 'bg-green-100 dark:bg-green-900 text-green-900 dark:text-white';
-      quote = 'Take time to recharge. Your well-being matters!';
-      message = `Excellent! You can use all your remaining ${Math.round(remainingBalance)} days. Your usage (${Math.round(usagePercentage)}%) is well-balanced for this time of year (${Math.round(yearProgress * 100)}% through).`;
-      scoreLabel = 'Excellent';
-    }
+
+  const hasCarryoverRestrictions =
+    (carryoverLimitedToMonths?.length ?? 0) > 0 ||
+    carryoverExpiryDate !== undefined ||
+    (carryoverMaxDays !== undefined && carryoverMaxDays <= 0);
+
+  const canApplyCarryoverUplift =
+    willCarryover > 0 &&
+    willLose <= 0 &&
+    remainingBalance > 0 &&
+    !hasCarryoverRestrictions;
+
+  if (canApplyCarryoverUplift) {
+    if (band === 'good') band = 'excellent';
+    if (band === 'fair') band = 'good';
+    if (band === 'needs-attention') band = 'fair';
+    if (band === 'critical') band = 'needs-attention';
   }
-  // Priority 2: Check if they can use most remaining days (good availability)
-  else if (realisticUsableDays >= remainingBalance * 0.7) {
-    if (isOverUsedEarly) {
-      // Used too much too early - needs attention
-      score = 'fair';
-      gradientColors = 'from-yellow-500 via-amber-500 to-orange-500';
-      bgGradient = 'bg-gradient-to-br from-yellow-200 to-amber-200 dark:from-yellow-900/50 dark:to-amber-900/50';
-      borderColor = 'border-yellow-500 dark:border-yellow-500';
-      textColor = 'text-yellow-700 dark:text-yellow-300';
-      badgeColor = 'bg-yellow-100 dark:bg-yellow-900 text-yellow-900 dark:text-white';
-      quote = 'You\'ve used more leave early in the year. Plan carefully.';
-      message = `Fair. You can use most of your remaining ${Math.round(remainingBalance)} days (${Math.round(realisticUsableDays)} usable). However, you've used ${Math.round(usagePercentage)}% of your leave while we're only ${Math.round(yearProgress * 100)}% through the year. Consider saving some days for unexpected needs.`;
-      scoreLabel = 'Fair - Plan Carefully';
-    } else {
-      // Good availability
-      score = 'good';
-      gradientColors = 'from-blue-500 via-indigo-500 to-purple-500';
-      bgGradient = 'bg-gradient-to-br from-blue-200 to-indigo-200 dark:from-blue-900/50 dark:to-indigo-900/50';
-      borderColor = 'border-blue-500 dark:border-blue-500';
-      textColor = 'text-blue-700 dark:text-blue-300';
-      badgeColor = 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-white';
-      quote = 'Plan ahead to make the most of your leave days.';
-      message = `Good! You can use most of your remaining ${Math.round(remainingBalance)} days (${Math.round(realisticUsableDays)} usable). Plan ahead and coordinate with your team to ensure you can take your well-deserved time off.`;
-      scoreLabel = 'Good';
-    }
+
+  if (!message) {
+    message =
+      band === 'excellent'
+        ? 'Your leave health is strong across pacing, risk, and usable access.'
+        : band === 'good'
+          ? 'Your leave health is in a good place. Keep coordinating proactively.'
+          : band === 'fair'
+            ? 'You still have options, but planning early will protect your leave.'
+            : band === 'needs-attention'
+              ? 'Risk is rising. Act soon to avoid losing leave flexibility.'
+              : 'Immediate planning is needed to avoid losing leave opportunities.';
   }
-  // Priority 3: Check if they can use some remaining days (fair availability)
-  else if (realisticUsableDays >= remainingBalance * 0.3) {
-    score = 'fair';
-    gradientColors = 'from-yellow-500 via-amber-500 to-orange-500';
-    bgGradient = 'bg-gradient-to-br from-yellow-200 to-amber-200 dark:from-yellow-900/50 dark:to-amber-900/50';
-    borderColor = 'border-yellow-500 dark:border-yellow-500';
-    textColor = 'text-yellow-700 dark:text-yellow-300';
-    badgeColor = 'bg-yellow-100 dark:bg-yellow-900 text-yellow-900 dark:text-white';
-    quote = 'Work-life balance is crucial. Use your leave wisely!';
-    message = `Fair. You can use some of your remaining ${Math.round(remainingBalance)} days (${Math.round(realisticUsableDays)} usable). ${isOverUsedEarly ? `Note: You've used ${Math.round(usagePercentage)}% of your leave while we're only ${Math.round(yearProgress * 100)}% through the year. ` : ''}Coordinate early with your team to maximize your opportunities to take time off.`;
-    scoreLabel = 'Fair';
-  }
-  // Priority 4: Limited days available (needs attention)
-  else if (realisticUsableDays > 0) {
-    score = 'needs-attention';
-    gradientColors = 'from-orange-500 via-red-500 to-pink-500';
-    bgGradient = 'bg-gradient-to-br from-orange-200 to-red-200 dark:from-orange-900/50 dark:to-red-900/50';
-    borderColor = 'border-orange-500 dark:border-orange-500';
-    textColor = 'text-orange-700 dark:text-orange-300';
-    badgeColor = 'bg-orange-100 dark:bg-orange-900 text-orange-900 dark:text-white';
-    quote = 'Rest is not a reward for finishing everything. Rest is a vital part of the process.';
-    message = `Needs attention. You can realistically use ${Math.round(realisticUsableDays)} days out of ${Math.round(remainingBalance)} remaining. ${isOverUsedEarly ? `You've used ${Math.round(usagePercentage)}% of your leave while we're only ${Math.round(yearProgress * 100)}% through the year. ` : ''}Plan carefully and communicate with your team early.`;
-    scoreLabel = 'Needs Attention';
-  }
-  // Priority 5: No days available (critical)
-  else {
-    score = 'critical';
-    gradientColors = 'from-red-600 via-rose-600 to-pink-600';
-    bgGradient = 'bg-gradient-to-br from-red-200 to-rose-200 dark:from-red-900/50 dark:to-rose-900/50';
-    borderColor = 'border-red-500 dark:border-red-500';
-    textColor = 'text-red-700 dark:text-red-300';
-    badgeColor = 'bg-red-100 dark:bg-red-900 text-red-900 dark:text-white';
-    quote = 'Remember: Taking breaks is essential for productivity and well-being.';
-    message = `Limited availability. All usable days are already booked. ${isOverUsedEarly ? `You've used ${Math.round(usagePercentage)}% of your leave while we're only ${Math.round(yearProgress * 100)}% through the year. ` : ''}Consider discussing leave options with your team leader for better planning next year.`;
-    scoreLabel = 'Requires Planning';
-  }
-  
-  // Add messages about carryover or loss
+
   if (willCarryover > 0) {
-    message += ` Great news: ${Math.round(willCarryover)} days will carry over to next year!`;
-    
-    // Add carryover limitations if applicable
+    message += ` Carryover projection: ${Math.round(willCarryover)} day${Math.round(willCarryover) !== 1 ? 's' : ''}.`;
     if (carryoverLimitedToMonths && carryoverLimitedToMonths.length > 0) {
-      const monthNames = carryoverLimitedToMonths.map(m => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m]).join(', ');
-      message += ` Note: These carryover days can only be used in ${monthNames} of next year.`;
+      const monthNames = carryoverLimitedToMonths
+        .map((m) => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m])
+        .join(', ');
+      message += ` Use window is limited to: ${monthNames}.`;
     }
-    
-    if (carryoverMaxDays && willCarryover > carryoverMaxDays) {
+    if (carryoverMaxDays !== undefined && willCarryover > carryoverMaxDays) {
       const excessDays = Math.round(willCarryover - carryoverMaxDays);
-      message += ` Warning: Only ${carryoverMaxDays} days can carry over. ${excessDays} day${excessDays !== 1 ? 's' : ''} will be lost.`;
+      message += ` Policy cap allows ${carryoverMaxDays} carryover day${carryoverMaxDays !== 1 ? 's' : ''}; ${excessDays} day${excessDays !== 1 ? 's' : ''} may be lost.`;
     }
-    
     if (carryoverExpiryDate) {
-      const expiryDate = new Date(carryoverExpiryDate);
-      message += ` Important: Carryover days expire on ${expiryDate.toLocaleDateString()}. Use them before this date.`;
+      message += ` Carryover expires on ${new Date(carryoverExpiryDate).toLocaleDateString()}.`;
     }
   } else if (willLose > 0) {
-    message += ` Note: ${Math.round(willLose)} days will be lost at year end if not used.`;
+    message += ` Projected loss: ${Math.round(willLose)} day${Math.round(willLose) !== 1 ? 's' : ''} by year end.`;
   }
-  
-  // Add coordination advice if manual balance is set (but not if we already added it in the zero balance case)
+
   if (hasManualBalance && remainingBalance !== 0) {
-    message += ` Your leave balance has been manually adjusted by your team leader. Please coordinate with your leader if you have questions about your leave allocation or need to discuss adjustments.`;
+    message += ' Your balance includes a manual adjustment from your team leader.';
   }
-  
+
+  const theme = buildLeaveBandTheme(band);
+
   return {
-    score,
-    scoreLabel,
-    gradientColors,
-    bgGradient,
-    borderColor,
-    textColor,
-    badgeColor,
-    quote,
+    score: band,
+    scoreLabel: theme.scoreLabel,
+    gradientColors: theme.gradientColors,
+    bgGradient: theme.bgGradient,
+    borderColor: theme.borderColor,
+    textColor: theme.textColor,
+    badgeColor: theme.badgeColor,
+    quote: theme.quote,
     message,
   };
 }

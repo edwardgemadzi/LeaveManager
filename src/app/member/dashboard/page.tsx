@@ -595,6 +595,31 @@ export default function MemberDashboard() {
               return sum;
             });
 
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+            const approvedFutureDays = myRequests
+              .filter((r) => r.status === 'approved' && parseDateSafe(r.endDate).getTime() >= now.getTime())
+              .reduce((sum, r) => {
+                const start = parseDateSafe(r.startDate);
+                const end = parseDateSafe(r.endDate);
+                start.setHours(0, 0, 0, 0);
+                end.setHours(23, 59, 59, 999);
+                if (end < now) return sum;
+                const effectiveStart = start < now ? now : start;
+                return sum + countWorkingDays(effectiveStart, end, shiftSchedule);
+              }, 0);
+            const pendingFutureDays = myRequests
+              .filter((r) => r.status === 'pending' && parseDateSafe(r.endDate).getTime() >= now.getTime())
+              .reduce((sum, r) => {
+                const start = parseDateSafe(r.startDate);
+                const end = parseDateSafe(r.endDate);
+                start.setHours(0, 0, 0, 0);
+                end.setHours(23, 59, 59, 999);
+                if (end < now) return sum;
+                const effectiveStart = start < now ? now : start;
+                return sum + countWorkingDays(effectiveStart, end, shiftSchedule);
+              }, 0);
+
             const leaveScore = analytics
               ? calculateTimeBasedLeaveScore(
                   maxPerYear,
@@ -608,7 +633,9 @@ export default function MemberDashboard() {
                   team?.settings.carryoverSettings?.maxCarryoverDays,
                   team?.settings.carryoverSettings?.expiryDate
                     ? new Date(team.settings.carryoverSettings.expiryDate)
-                    : undefined
+                    : undefined,
+                  approvedFutureDays,
+                  pendingFutureDays
                 )
               : null;
 
