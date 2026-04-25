@@ -8,7 +8,7 @@ import { LEAVE_REASONS } from '@/lib/leaveReasons';
 import { ExclamationTriangleIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useNotification } from '@/hooks/useNotification';
 import { useBrowserNotification } from '@/hooks/useBrowserNotification';
-import { parseDateSafe } from '@/lib/dateUtils';
+import { formatDateSafe, parseDateSafe } from '@/lib/dateUtils';
 import { isBypassNoticePeriodActive } from '@/lib/noticePeriod';
 import { useTeamData } from '@/hooks/useTeamData';
 import { useRequests } from '@/hooks/useRequests';
@@ -59,6 +59,7 @@ export default function MemberRequestsPage() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [availabilityPreview, setAvailabilityPreview] = useState<{ available: boolean; message: string } | null>(null);
   const [dateConstraints, setDateConstraints] = useState<Record<string, LeaveDateConstraintDay>>({});
+  const [constraintsFetchState, setConstraintsFetchState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const bypassActive = isBypassNoticePeriodActive(teamSettings);
   const todayIso = new Date().toISOString().split('T')[0];
   const minStartDateIso = (() => {
@@ -174,21 +175,34 @@ export default function MemberRequestsPage() {
   useEffect(() => {
     const controller = new AbortController();
     const fetchConstraints = async () => {
-      if (!showForm) return;
+      if (!showForm) {
+        setConstraintsFetchState('idle');
+        setDateConstraints({});
+        return;
+      }
       const from = minStartDateIso;
-      const toDate = new Date(from);
-      toDate.setDate(toDate.getDate() + 120);
-      const to = toDate.toISOString().split('T')[0];
+      // API allows at most 120 inclusive calendar days; from..to must span 120 days, not 121.
+      const fromParsed = parseDateSafe(from);
+      const toParsed = new Date(fromParsed);
+      toParsed.setDate(toParsed.getDate() + 119);
+      const to = formatDateSafe(toParsed);
+      setConstraintsFetchState('loading');
+      setDateConstraints({});
       try {
         const response = await fetch(
           `/api/leave-requests/constraints?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
           { credentials: 'include', signal: controller.signal }
         );
-        if (!response.ok) return;
+        if (!response.ok) {
+          setConstraintsFetchState('error');
+          return;
+        }
         const data = await response.json();
         setDateConstraints(data.days || {});
-      } catch {
-        // ignore transient constraint fetch failures
+        setConstraintsFetchState('success');
+      } catch (err: unknown) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        setConstraintsFetchState('error');
       }
     };
     fetchConstraints();
@@ -204,7 +218,19 @@ export default function MemberRequestsPage() {
     }
     const constraint = dateConstraints[dateIso];
     if (!constraint) {
-      return { selectable: false, message: 'Date constraints are still loading. Please try again in a moment.' };
+      if (constraintsFetchState === 'loading') {
+        return { selectable: false, message: 'Date constraints are still loading. Please try again in a moment.' };
+      }
+      if (constraintsFetchState === 'error') {
+        return {
+          selectable: false,
+          message: 'Could not load date availability. Refresh the page or try again in a moment.',
+        };
+      }
+      return {
+        selectable: false,
+        message: 'No availability data for this date. Try refreshing or pick a date within the next few months.',
+      };
     }
     return { selectable: constraint.selectable, message: constraint.message };
   };
@@ -596,19 +622,17 @@ export default function MemberRequestsPage() {
                           return;
                         }
 
-                        const startDate = new Date(start);
-                        const endDate = new Date(nextEndDate);
+                        const startDate = parseDateSafe(start);
+                        const endDate = parseDateSafe(nextEndDate);
                         if (endDate < startDate) {
                           showInfo('End date cannot be before start date.');
                           return;
                         }
 
                         const cursor = new Date(startDate);
-                        cursor.setHours(0, 0, 0, 0);
                         const last = new Date(endDate);
-                        last.setHours(0, 0, 0, 0);
                         while (cursor <= last) {
-                          const dayKey = cursor.toISOString().split('T')[0];
+                          const dayKey = formatDateSafe(cursor);
                           const selection = isDateSelectable(dayKey);
                           if (!selection.selectable) {
                             showInfo(selection.message || `Date ${dayKey} is not available.`);

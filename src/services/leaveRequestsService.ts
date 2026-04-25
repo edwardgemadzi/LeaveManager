@@ -5,7 +5,7 @@ import { UserModel } from '@/models/User';
 import { isBypassNoticePeriodActive } from '@/lib/noticePeriod';
 import { validateRequest, schemas } from '@/lib/validation';
 import { getClient } from '@/lib/mongodb';
-import { parseDateSafe } from '@/lib/dateUtils';
+import { formatDateSafe, parseDateSafe } from '@/lib/dateUtils';
 import { isWorkingDay } from '@/lib/leaveCalculations';
 import { teamIdsMatch } from '@/lib/helpers';
 
@@ -949,7 +949,7 @@ export async function getLeaveDateConstraints(params: {
     const reqEnd = parseDateSafe(req.endDate);
     reqEnd.setHours(0, 0, 0, 0);
     for (let d = new Date(reqStart); d <= reqEnd; d.setDate(d.getDate() + 1)) {
-      pendingOverlapDays.add(d.toISOString().split('T')[0]);
+      pendingOverlapDays.add(formatDateSafe(d));
     }
   });
 
@@ -978,7 +978,7 @@ export async function getLeaveDateConstraints(params: {
 
   while (iter <= iterEnd) {
     const current = new Date(iter);
-    const dayKey = current.toISOString().split('T')[0];
+    const dayKey = formatDateSafe(current);
     const codes: LeaveDateConstraintCode[] = [];
 
     if (current < today) {
