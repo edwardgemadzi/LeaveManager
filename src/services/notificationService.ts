@@ -1,4 +1,4 @@
-import type { LeaveRequest, User } from '@/types';
+import type { LeaveRequest, LeaveSwapRequest, User } from '@/types';
 import { shell, formatDateRange, escapeForHtml, sendHtmlEmail } from '@/lib/mailer';
 import { sendTelegramMessage } from '@/lib/telegram';
 import { UserModel } from '@/models/User';
@@ -159,6 +159,154 @@ export async function notifyLeaveSubmitted(params: {
         );
       }
     }
+  }
+
+  await Promise.allSettled(tasks);
+}
+
+function swapDateRange(swap: LeaveSwapRequest): { source: string; target: string } {
+  const s0 = toIsoDate(swap.sourceSubStart);
+  const s1 = toIsoDate(swap.sourceSubEnd);
+  const t0 = toIsoDate(swap.targetStart);
+  const t1 = toIsoDate(swap.targetEnd);
+  return {
+    source: formatDateRange(s0, s1),
+    target: formatDateRange(t0, t1),
+  };
+}
+
+export async function notifyLeaveSwapSubmitted(params: {
+  swap: LeaveSwapRequest;
+  member: User;
+  teamName: string;
+}): Promise<void> {
+  const { swap, member, teamName } = params;
+  const { source, target } = swapDateRange(swap);
+  const base = appBaseUrl();
+  const tasks: Promise<unknown>[] = [];
+
+  const team = await TeamModel.findById(String(swap.teamId));
+  if (team?.leaderId) {
+    const leader = await UserModel.findById(String(team.leaderId));
+    if (leader && leader._id && String(leader._id) !== String(member._id)) {
+      const leaderMagic = await createSingleUseMagicLinkToken({
+        userId: String(leader._id),
+        nextPath: '/leader/requests',
+      });
+      const leaderLink = `${base}/api/auth/magic?token=${encodeURIComponent(leaderMagic)}`;
+      const memberLabel = displayName(member);
+
+      if (wantsEmail(leader)) {
+        const inner = `
+          <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;"><strong>${escapeForHtml(memberLabel)}</strong> requested a <strong>leave date swap</strong> (pending your approval).</p>
+          <table role="presentation" style="margin:16px 0;border-collapse:collapse;width:100%;">
+            <tr><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:13px;">Team</td><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;font-size:14px;">${escapeForHtml(teamName)}</td></tr>
+            <tr><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:13px;">Move from</td><td style="padding:8px 0;border-bottom:1px solid #e2e8f0;font-size:14px;">${escapeForHtml(source)}</td></tr>
+            <tr><td style="padding:8px 0;color:#64748b;font-size:13px;">Move to</td><td style="padding:8px 0;font-size:14px;">${escapeForHtml(target)}</td></tr>
+          </table>
+          <p style="margin:20px 0 0;">
+            <a href="${leaderLink}" style="display:inline-block;background:#4f46e5;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:14px;">Review swap requests</a>
+          </p>
+        `;
+        tasks.push(
+          sendHtmlEmail({
+            to: leader.email!.trim(),
+            subject: `Leave swap request from ${memberLabel}`,
+            html: shell(inner, {
+              title: 'Leave swap pending',
+              preheader: `${source} → ${target}`,
+            }),
+          })
+        );
+      }
+
+      if (wantsTelegram(leader)) {
+        tasks.push(
+          sendTelegramMessage({
+            chatId: leader.telegramUserId!,
+            text:
+              `Leave swap request\n` +
+              `From: ${memberLabel}\n` +
+              `Move from: ${source}\n` +
+              `Move to: ${target}\n` +
+              `Team: ${teamName}`,
+          })
+        );
+      }
+    }
+  }
+
+  await Promise.allSettled(tasks);
+}
+
+export async function notifyLeaveSwapDecision(params: {
+  swap: LeaveSwapRequest;
+  member: User;
+  status: 'approved' | 'rejected';
+  decisionNote?: string;
+  leaderUsername: string;
+}): Promise<void> {
+  const { swap, member, status, decisionNote, leaderUsername } = params;
+  const { source, target } = swapDateRange(swap);
+  const base = appBaseUrl();
+  const magic = await createSingleUseMagicLinkToken({
+    userId: String(member._id),
+    nextPath: '/member/requests',
+  });
+  const link = `${base}/api/auth/magic?token=${encodeURIComponent(magic)}`;
+
+  const statusWord = status === 'approved' ? 'approved' : 'declined';
+  const subject =
+    status === 'approved'
+      ? `Leave swap approved — ${target}`
+      : `Leave swap declined — ${source} → ${target}`;
+
+  const noteHtml =
+    status === 'rejected' && decisionNote
+      ? `<p style="margin:12px 0;font-size:14px;line-height:1.5;color:#334155;"><strong>Note from approver:</strong> ${escapeForHtml(decisionNote)}</p>`
+      : decisionNote && status === 'approved'
+        ? `<p style="margin:12px 0;font-size:14px;line-height:1.5;color:#334155;"><strong>Note:</strong> ${escapeForHtml(decisionNote)}</p>`
+        : '';
+
+  const tasks: Promise<unknown>[] = [];
+
+  if (wantsEmail(member)) {
+    const inner = `
+      <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Hi ${escapeForHtml(greetingName(member))},</p>
+      <p style="margin:0 0 12px;font-size:15px;line-height:1.5;color:#334155;">Your leave date swap (${escapeForHtml(source)} → ${escapeForHtml(target)}) was <strong>${escapeForHtml(statusWord)}</strong> by ${escapeForHtml(leaderUsername)}.</p>
+      ${noteHtml}
+      <p style="margin:20px 0 0;">
+        <a href="${link}" style="display:inline-block;background:#4f46e5;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:14px;">View my requests</a>
+      </p>
+    `;
+    tasks.push(
+      sendHtmlEmail({
+        to: member.email!.trim(),
+        subject,
+        html: shell(inner, {
+          title: status === 'approved' ? 'Swap approved' : 'Swap declined',
+          preheader: `${source} → ${target}`,
+        }),
+      })
+    );
+  }
+
+  if (wantsTelegram(member)) {
+    const note =
+      decisionNote && status === 'rejected'
+        ? `\nNote: ${decisionNote}`
+        : decisionNote && status === 'approved'
+          ? `\nNote: ${decisionNote}`
+          : '';
+    tasks.push(
+      sendTelegramMessage({
+        chatId: member.telegramUserId!,
+        text:
+          `Leave swap ${status === 'approved' ? 'approved' : 'declined'}\n` +
+          `${source} → ${target}\n` +
+          `By: ${leaderUsername}${note}`,
+      })
+    );
   }
 
   await Promise.allSettled(tasks);

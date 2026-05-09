@@ -244,3 +244,36 @@ export interface CreateLeaveRequestBatch {
   requestedFor?: string;
   isHistorical?: boolean;
 }
+
+export type LeaveSwapRequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+
+export interface LeaveSwapRequest {
+  _id?: string;
+  userId: string;
+  teamId: string;
+  leaveRequestId: string;
+  sourceSubStart: Date;
+  sourceSubEnd: Date;
+  targetStart: Date;
+  targetEnd: Date;
+  /** Full leave request bounds at submission (stale detection). */
+  sourceSnapshotStart: Date;
+  sourceSnapshotEnd: Date;
+  memberNote?: string;
+  status: LeaveSwapRequestStatus;
+  decisionNote?: string;
+  decisionAt?: Date;
+  decisionBy?: string;
+  decisionByUsername?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateLeaveSwapRequestBody {
+  leaveRequestId: string;
+  sourceSubStart: string;
+  sourceSubEnd: string;
+  targetStart: string;
+  targetEnd: string;
+  memberNote?: string;
+}

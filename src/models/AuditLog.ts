@@ -2,7 +2,18 @@ import { getDatabase, getDatabaseRaw } from '@/lib/mongodb';
 
 export interface AuditLog {
   _id?: string;
-  action: 'leave_approved' | 'leave_rejected' | 'leave_created' | 'leave_updated' | 'leave_deleted' | 'team_settings_updated' | 'user_registered';
+  action:
+    | 'leave_approved'
+    | 'leave_rejected'
+    | 'leave_created'
+    | 'leave_updated'
+    | 'leave_deleted'
+    | 'leave_swap_created'
+    | 'leave_swap_approved'
+    | 'leave_swap_rejected'
+    | 'leave_swap_cancelled'
+    | 'team_settings_updated'
+    | 'user_registered';
   userId: string;
   userName: string;
   userRole: 'leader' | 'member';

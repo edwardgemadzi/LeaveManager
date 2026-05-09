@@ -4,12 +4,15 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import TeamCalendar from '@/components/shared/Calendar';
-import { Team, User, LeaveRequest } from '@/types';
+import { Team, User, LeaveRequest, LeaveSwapRequest } from '@/types';
 import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
 import { getWorkingDaysGroupDisplayName } from '@/lib/helpers';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
 import { useTeamData } from '@/hooks/useTeamData';
 import { useRequests } from '@/hooks/useRequests';
+import { useAuthedSWR } from '@/hooks/useAuthedSWR';
+import { formatDateSafe, parseDateSafe } from '@/lib/dateUtils';
+import { userDisplayName } from '@/lib/userDisplayName';
 
 export default function LeaderCalendarPage() {
   const [team, setTeam] = useState<Team | null>(null);
@@ -28,6 +31,24 @@ export default function LeaderCalendarPage() {
   const { data: requestsData, mutate: mutateRequests, isLoading: requestsLoading } = useRequests({
     fields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'createdAt'],
   });
+  const { data: swapRequestsRaw, mutate: mutateSwaps } = useAuthedSWR<LeaveSwapRequest[]>(
+    teamData?.team?._id ? '/api/leave-swap-requests?status=pending' : null
+  );
+  const pendingSwaps = useMemo(
+    () => (swapRequestsRaw ?? []).filter((s) => s.status === 'pending'),
+    [swapRequestsRaw]
+  );
+  const swapTargetPreviewDates = useMemo(() => {
+    const roster = teamData?.members?.length ? teamData.members : members;
+    return pendingSwaps.map((s) => {
+      const requestor = roster.find((m) => String(m._id) === String(s.userId));
+      return {
+        startDate: formatDateSafe(parseDateSafe(s.targetStart as unknown as string | Date)),
+        endDate: formatDateSafe(parseDateSafe(s.targetEnd as unknown as string | Date)),
+        requestorName: userDisplayName(requestor),
+      };
+    });
+  }, [pendingSwaps, members, teamData?.members]);
 
   useEffect(() => {
     if (teamData?.team) setTeam(teamData.team);
@@ -47,7 +68,7 @@ export default function LeaderCalendarPage() {
     enabled: !loading && !!team,
     onEvent: (event) => {
       // Refresh calendar when leave requests are created, updated, or deleted
-      if (event.type === 'leaveRequestCreated' || event.type === 'leaveRequestUpdated' || event.type === 'leaveRequestDeleted' || event.type === 'leaveRequestRestored') {
+      if (event.type === 'leaveRequestCreated' || event.type === 'leaveRequestUpdated' || event.type === 'leaveRequestDeleted' || event.type === 'leaveRequestRestored' || event.type === 'leaveSwapRequestUpdated') {
         // Debounce refresh to avoid excessive API calls
         if (refreshTimeoutRef.current) {
           clearTimeout(refreshTimeoutRef.current);
@@ -55,6 +76,7 @@ export default function LeaderCalendarPage() {
         refreshTimeoutRef.current = setTimeout(() => {
           mutateRequests();
           mutateTeam();
+          void mutateSwaps();
         }, 300);
       }
     },
@@ -382,6 +404,7 @@ export default function LeaderCalendarPage() {
                       paternityLeave: team.settings.paternityLeave
                     } : undefined}
                     initialRequests={filteredRequests}
+                    swapTargetPreviewDates={swapTargetPreviewDates}
                   />
                 ) : (
                   <div className="flex items-center justify-center h-64">

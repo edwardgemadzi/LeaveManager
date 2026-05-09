@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
-import { LeaveRequest } from '@/types';
+import { LeaveRequest, LeaveSwapRequest } from '@/types';
 import { LEAVE_REASONS } from '@/lib/leaveReasons';
 import { ExclamationTriangleIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useNotification } from '@/hooks/useNotification';
@@ -15,6 +15,9 @@ import { useRequests } from '@/hooks/useRequests';
 import { setStoredUser } from '@/lib/clientUserStorage';
 import EditRequestModal from '@/components/shared/EditRequestModal';
 import MemberAutoFillModal from '@/components/shared/MemberAutoFillModal';
+import MemberLeaveSwapModal from '@/components/shared/MemberLeaveSwapModal';
+import { useAuthedSWR } from '@/hooks/useAuthedSWR';
+import { useTeamEvents } from '@/hooks/useTeamEvents';
 import { SparklesIcon } from '@heroicons/react/24/outline';
 import { calculateLeaveBalance } from '@/lib/leaveCalculations';
 import { getEffectiveManualYearToDateUsed } from '@/lib/yearOverrides';
@@ -53,6 +56,8 @@ export default function MemberRequestsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [editingRequest, setEditingRequest] = useState<LeaveRequest | null>(null);
+  const [swapModalRequest, setSwapModalRequest] = useState<LeaveRequest | null>(null);
+  const [cancellingSwapId, setCancellingSwapId] = useState<string | null>(null);
   const [autoFillOpen, setAutoFillOpen] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -99,7 +104,32 @@ export default function MemberRequestsPage() {
   const { data: allRequests, mutate: mutateRequests, isLoading: requestsLoading } = useRequests({
     fields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'decisionNote', 'decisionAt', 'decisionByUsername', 'createdAt', 'requestedBy', 'requiresMemberConsent', 'memberConsentStatus'],
   });
+  const { data: swapRequestsRaw, mutate: mutateSwaps } = useAuthedSWR<LeaveSwapRequest[]>(
+    teamData?.team?._id ? '/api/leave-swap-requests' : null
+  );
+  const swapRequests = swapRequestsRaw ?? [];
+  const pendingSwaps = swapRequests.filter((s) => s.status === 'pending');
   const [consentLoading, setConsentLoading] = useState<string | null>(null);
+
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  useTeamEvents(teamData?.team?._id ?? null, {
+    enabled: !teamLoading && !requestsLoading && !!teamData?.team?._id,
+    onEvent: (event) => {
+      if (
+        event.type === 'leaveRequestCreated' ||
+        event.type === 'leaveRequestUpdated' ||
+        event.type === 'leaveRequestDeleted' ||
+        event.type === 'leaveRequestRestored' ||
+        event.type === 'leaveSwapRequestUpdated'
+      ) {
+        if (refreshTimeoutRef.current) clearTimeout(refreshTimeoutRef.current);
+        refreshTimeoutRef.current = setTimeout(() => {
+          mutateRequests();
+          mutateSwaps();
+        }, 300);
+      }
+    },
+  });
 
   useEffect(() => {
     const run = async () => {
@@ -468,6 +498,27 @@ export default function MemberRequestsPage() {
     }
   }
 
+  async function handleCancelSwap(swapId: string) {
+    setCancellingSwapId(swapId);
+    try {
+      const res = await fetch(`/api/leave-swap-requests/${swapId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        showSuccess('Swap request cancelled');
+        await mutateSwaps();
+      } else {
+        showError(String(data.error || 'Failed to cancel swap'));
+      }
+    } catch {
+      showError('Network error');
+    } finally {
+      setCancellingSwapId(null);
+    }
+  }
+
   const consentPendingRequests = myRequests.filter(
     (r) => r.requiresMemberConsent && r.memberConsentStatus === 'pending'
   );
@@ -723,6 +774,44 @@ export default function MemberRequestsPage() {
           </div>
         )}
 
+        {pendingSwaps.length > 0 && (
+          <div className="mb-6 rounded-2xl border border-indigo-200 dark:border-indigo-800/60 bg-indigo-50/50 dark:bg-indigo-950/20 overflow-hidden">
+            <div className="px-4 py-3 border-b border-indigo-200 dark:border-indigo-800/50">
+              <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-200">
+                Pending date swaps ({pendingSwaps.length})
+              </p>
+              <p className="text-xs text-indigo-700 dark:text-indigo-300 mt-0.5">
+                Waiting for your leader to approve moving part of your approved leave to new dates.
+              </p>
+            </div>
+            <div className="divide-y divide-indigo-100 dark:divide-indigo-900/40">
+              {pendingSwaps.map((swap) => (
+                <div key={swap._id} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
+                  <div className="min-w-0 text-zinc-700 dark:text-zinc-200">
+                    <span className="font-medium">
+                      {formatDateSafe(parseDateSafe(swap.sourceSubStart))} –{' '}
+                      {formatDateSafe(parseDateSafe(swap.sourceSubEnd))}
+                    </span>
+                    <span className="text-zinc-500 dark:text-zinc-400"> → </span>
+                    <span className="font-medium">
+                      {formatDateSafe(parseDateSafe(swap.targetStart))} –{' '}
+                      {formatDateSafe(parseDateSafe(swap.targetEnd))}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => swap._id && void handleCancelSwap(swap._id)}
+                    disabled={cancellingSwapId === swap._id}
+                    className="btn-secondary text-xs py-1.5 px-2.5 self-start sm:self-auto disabled:opacity-50"
+                  >
+                    {cancellingSwapId === swap._id ? 'Cancelling…' : 'Cancel swap'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Action Required — consent pending section */}
         {consentPendingRequests.length > 0 && (
           <div className="mb-6 rounded-2xl border-2 border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/20 overflow-hidden">
@@ -866,6 +955,24 @@ export default function MemberRequestsPage() {
                               {deleting === request._id ? 'Cancelling…' : 'Cancel'}
                             </button>
                           </div>
+                        ) : request.status === 'approved' && !selectionMode ? (
+                          <div className="shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (pendingSwaps.some((s) => String(s.leaveRequestId) === String(request._id))) {
+                                  showInfo(
+                                    'You already have a pending swap for this leave. Cancel it first or wait for a decision.'
+                                  );
+                                  return;
+                                }
+                                setSwapModalRequest(request);
+                              }}
+                              className="btn-secondary text-xs py-1.5 px-2.5"
+                            >
+                              Swap dates
+                            </button>
+                          </div>
                         ) : null}
                       </div>
                     </div>
@@ -907,6 +1014,18 @@ export default function MemberRequestsPage() {
         request={editingRequest}
         onConfirm={handleEditConfirm}
         onCancel={() => setEditingRequest(null)}
+      />
+      <MemberLeaveSwapModal
+        open={!!swapModalRequest}
+        request={swapModalRequest}
+        onClose={() => setSwapModalRequest(null)}
+        onSuccess={() => {
+          void mutateRequests();
+          void mutateSwaps();
+        }}
+        showInfo={showInfo}
+        showSuccess={showSuccess}
+        showError={showError}
       />
       {teamData?.currentUser && teamData?.team && allRequests && (
         <MemberAutoFillModal

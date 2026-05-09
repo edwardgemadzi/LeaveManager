@@ -15,6 +15,9 @@ import { isBypassNoticePeriodActive } from '@/lib/noticePeriod';
 
 const localizer = momentLocalizer(moment);
 
+/** Thicker, darker dashed frame for pending swap tiles (original leave + requested dates). */
+const PENDING_SWAP_DASH_BORDER = '3px dashed #a16207';
+
 interface CalendarEvent {
   id: string;
   title: string;
@@ -27,6 +30,10 @@ interface CalendarEvent {
     fullName?: string;
     isEmergency?: boolean;
     requestedBy?: string;
+    /** Source leave request id for swap / linking (omit for preview or aggregated tiles). */
+    leaveRequestId?: string;
+    /** True when this leave has a submitted swap awaiting leader decision. */
+    swapPending?: boolean;
     aggregated?: boolean;
     memberNames?: string[];
     requestCount?: number;
@@ -62,6 +69,39 @@ function buildPreviewEvents(previewDates: Array<{ startDate: string; endDate: st
   return events;
 }
 
+export type SwapTargetPreviewBlock = {
+  startDate: string;
+  endDate: string;
+  /** Shown on each tile so teammates know who requested the swap. */
+  requestorName: string;
+};
+
+/** Pending swap “move to” range — not booked leave until the leader approves. */
+function buildSwapTargetPreviewEvents(blocks: SwapTargetPreviewBlock[] | null | undefined): CalendarEvent[] {
+  if (!blocks || blocks.length === 0) return [];
+  const events: CalendarEvent[] = [];
+  blocks.forEach((block, idx) => {
+    const name = (block.requestorName || 'Member').trim() || 'Member';
+    const start = new Date(block.startDate + 'T00:00:00');
+    const end = new Date(block.endDate + 'T00:00:00');
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      events.push({
+        id: `swap-target-${idx}-${d.toISOString().split('T')[0]}`,
+        title: `${name} — swap pending`,
+        start: new Date(d),
+        end: new Date(d),
+        resource: {
+          status: 'swap-target',
+          userId: 'swap-target',
+          username: name,
+          fullName: name,
+        },
+      });
+    }
+  });
+  return events;
+}
+
 type LeaveDateConstraintDay = {
   selectable: boolean;
   codes: string[];
@@ -81,9 +121,15 @@ interface CalendarProps {
   initialRequests?: LeaveRequest[]; // Optional: initial requests (if provided, skip fetching)
   onMemberSelectionChange?: (summary: { selectionMode: boolean; selectedCount: number; clearSelection: () => void }) => void;
   previewDates?: Array<{ startDate: string; endDate: string }>;
+  /** When set, members can open date-swap from their own approved leave in the event details modal. */
+  onMemberSwapDates?: (leaveRequestId: string) => void;
+  /** Leave request ids with a pending swap (member calendar); used to style tiles and copy. */
+  pendingSwapLeaveRequestIds?: readonly string[];
+  /** “Move to” date ranges for pending swaps; shown as yellow pending overlay (member + leader). */
+  swapTargetPreviewDates?: SwapTargetPreviewBlock[];
 }
 
-export default function TeamCalendar({ teamId, members, currentUser, teamSettings: providedTeamSettings, initialRequests, onMemberSelectionChange, previewDates }: CalendarProps) {
+export default function TeamCalendar({ teamId, members, currentUser, teamSettings: providedTeamSettings, initialRequests, onMemberSelectionChange, previewDates, onMemberSwapDates, pendingSwapLeaveRequestIds, swapTargetPreviewDates }: CalendarProps) {
   const { showSuccess, showError, showInfo } = useNotification();
   const { showNotification: showBrowserNotification } = useBrowserNotification();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -159,12 +205,15 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
   // Process requests into calendar events
   const processRequestsIntoEvents = useCallback((requests: LeaveRequest[]) => {
     const calendarEvents: CalendarEvent[] = [];
-    
+    const swapPendingIds = new Set((pendingSwapLeaveRequestIds ?? []).map((id) => String(id)));
+
     requests.forEach(request => {
       // Skip rejected requests - they shouldn't show on the calendar
       if (request.status === 'rejected') {
         return;
       }
+
+      const swapPending = request._id ? swapPendingIds.has(String(request._id)) : false;
 
       const member = members.find(m => m._id === request.userId);
       // If member not found in members array, still create event with basic info
@@ -222,6 +271,8 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
               fullName: member?.fullName,
               isEmergency,
               requestedBy: request.requestedBy,
+              leaveRequestId: request._id!,
+              swapPending,
             },
           });
           
@@ -247,6 +298,8 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
             fullName: member?.fullName,
             isEmergency,
             requestedBy: request.requestedBy,
+            leaveRequestId: request._id!,
+            swapPending,
           },
         });
       } else {
@@ -276,6 +329,8 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
               fullName: member?.fullName,
               isEmergency,
               requestedBy: request.requestedBy,
+              leaveRequestId: request._id!,
+              swapPending,
             },
           });
         });
@@ -330,12 +385,14 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
       });
 
       const previewEvts = buildPreviewEvents(previewDatesRef.current);
-      setEvents([...mobileMonthEvents, ...previewEvts]);
+      const swapTargetEvts = buildSwapTargetPreviewEvents(swapTargetPreviewDates);
+      setEvents([...mobileMonthEvents, ...previewEvts, ...swapTargetEvts]);
       return;
     }
     const previewEvts = buildPreviewEvents(previewDatesRef.current);
-    setEvents([...calendarEvents, ...previewEvts]);
-  }, [members, providedTeamSettings, isMobile, currentView]);
+    const swapTargetEvts = buildSwapTargetPreviewEvents(swapTargetPreviewDates);
+    setEvents([...calendarEvents, ...previewEvts, ...swapTargetEvts]);
+  }, [members, providedTeamSettings, isMobile, currentView, pendingSwapLeaveRequestIds, swapTargetPreviewDates]);
 
   // Merge preview dates into events
   useEffect(() => {
@@ -363,6 +420,15 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
       return [...nonPreview, ...previewEvents];
     });
   }, [previewDates]);
+
+  // Keep swap-target overlay in sync when only pending swap ranges change (without re-fetching leave list).
+  useEffect(() => {
+    setEvents((prev) => {
+      const withoutSwapTarget = prev.filter((e) => e.resource.status !== 'swap-target');
+      const swapEvts = buildSwapTargetPreviewEvents(swapTargetPreviewDates);
+      return [...withoutSwapTarget, ...swapEvts];
+    });
+  }, [swapTargetPreviewDates]);
 
   useEffect(() => {
     // Use provided initialRequests if available (including empty array for filtered results)
@@ -472,15 +538,31 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
       };
     }
 
+    if (event.resource.status === 'swap-target') {
+      return {
+        style: {
+          backgroundColor: '#fef08a',
+          borderRadius: '5px',
+          opacity: 0.98,
+          color: '#713f12',
+          border: PENDING_SWAP_DASH_BORDER,
+          display: 'block',
+          fontWeight: 700,
+          fontSize: '11px',
+        },
+      };
+    }
+
     const backgroundColor = getEventColor(reason, event.resource.isEmergency || false, event.resource.status);
+    const swapPending = Boolean(event.resource.swapPending);
 
     return {
       style: {
         backgroundColor,
         borderRadius: '5px',
-        opacity: 0.8,
+        opacity: swapPending ? 0.95 : 0.8,
         color: 'white',
-        border: '0px',
+        border: swapPending ? PENDING_SWAP_DASH_BORDER : '0px',
         display: 'block',
         fontWeight: event.resource.isEmergency ? 'bold' : 'normal',
       },
@@ -911,6 +993,19 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
             </div>
           </div>
         )}
+        {swapTargetPreviewDates && swapTargetPreviewDates.length > 0 && (
+          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700 rounded-lg p-3">
+            <div className="flex items-start gap-2">
+              <div
+                className="w-6 h-6 rounded shrink-0 mt-0.5"
+                style={{ backgroundColor: '#fef08a', border: PENDING_SWAP_DASH_BORDER }}
+              />
+              <p className="text-sm text-amber-950 dark:text-amber-100">
+                <span className="font-semibold">Yellow dashed tiles</span> are <strong>requested new dates</strong> for a pending leave swap. Each tile shows the <strong>requestor’s name</strong>. They are not booked until a leader approves the swap.
+              </p>
+            </div>
+          </div>
+        )}
         {/* Status Priority */}
         <div>
           <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">Status Priority:</h4>
@@ -975,7 +1070,9 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-6">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Leave Request Details</h3>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                {selectedEvent.resource.status === 'swap-target' ? 'Pending date swap' : 'Leave Request Details'}
+              </h3>
               <button
                 onClick={closeModal}
                 className="text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl font-bold"
@@ -985,6 +1082,48 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
             </div>
             
             {(() => {
+              if (selectedEvent.resource.status === 'swap-target') {
+                const requestor =
+                  selectedEvent.resource.fullName ||
+                  selectedEvent.resource.username ||
+                  'Member';
+                const day = selectedEvent.start.toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                });
+                return (
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3">
+                      <ClockIcon className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+                      <div>
+                        <p className="font-semibold text-gray-900 dark:text-gray-100">{requestor}</p>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-200 dark:bg-amber-900/50 text-amber-950 dark:text-amber-100">
+                          PENDING LEADER APPROVAL
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <strong>{requestor}</strong> requested to move approved leave; this day is in the <strong>move to</strong> range they chose. It is not approved leave until a leader approves the swap.
+                    </p>
+                    <div className="border-t dark:border-gray-700 pt-4">
+                      <p className="text-sm text-gray-600 dark:text-gray-400"><strong>Date:</strong></p>
+                      <p className="text-gray-900 dark:text-gray-100">{day}</p>
+                    </div>
+                    <div className="flex justify-end pt-4">
+                      <button
+                        type="button"
+                        onClick={closeModal}
+                        className="px-4 py-2 bg-indigo-600 dark:bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-700 transition-colors"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
               const member = members.find(m => m._id === selectedEvent.resource.userId);
               const memberName = selectedEvent.resource.fullName || member?.fullName || selectedEvent.resource.username || 'Unknown Member';
               const startDate = selectedEvent.start.toLocaleDateString('en-US', {
@@ -1011,6 +1150,15 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
                 : statusConfig[selectedEvent.resource.status as keyof typeof statusConfig];
               
               const StatusIcon = status.Icon;
+
+              const canSwapDates =
+                Boolean(onMemberSwapDates) &&
+                isMember &&
+                currentUser?._id === selectedEvent.resource.userId &&
+                selectedEvent.resource.status === 'approved' &&
+                !selectedEvent.resource.aggregated &&
+                Boolean(selectedEvent.resource.leaveRequestId) &&
+                !selectedEvent.resource.swapPending;
               
               return (
                 <div className="space-y-4">
@@ -1026,6 +1174,11 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
                   </div>
                   
                   <div className="border-t dark:border-gray-700 pt-4">
+                    {selectedEvent.resource.swapPending ? (
+                      <div className="mb-4 rounded-lg border border-amber-200 dark:border-amber-800/80 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-100">
+                        <strong>Swap pending.</strong> Your leader has not approved this date change yet. Your original approved dates and the requested new dates both use a <strong className="text-amber-900 dark:text-amber-200">yellow dashed</strong> frame (new dates also show your name) until then.
+                      </div>
+                    ) : null}
                     {!selectedEvent.resource.aggregated ? (
                       <>
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-2"><strong>Reason:</strong></p>
@@ -1054,8 +1207,22 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
                     </div>
                   </div>
                   
-                  <div className="flex justify-end pt-4">
+                  <div className="flex justify-end gap-2 pt-4 flex-wrap">
+                    {canSwapDates && onMemberSwapDates && selectedEvent.resource.leaveRequestId ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const id = selectedEvent.resource.leaveRequestId!;
+                          closeModal();
+                          onMemberSwapDates(id);
+                        }}
+                        className="px-4 py-2 border border-indigo-600 dark:border-indigo-500 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors font-medium"
+                      >
+                        Swap dates
+                      </button>
+                    ) : null}
                     <button
+                      type="button"
                       onClick={closeModal}
                       className="px-4 py-2 bg-indigo-600 dark:bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-700 transition-colors"
                     >

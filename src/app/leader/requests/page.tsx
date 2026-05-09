@@ -4,13 +4,14 @@ import { useState, useEffect, useRef } from 'react';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import MigrationCalendar from '@/components/shared/MigrationCalendar';
-import { LeaveRequest, User } from '@/types';
+import { LeaveRequest, LeaveSwapRequest, User } from '@/types';
 import { LEAVE_REASONS, EMERGENCY_REASONS, isEmergencyReason } from '@/lib/leaveReasons';
 import { ExclamationTriangleIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import { useNotification } from '@/hooks/useNotification';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
 import { useTeamData } from '@/hooks/useTeamData';
 import { useRequests } from '@/hooks/useRequests';
+import { useAuthedSWR } from '@/hooks/useAuthedSWR';
 import { parseDateSafe, formatDateSafe } from '@/lib/dateUtils';
 import DecisionModal, { DecisionType } from '@/components/shared/DecisionModal';
 
@@ -75,6 +76,11 @@ export default function LeaderRequestsPage() {
     requestId: string | null;
     isBulk: boolean;
   }>({ open: false, type: 'approve', requestId: null, isBulk: false });
+  const [swapDecisionModal, setSwapDecisionModal] = useState<{
+    open: boolean;
+    type: DecisionType;
+    swapId: string | null;
+  }>({ open: false, type: 'approve', swapId: null });
   // Pending bulk action — resolved when modal confirms
   const pendingBulkActionRef = useRef<'approve' | 'reject' | null>(null);
 
@@ -84,6 +90,10 @@ export default function LeaderRequestsPage() {
     includeDeleted: true,
     fields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'decisionNote', 'decisionAt', 'decisionByUsername', 'createdAt', 'updatedAt', 'deletedAt', 'deletedBy', 'requestedBy', 'isHistoricalSubmission', 'submittedByMember', 'requiresMemberConsent', 'memberConsentStatus'],
   });
+  const { data: pendingSwapsRaw, mutate: mutateSwaps } = useAuthedSWR<LeaveSwapRequest[]>(
+    teamId ? '/api/leave-swap-requests?status=pending' : null
+  );
+  const pendingSwaps = pendingSwapsRaw ?? [];
 
   useEffect(() => {
     if (teamData?.members) {
@@ -114,7 +124,7 @@ export default function LeaderRequestsPage() {
     enabled: !loading && !!teamId,
     onEvent: (event) => {
       // Refresh requests list when events received
-      if (event.type === 'leaveRequestCreated' || event.type === 'leaveRequestUpdated' || event.type === 'leaveRequestDeleted' || event.type === 'leaveRequestRestored') {
+      if (event.type === 'leaveRequestCreated' || event.type === 'leaveRequestUpdated' || event.type === 'leaveRequestDeleted' || event.type === 'leaveRequestRestored' || event.type === 'leaveSwapRequestUpdated') {
         // Debounce refresh to avoid excessive API calls
         if (refreshTimeoutRef.current) {
           clearTimeout(refreshTimeoutRef.current);
@@ -122,6 +132,7 @@ export default function LeaderRequestsPage() {
         refreshTimeoutRef.current = setTimeout(() => {
           mutateRequests();
           mutateTeam();
+          mutateSwaps();
         }, 300);
       }
     },
@@ -162,6 +173,36 @@ export default function LeaderRequestsPage() {
       pendingBulkActionRef.current = null;
     } else if (requestId) {
       await submitDecision(requestId, type === 'approve' ? 'approved' : 'rejected', note);
+    }
+  };
+
+  const submitSwapDecision = async (swapId: string, status: 'approved' | 'rejected', decisionNote: string) => {
+    try {
+      const response = await fetch(`/api/leave-swap-requests/${swapId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status, decisionNote }),
+      });
+      const errBody = await response.json().catch(() => ({}));
+      if (response.ok) {
+        await mutateSwaps();
+        await mutateRequests();
+        showSuccess(status === 'approved' ? 'Swap approved' : 'Swap rejected');
+      } else {
+        showError(String(errBody.error || 'Failed to update swap'));
+      }
+    } catch (err) {
+      console.error('Swap decision error:', err);
+      showError('Network error. Please try again.');
+    }
+  };
+
+  const handleSwapDecisionConfirm = async (note: string) => {
+    const { type, swapId } = swapDecisionModal;
+    setSwapDecisionModal((m) => ({ ...m, open: false }));
+    if (swapId) {
+      await submitSwapDecision(swapId, type === 'approve' ? 'approved' : 'rejected', note);
     }
   };
 
@@ -810,6 +851,59 @@ export default function LeaderRequestsPage() {
           </div>
         )}
 
+        {pendingSwaps.length > 0 && (
+          <div className="card mb-5 border border-indigo-200 dark:border-indigo-800/60 bg-indigo-50/40 dark:bg-indigo-950/20">
+            <div className="p-5 sm:p-6">
+              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3">
+                Pending leave swaps ({pendingSwaps.length})
+              </h3>
+              <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                {pendingSwaps.map((swap) => {
+                  const m = members.find((u) => u._id && String(u._id) === String(swap.userId));
+                  const who = m
+                    ? [m.firstName, m.lastName].filter(Boolean).join(' ').trim() || m.username
+                    : String(swap.userId);
+                  const from = `${formatDateSafe(parseDateSafe(swap.sourceSubStart))} – ${formatDateSafe(parseDateSafe(swap.sourceSubEnd))}`;
+                  const to = `${formatDateSafe(parseDateSafe(swap.targetStart))} – ${formatDateSafe(parseDateSafe(swap.targetEnd))}`;
+                  return (
+                    <div key={swap._id} className="py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="min-w-0 text-sm">
+                        <p className="font-medium text-zinc-900 dark:text-zinc-100">{who}</p>
+                        <p className="text-zinc-600 dark:text-zinc-300 mt-0.5">
+                          Move <span className="font-medium">{from}</span> → <span className="font-medium">{to}</span>
+                        </p>
+                        {swap.memberNote ? (
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Note: {swap.memberNote}</p>
+                        ) : null}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSwapDecisionModal({ open: true, type: 'approve', swapId: swap._id ?? null })
+                          }
+                          className="btn-success text-xs px-3 py-1.5"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSwapDecisionModal({ open: true, type: 'reject', swapId: swap._id ?? null })
+                          }
+                          className="btn-danger text-xs px-3 py-1.5"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Filter Tabs - Enhanced */}
         <div className="card mb-5">
           <div className="p-5 sm:p-6">
@@ -1054,6 +1148,12 @@ export default function LeaderRequestsPage() {
           pendingBulkActionRef.current = null;
           setDecisionModal((m) => ({ ...m, open: false }));
         }}
+      />
+      <DecisionModal
+        open={swapDecisionModal.open}
+        type={swapDecisionModal.type}
+        onConfirm={handleSwapDecisionConfirm}
+        onCancel={() => setSwapDecisionModal((m) => ({ ...m, open: false }))}
       />
     </ProtectedRoute>
   );

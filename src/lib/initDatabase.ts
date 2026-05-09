@@ -6,6 +6,7 @@ import { TelegramLinkTokenModel } from '@/models/TelegramLinkToken';
 import { MagicLinkModel } from '@/models/MagicLink';
 import { PasswordResetTokenModel } from '@/models/PasswordResetToken';
 import { TeamPolicyVersionModel } from '@/models/TeamPolicyVersion';
+import { LeaveSwapRequestModel } from '@/models/LeaveSwapRequest';
 
 /**
  * Initialize all database indexes for optimal query performance.
@@ -25,6 +26,7 @@ export async function initializeDatabaseIndexes(): Promise<void> {
       MagicLinkModel.createIndexes(),
       PasswordResetTokenModel.createIndexes(),
       TeamPolicyVersionModel.createIndexes(),
+      LeaveSwapRequestModel.createIndexes(),
     ]);
     
     console.log('Database indexes initialized successfully');

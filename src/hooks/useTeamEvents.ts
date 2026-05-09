@@ -3,7 +3,16 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { usePolling } from './usePolling';
 
-type EventType = 'leaveRequestCreated' | 'leaveRequestUpdated' | 'leaveRequestDeleted' | 'leaveRequestRestored' | 'settingsUpdated' | 'connected' | 'keepalive' | 'error';
+type EventType =
+  | 'leaveRequestCreated'
+  | 'leaveRequestUpdated'
+  | 'leaveRequestDeleted'
+  | 'leaveRequestRestored'
+  | 'leaveSwapRequestUpdated'
+  | 'settingsUpdated'
+  | 'connected'
+  | 'keepalive'
+  | 'error';
 
 type EventData = {
   type: EventType;
@@ -196,6 +205,20 @@ export function useTeamEvents(
           }
         } catch (error) {
           console.error('[useTeamEvents] Error handling leaveRequestDeleted:', error);
+        }
+      });
+
+      eventSource.addEventListener('leaveSwapRequestUpdated', (event: MessageEvent) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (onEventRef.current) {
+            onEventRef.current({
+              type: 'leaveSwapRequestUpdated',
+              data,
+            });
+          }
+        } catch (error) {
+          console.error('[useTeamEvents] Error handling leaveSwapRequestUpdated:', error);
         }
       });
 

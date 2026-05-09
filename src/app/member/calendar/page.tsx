@@ -1,18 +1,22 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import Navbar from '@/components/shared/Navbar';
 import ProtectedRoute from '@/components/shared/ProtectedRoute';
 import TeamCalendar from '@/components/shared/Calendar';
 import MemberAutoFillModal from '@/components/shared/MemberAutoFillModal';
-import { Team, User, LeaveRequest } from '@/types';
+import MemberLeaveSwapModal from '@/components/shared/MemberLeaveSwapModal';
+import { useNotification } from '@/hooks/useNotification';
+import { useAuthedSWR } from '@/hooks/useAuthedSWR';
+import { Team, User, LeaveRequest, LeaveSwapRequest } from '@/types';
 import { useTeamEvents } from '@/hooks/useTeamEvents';
 import { useTeamData } from '@/hooks/useTeamData';
 import { useRequests } from '@/hooks/useRequests';
 import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
 import { calculateLeaveBalance } from '@/lib/leaveCalculations';
-import { parseDateSafe } from '@/lib/dateUtils';
+import { formatDateSafe, parseDateSafe } from '@/lib/dateUtils';
+import { userDisplayName } from '@/lib/userDisplayName';
 import { getEffectiveManualYearToDateUsed } from '@/lib/yearOverrides';
 import { LEAVE_REASONS } from '@/lib/leaveReasons';
 import { FunnelIcon, SparklesIcon, CheckCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
@@ -20,6 +24,7 @@ import { FunnelIcon, SparklesIcon, CheckCircleIcon, XMarkIcon } from '@heroicons
 type CalendarFilter = 'all' | 'my-leave' | 'same-working-days';
 
 export default function MemberCalendarPage() {
+  const { showSuccess, showError, showInfo } = useNotification();
   const [team, setTeam] = useState<Team | null>(null);
   const [allMembers, setAllMembers] = useState<User[]>([]);
   const [members, setMembers] = useState<User[]>([]);
@@ -31,6 +36,7 @@ export default function MemberCalendarPage() {
   const [autoFillOpen, setAutoFillOpen] = useState(false);
   const [previewReason, setPreviewReason] = useState('Annual leave');
   const [previewSubmitting, setPreviewSubmitting] = useState(false);
+  const [swapModalRequest, setSwapModalRequest] = useState<LeaveRequest | null>(null);
 
   const [allRequests, setAllRequests] = useState<LeaveRequest[]>([]);
   const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -43,6 +49,44 @@ export default function MemberCalendarPage() {
   const { data: requestsData, mutate: mutateRequests, isLoading: requestsLoading } = useRequests({
     fields: ['_id', 'userId', 'startDate', 'endDate', 'reason', 'status', 'createdAt'],
   });
+  const { data: swapRequestsRaw, mutate: mutateSwaps } = useAuthedSWR<LeaveSwapRequest[]>(
+    teamData?.team?._id ? '/api/leave-swap-requests' : null
+  );
+  const pendingSwaps = useMemo(
+    () => (swapRequestsRaw ?? []).filter((s) => s.status === 'pending'),
+    [swapRequestsRaw]
+  );
+
+  const swapTargetPreviewDates = useMemo(() => {
+    const memberList = teamData?.members ?? [];
+    return pendingSwaps.map((s) => {
+      const requestor =
+        memberList.find((m) => String(m._id) === String(s.userId)) ?? user ?? undefined;
+      return {
+        startDate: formatDateSafe(parseDateSafe(s.targetStart as unknown as string | Date)),
+        endDate: formatDateSafe(parseDateSafe(s.targetEnd as unknown as string | Date)),
+        requestorName: userDisplayName(requestor),
+      };
+    });
+  }, [pendingSwaps, teamData?.members, user]);
+
+  const handleMemberSwapDates = useCallback(
+    (leaveRequestId: string) => {
+      if (pendingSwaps.some((s) => String(s.leaveRequestId) === String(leaveRequestId))) {
+        showInfo(
+          'You already have a pending swap for this leave. Cancel it first or wait for a decision.'
+        );
+        return;
+      }
+      const req = allRequests.find((r) => String(r._id) === String(leaveRequestId));
+      if (!req) {
+        showInfo('Could not find that leave request. Try refreshing the page.');
+        return;
+      }
+      setSwapModalRequest(req);
+    },
+    [allRequests, pendingSwaps, showInfo]
+  );
 
   useEffect(() => {
     const userData = JSON.parse(localStorage.getItem('user') || '{}');
@@ -99,7 +143,7 @@ export default function MemberCalendarPage() {
     enabled: !loading && !!team,
     onEvent: (event) => {
       // Refresh calendar when leave requests are created, updated, or deleted
-      if (event.type === 'leaveRequestCreated' || event.type === 'leaveRequestUpdated' || event.type === 'leaveRequestDeleted' || event.type === 'leaveRequestRestored') {
+      if (event.type === 'leaveRequestCreated' || event.type === 'leaveRequestUpdated' || event.type === 'leaveRequestDeleted' || event.type === 'leaveRequestRestored' || event.type === 'leaveSwapRequestUpdated') {
         // Debounce refresh to avoid excessive API calls
         if (refreshTimeoutRef.current) {
           clearTimeout(refreshTimeoutRef.current);
@@ -107,6 +151,7 @@ export default function MemberCalendarPage() {
         refreshTimeoutRef.current = setTimeout(() => {
           mutateRequests();
           mutateTeam();
+          void mutateSwaps();
         }, 300);
       }
     },
@@ -320,6 +365,9 @@ export default function MemberCalendarPage() {
                     initialRequests={filteredRequests}
                     onMemberSelectionChange={setSelectionSummary}
                     previewDates={previewDates || undefined}
+                    onMemberSwapDates={handleMemberSwapDates}
+                    pendingSwapLeaveRequestIds={pendingSwaps.map((s) => String(s.leaveRequestId))}
+                    swapTargetPreviewDates={swapTargetPreviewDates}
                   />
                 ) : (
                   <div className="flex items-center justify-center h-64">
@@ -422,6 +470,18 @@ export default function MemberCalendarPage() {
       </div>
     </div>
       )}
+      <MemberLeaveSwapModal
+        open={!!swapModalRequest}
+        request={swapModalRequest}
+        onClose={() => setSwapModalRequest(null)}
+        onSuccess={() => {
+          void mutateRequests();
+          void mutateSwaps();
+        }}
+        showInfo={showInfo}
+        showSuccess={showSuccess}
+        showError={showError}
+      />
       {teamData?.currentUser && teamData?.team && allRequests && (
         <MemberAutoFillModal
           open={autoFillOpen}

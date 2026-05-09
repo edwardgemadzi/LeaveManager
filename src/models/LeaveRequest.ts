@@ -81,7 +81,11 @@ export class LeaveRequestModel {
     return await requests.find(query).sort({ createdAt: -1 }).toArray();
   }
 
-  static async findById(id: string, includeDeleted = false): Promise<LeaveRequest | null> {
+  static async findById(
+    id: string,
+    includeDeleted = false,
+    session?: ClientSession
+  ): Promise<LeaveRequest | null> {
     const db = await getDatabase();
     const requests = db.collection<LeaveRequest>('leaveRequests');
     try {
@@ -90,7 +94,8 @@ export class LeaveRequestModel {
       const query = includeDeleted
         ? baseQuery
         : ({ $and: [baseQuery, LeaveRequestModel.buildNotDeletedQuery()] } as unknown as Filter<LeaveRequest>);
-      return await requests.findOne(query);
+      const options = session ? { session } : {};
+      return await requests.findOne(query, options);
     } catch (error) {
       console.error('LeaveRequestModel.findById error:', error);
       return null;
@@ -378,6 +383,37 @@ export class LeaveRequestModel {
         $set: { updatedAt: new Date() },
       }
     );
+  }
+
+  /**
+   * Updates start/end for an approved, non-deleted leave request (e.g. leader-approved swap).
+   */
+  static async updateApprovedDateRange(
+    id: string,
+    startDate: Date,
+    endDate: Date,
+    session?: ClientSession
+  ): Promise<boolean> {
+    const db = await getDatabase();
+    const requests = db.collection<LeaveRequest>('leaveRequests');
+    try {
+      const objectId = new ObjectId(id);
+      const options = session ? { session } : {};
+      const result = await requests.updateOne(
+        {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          _id: objectId as any,
+          status: 'approved',
+          ...LeaveRequestModel.buildNotDeletedQuery(),
+        },
+        { $set: { startDate, endDate, updatedAt: new Date() } },
+        options
+      );
+      return result.modifiedCount > 0;
+    } catch (error) {
+      console.error('LeaveRequestModel.updateApprovedDateRange error:', error);
+      return false;
+    }
   }
 
   static async updateConsentStatus(
