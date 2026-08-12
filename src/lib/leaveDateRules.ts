@@ -1,9 +1,11 @@
 import { TeamSettings } from '@/types';
+import { formatDateSafe, parseDateSafe } from '@/lib/dateUtils';
 
+// Blackout and holiday entries are calendar dates. Parsing them with `new Date`
+// and keying them with toISOString() both reintroduce a UTC shift, so go through
+// the calendar-date helpers instead.
 function toDateOnly(input: string): Date {
-  const d = new Date(input);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  return parseDateSafe(input);
 }
 
 function dateRange(start: Date, end: Date): Date[] {
@@ -17,7 +19,7 @@ function dateRange(start: Date, end: Date): Date[] {
 }
 
 function dateKey(d: Date): string {
-  return d.toISOString().split('T')[0];
+  return formatDateSafe(d);
 }
 
 export function validateLeaveDatesAgainstTeamPolicy(params: {

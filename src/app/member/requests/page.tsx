@@ -66,13 +66,16 @@ export default function MemberRequestsPage() {
   const [dateConstraints, setDateConstraints] = useState<Record<string, LeaveDateConstraintDay>>({});
   const [constraintsFetchState, setConstraintsFetchState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const bypassActive = isBypassNoticePeriodActive(teamSettings);
-  const todayIso = new Date().toISOString().split('T')[0];
+  // These feed the date inputs' `min` and the constraint-map keys, so they must be
+  // the user's local calendar date. toISOString() names the previous day east of
+  // UTC, which shifted the whole bookable window by one day in Zambia (UTC+2).
+  const todayIso = formatDateSafe(new Date());
   const minStartDateIso = (() => {
     if (formData.isHistorical) {
       const minDate = new Date();
       minDate.setHours(0, 0, 0, 0);
       minDate.setDate(minDate.getDate() - (teamSettings.historicalSubmissionLookbackDays || 365));
-      return minDate.toISOString().split('T')[0];
+      return formatDateSafe(minDate);
     }
     if (bypassActive || teamSettings.minimumNoticePeriod <= 0) {
       return todayIso;
@@ -80,7 +83,7 @@ export default function MemberRequestsPage() {
     const minDate = new Date();
     minDate.setHours(0, 0, 0, 0);
     minDate.setDate(minDate.getDate() + teamSettings.minimumNoticePeriod);
-    return minDate.toISOString().split('T')[0];
+    return formatDateSafe(minDate);
   })();
 
   const handleReasonChange = (reasonType: string) => {

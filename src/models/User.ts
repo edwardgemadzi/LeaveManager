@@ -3,6 +3,7 @@ import { debug } from '@/lib/logger';
 import { ClientSession, ObjectId } from 'mongodb';
 import { User, ShiftSchedule } from '@/types';
 import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
+import { toStoredDate } from '@/lib/dateUtils';
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -169,24 +170,28 @@ export class UserModel {
       throw new Error('User not found');
     }
     
+    // Anchor the rotation on UTC midnight so the day it names does not depend on
+    // the timezone of whoever reads it back.
+    const normalizedSchedule: ShiftSchedule = {
+      ...shiftSchedule,
+      startDate: toStoredDate(shiftSchedule.startDate),
+    };
+
     // Prepare update object
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const update: any = { $set: { shiftSchedule } };
-    
+    const update: any = { $set: { shiftSchedule: normalizedSchedule } };
+
     // If user has an existing shift schedule, move it to history
     if (currentUser.shiftSchedule) {
-      const newStartDate = new Date(shiftSchedule.startDate);
-      newStartDate.setHours(0, 0, 0, 0);
-      
-      // Calculate end date for previous shift (day before new shift starts)
-      const previousEndDate = new Date(newStartDate);
-      previousEndDate.setDate(previousEndDate.getDate() - 1);
-      previousEndDate.setHours(23, 59, 59, 999);
-      
+      // Previous shift ends the day before the new one starts. Stored as UTC
+      // midnight of that day; readers widen it to end-of-day themselves.
+      const previousEndDate = new Date(normalizedSchedule.startDate);
+      previousEndDate.setUTCDate(previousEndDate.getUTCDate() - 1);
+
       // Create historical shift entry
       const historicalShift = {
         pattern: currentUser.shiftSchedule.pattern,
-        startDate: currentUser.shiftSchedule.startDate,
+        startDate: toStoredDate(currentUser.shiftSchedule.startDate),
         endDate: previousEndDate,
         type: currentUser.shiftSchedule.type
       };
@@ -199,7 +204,7 @@ export class UserModel {
     // Only store tag for fixed schedules (tags are stable)
     // For rotating schedules, tags change daily and should be regenerated
     if (shiftSchedule.type === 'fixed') {
-      const workingDaysTag = generateWorkingDaysTag(shiftSchedule);
+      const workingDaysTag = generateWorkingDaysTag(normalizedSchedule);
       update.$set.workingDaysTag = workingDaysTag;
     } else {
       // For rotating schedules, remove stored tag (will be regenerated on use)

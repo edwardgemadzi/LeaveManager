@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { ShiftSchedule, TeamSettings, User } from '@/types';
 import { tagToFixedPattern } from '@/lib/helpers';
 import { generateWorkingDaysTag } from '@/lib/analyticsCalculations';
-import { formatDateSafe, parseDateSafe } from '@/lib/dateUtils';
+import { formatDateSafe, parseStoredDate, toStoredDate } from '@/lib/dateUtils';
 
 interface ShiftScheduleBuilderProps {
   onScheduleChange: (schedule: ShiftSchedule) => void;
@@ -27,7 +27,7 @@ export default function ShiftScheduleBuilder({
   );
   const [startDate, setStartDate] = useState(
     initialSchedule?.startDate 
-      ? formatDateSafe(parseDateSafe(initialSchedule.startDate))
+      ? formatDateSafe(parseStoredDate(initialSchedule.startDate))
       : formatDateSafe(new Date())
   );
   const [workingDays, setWorkingDays] = useState<boolean[]>(
@@ -70,7 +70,7 @@ export default function ShiftScheduleBuilder({
       setPattern(newPattern);
       onScheduleChange({
         pattern: newPattern,
-        startDate: parseDateSafe(startDate),
+        startDate: toStoredDate(startDate),
         type: 'rotating'
       });
     }
@@ -84,7 +84,7 @@ export default function ShiftScheduleBuilder({
     if (scheduleType === 'rotating') {
       onScheduleChange({
         pattern: newPattern,
-        startDate: parseDateSafe(startDate),
+        startDate: toStoredDate(startDate),
         type: 'rotating'
       });
     }
@@ -98,7 +98,7 @@ export default function ShiftScheduleBuilder({
     if (scheduleType === 'fixed') {
       onScheduleChange({
         pattern: newWorkingDays,
-        startDate: parseDateSafe(startDate),
+        startDate: toStoredDate(startDate),
         type: 'fixed'
       });
     }
@@ -108,7 +108,7 @@ export default function ShiftScheduleBuilder({
     setStartDate(date);
     onScheduleChange({
       pattern: scheduleType === 'rotating' ? pattern : workingDays,
-      startDate: parseDateSafe(date),
+      startDate: toStoredDate(date),
       type: scheduleType
     });
   };
@@ -134,7 +134,7 @@ export default function ShiftScheduleBuilder({
                 setPattern(newPattern);
                 onScheduleChange({
                   pattern: newPattern,
-                  startDate: new Date(startDate),
+                  startDate: toStoredDate(startDate),
                   type: 'rotating'
                 });
                 setIsInitialized(true);
@@ -153,7 +153,7 @@ export default function ShiftScheduleBuilder({
                 // If switching to fixed, ensure we trigger re-render to show group selector
                 onScheduleChange({
                   pattern: workingDays,
-                  startDate: new Date(startDate),
+                  startDate: toStoredDate(startDate),
                   type: 'fixed'
                 });
               }}
@@ -222,11 +222,11 @@ export default function ShiftScheduleBuilder({
                             setPattern(memberPattern);
                             setDaysOn(daysOnCount);
                             setDaysOff(daysOffCount);
-                            setStartDate(formatDateSafe(parseDateSafe(memberStartDate)));
+                            setStartDate(formatDateSafe(parseStoredDate(memberStartDate)));
                             
                             onScheduleChange({
                               pattern: memberPattern,
-                              startDate: parseDateSafe(memberStartDate),
+                              startDate: toStoredDate(memberStartDate),
                               type: 'rotating'
                             });
                           }
@@ -342,7 +342,7 @@ export default function ShiftScheduleBuilder({
                             setWorkingDays(pattern);
                             onScheduleChange({
                               pattern,
-                              startDate: new Date(startDate),
+                              startDate: toStoredDate(startDate),
                               type: 'fixed'
                             });
                           }

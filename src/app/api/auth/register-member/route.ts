@@ -10,6 +10,7 @@ import { internalServerError, badRequestError, notFoundError } from '@/lib/error
 import { validateRequest, schemas } from '@/lib/validation';
 import { authRateLimit } from '@/lib/rateLimit';
 import { resolveUserTimeZone } from '@/lib/timezone';
+import { formatDateSafe, toStoredDate } from '@/lib/dateUtils';
 
 export async function POST(request: NextRequest) {
   try {
@@ -71,24 +72,19 @@ export async function POST(request: NextRequest) {
       return internalServerError('Team ID not found');
     }
 
-    // Ensure shiftSchedule.startDate is a Date object (might come as string from JSON)
-    // Create a copy of shiftSchedule to avoid mutating the original
+    // Normalise the rotation anchor to UTC midnight. Clients send it as an
+    // instant, and a browser east of UTC serialises its local midnight to the
+    // previous day in UTC, which shifted the whole rotation for Zambian members.
     let startDate: Date;
     if (shiftSchedule.startDate) {
-      if (typeof shiftSchedule.startDate === 'string') {
-        startDate = new Date(shiftSchedule.startDate);
-      } else if (shiftSchedule.startDate instanceof Date) {
-        startDate = new Date(shiftSchedule.startDate);
-      } else {
-        startDate = new Date();
-      }
-      
+      startDate = toStoredDate(shiftSchedule.startDate as string | Date);
+
       // Validate that startDate is a valid date
       if (isNaN(startDate.getTime())) {
         return badRequestError('Invalid start date in shift schedule');
       }
     } else {
-      startDate = new Date();
+      startDate = toStoredDate(formatDateSafe(new Date()));
     }
 
     const shiftScheduleCopy: ShiftSchedule = {
