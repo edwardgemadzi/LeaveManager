@@ -459,8 +459,14 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
     if (!isMember) return;
     const controller = new AbortController();
 
+    // Pad a week either side of the month: the grid renders the tail of the
+    // previous month and the head of the next, and clicking one of those cells
+    // with no constraint loaded reports "still loading" and never recovers.
+    // The padded span stays well inside the endpoint's 120-day limit.
     const fromDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    fromDate.setDate(fromDate.getDate() - 7);
     const toDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 2, 0);
+    toDate.setDate(toDate.getDate() + 7);
     const from = formatDateSafe(fromDate);
     const to = formatDateSafe(toDate);
 
