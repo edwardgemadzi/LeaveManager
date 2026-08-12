@@ -85,6 +85,14 @@ export default function MemberRequestsPage() {
     minDate.setDate(minDate.getDate() + teamSettings.minimumNoticePeriod);
     return formatDateSafe(minDate);
   })();
+  // Availability is only loaded for the 120-day window below, so don't let the
+  // pickers offer dates the form would then have to reject as "no availability
+  // data". Historical entries look backwards and are not constrained this way.
+  const maxDateIso = (() => {
+    const maxDate = parseDateSafe(minStartDateIso);
+    maxDate.setDate(maxDate.getDate() + 119);
+    return formatDateSafe(maxDate);
+  })();
 
   const handleReasonChange = (reasonType: string) => {
     setSelectedReasonType(reasonType);
@@ -268,6 +276,52 @@ export default function MemberRequestsPage() {
     return { selectable: constraint.selectable, message: constraint.message };
   };
 
+  // A day the member is not scheduled to work carries no weight in a range: the
+  // server skips those days entirely when counting leave and checking capacity,
+  // so a span may freely cover them. Only days that are actually worked are
+  // checked, which is what the calendar's "request as range" mode already does.
+  const isNonWorkingDay = (dateIso: string) =>
+    dateConstraints[dateIso]?.codes.includes('NON_WORKING_DAY') === true;
+
+  /**
+   * Validate a whole start..end span. Returns an error message, or null if the
+   * range can be submitted.
+   *
+   * This deliberately differs from isDateSelectable, which answers the per-day
+   * question the calendar asks. Applying the per-day rule to every day of a span
+   * rejected any range that stretched over an off-day - a weekend for a Mon-Fri
+   * member, or every span longer than one block for a rotating shift - and
+   * reported it as "Not a scheduled working day" even though the dates the
+   * member picked were working days.
+   */
+  const getRangeError = (startIso: string, endIso: string): string | null => {
+    if (formData.isHistorical) {
+      return null;
+    }
+
+    const cursor = parseDateSafe(startIso);
+    const last = parseDateSafe(endIso);
+    let workingDaysInRange = 0;
+
+    while (cursor <= last) {
+      const dayKey = formatDateSafe(cursor);
+      if (!isNonWorkingDay(dayKey)) {
+        const selection = isDateSelectable(dayKey);
+        if (!selection.selectable) {
+          return selection.message || `Date ${dayKey} is not available.`;
+        }
+        workingDaysInRange++;
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    if (workingDaysInRange === 0) {
+      return 'That range covers none of your scheduled working days, so there is no leave to book. Pick a range that includes at least one working day.';
+    }
+
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -282,6 +336,16 @@ export default function MemberRequestsPage() {
       return;
     }
     
+    // Re-check the whole span: editing the start date after an end date was
+    // chosen leaves a range that was never validated as a pair.
+    if (formData.startDate && formData.endDate) {
+      const rangeError = getRangeError(formData.startDate, formData.endDate);
+      if (rangeError) {
+        showInfo(rangeError);
+        return;
+      }
+    }
+
     // Check minimum notice period
     if (!formData.isHistorical && !bypassActive && teamSettings.minimumNoticePeriod > 0) {
       const today = new Date();
@@ -641,6 +705,7 @@ export default function MemberRequestsPage() {
                       id="startDate"
                       required
                       min={minStartDateIso}
+                      max={formData.isHistorical ? undefined : maxDateIso}
                       value={formData.startDate}
                       onChange={(e) => {
                         const nextStartDate = e.target.value;
@@ -667,6 +732,7 @@ export default function MemberRequestsPage() {
                       id="endDate"
                       required
                       min={formData.startDate || minStartDateIso}
+                      max={formData.isHistorical ? undefined : maxDateIso}
                       value={formData.endDate}
                       onChange={(e) => {
                         const nextEndDate = e.target.value;
@@ -676,23 +742,15 @@ export default function MemberRequestsPage() {
                           return;
                         }
 
-                        const startDate = parseDateSafe(start);
-                        const endDate = parseDateSafe(nextEndDate);
-                        if (endDate < startDate) {
+                        if (parseDateSafe(nextEndDate) < parseDateSafe(start)) {
                           showInfo('End date cannot be before start date.');
                           return;
                         }
 
-                        const cursor = new Date(startDate);
-                        const last = new Date(endDate);
-                        while (cursor <= last) {
-                          const dayKey = formatDateSafe(cursor);
-                          const selection = isDateSelectable(dayKey);
-                          if (!selection.selectable) {
-                            showInfo(selection.message || `Date ${dayKey} is not available.`);
-                            return;
-                          }
-                          cursor.setDate(cursor.getDate() + 1);
+                        const rangeError = getRangeError(start, nextEndDate);
+                        if (rangeError) {
+                          showInfo(rangeError);
+                          return;
                         }
 
                         setFormData({ ...formData, endDate: nextEndDate });
