@@ -54,7 +54,7 @@ function buildPreviewEvents(previewDates: Array<{ startDate: string; endDate: st
     const end = new Date(block.endDate + 'T00:00:00');
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       events.push({
-        id: `preview-${idx}-${d.toISOString().split('T')[0]}`,
+        id: `preview-${idx}-${formatDateSafe(d)}`,
         title: 'Preview',
         start: new Date(d),
         end: new Date(d),
@@ -86,7 +86,7 @@ function buildSwapTargetPreviewEvents(blocks: SwapTargetPreviewBlock[] | null | 
     const end = new Date(block.endDate + 'T00:00:00');
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       events.push({
-        id: `swap-target-${idx}-${d.toISOString().split('T')[0]}`,
+        id: `swap-target-${idx}-${formatDateSafe(d)}`,
         title: `${name} — swap pending`,
         start: new Date(d),
         end: new Date(d),
@@ -342,7 +342,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
       for (const event of calendarEvents) {
         const day = new Date(event.start);
         day.setHours(0, 0, 0, 0);
-        const key = day.toISOString().split('T')[0];
+        const key = formatDateSafe(day);
         const existing = grouped.get(key);
         if (!existing) {
           grouped.set(key, {
@@ -359,7 +359,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
         const names = group.events.map((e) => e.resource.fullName || e.resource.username).filter(Boolean);
         if (group.events.length >= 4) {
           mobileMonthEvents.push({
-            id: `agg-${groupIndex}-${group.date.toISOString()}`,
+            id: `agg-${groupIndex}-${formatDateSafe(group.date)}`,
             title: `${group.events.length} on leave`,
             start: group.date,
             end: group.date,
@@ -403,7 +403,7 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
       const end = new Date(block.endDate + 'T00:00:00');
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         previewEvents.push({
-          id: `preview-${idx}-${d.toISOString().split('T')[0]}`,
+          id: `preview-${idx}-${formatDateSafe(d)}`,
           title: 'Preview',
           start: new Date(d),
           end: new Date(d),
@@ -461,8 +461,8 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
 
     const fromDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
     const toDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 2, 0);
-    const from = fromDate.toISOString().split('T')[0];
-    const to = toDate.toISOString().split('T')[0];
+    const from = formatDateSafe(fromDate);
+    const to = formatDateSafe(toDate);
 
     const fetchConstraints = async () => {
       try {
@@ -601,7 +601,9 @@ export default function TeamCalendar({ teamId, members, currentUser, teamSetting
     if (!isMember) return;
 
     const clickedDate = normalizeDate(slotInfo.start);
-    const dateKey = clickedDate.toISOString().split('T')[0];
+    // Key off the local calendar date: toISOString() on a local-midnight Date
+    // names the previous day east of UTC, which looked up the wrong day's rules.
+    const dateKey = formatDateSafe(clickedDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (clickedDate < today) {
