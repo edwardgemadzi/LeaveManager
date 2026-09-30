@@ -1,5 +1,5 @@
 import { ShiftSchedule, User } from '@/types';
-import { parseStoredDate } from '@/lib/dateUtils';
+import { parseStoredDate, parseStoredEndDate } from '@/lib/dateUtils';
 
 // Strip the time component so day arithmetic counts calendar days, not elapsed hours.
 const startOfLocalDay = (date: Date): Date =>
@@ -22,7 +22,7 @@ export const getShiftScheduleForDate = (user: User, date: Date): ShiftSchedule |
       // which calendar day a boundary falls on (see parseStoredDate).
       const startDate = parseStoredDate(historicalShift.startDate);
       startDate.setHours(0, 0, 0, 0);
-      const endDate = parseStoredDate(historicalShift.endDate);
+      const endDate = parseStoredEndDate(historicalShift.endDate);
       endDate.setHours(23, 59, 59, 999);
 
       // Check if date is within the historical shift period

@@ -3,13 +3,19 @@
  *
  * Run under several timezones and assert every one agrees with UTC about which
  * days a rotating shift covers:
- *   for tz in UTC Africa/Lusaka Asia/Kathmandu America/New_York Pacific/Auckland; do
+ *   for tz in UTC Africa/Luanda Africa/Lusaka Asia/Kathmandu America/New_York Pacific/Auckland; do
  *     TZ=$tz npx tsx maintenance/verify-timezone-working-days.ts
  *   done
  */
 import { isWorkingDay } from '../src/lib/leaveCalculations';
-import { formatDateSafe, parseDateSafe, parseStoredDate, toStoredDate } from '../src/lib/dateUtils';
-import type { ShiftSchedule } from '../src/types';
+import {
+  formatDateSafe,
+  parseDateSafe,
+  parseStoredDate,
+  parseStoredEndDate,
+  toStoredDate,
+} from '../src/lib/dateUtils';
+import type { ShiftSchedule, User } from '../src/types';
 
 const PATTERN = [true, true, true, true, false, false, false, false]; // 4 on / 4 off
 
@@ -20,6 +26,7 @@ const PATTERN = [true, true, true, true, false, false, false, false]; // 4 on / 
 // and are excluded; those rows self-heal the next time the schedule is saved.
 const ANCHORS: Array<[string, string]> = [
   ['UTC midnight (normalised)', '2026-01-05T00:00:00.000Z'],
+  ['legacy write from UTC+1 (Angola)', '2026-01-04T23:00:00.000Z'],
   ['legacy write from UTC+2 (Zambia)', '2026-01-04T22:00:00.000Z'],
   ['legacy write from UTC+5:45', '2026-01-04T18:15:00.000Z'],
   ['legacy write from UTC-5 (New York)', '2026-01-05T05:00:00.000Z'],
@@ -85,6 +92,28 @@ const fixedOk =
   weekdays.every((d) => isWorkingDay(parseDateSafe(d), fixed));
 if (!fixedOk) failures++;
 console.log(`  ${fixedOk ? 'ok  ' : 'FAIL'} fixed Mon-Fri schedule maps weekdays/weekend correctly`);
+
+// 5. Shift history must hand over to the new schedule on the day it starts. Rows
+// written before end dates were normalised stored 23:59:59.999 in the writer's
+// zone; snapping that to the nearest midnight would claim the next day too.
+const END_DATES: Array<[string, string]> = [
+  ['UTC midnight (normalised)', '2026-01-11T00:00:00.000Z'],
+  ['legacy end-of-day from UTC server', '2026-01-11T23:59:59.999Z'],
+  ['legacy end-of-day from UTC+1 writer', '2026-01-11T22:59:59.999Z'],
+  ['legacy end-of-day from UTC-5 writer', '2026-01-12T04:59:59.999Z'],
+];
+for (const [label, raw] of END_DATES) {
+  const resolved = formatDateSafe(parseStoredEndDate(raw));
+  const user = {
+    shiftSchedule: { pattern: [false, false, false, false, false, false, false], startDate: '2026-01-12', type: 'fixed' },
+    shiftHistory: [{ pattern: [true, true, true, true, true, true, true], startDate: '2026-01-01T00:00:00.000Z', endDate: raw, type: 'fixed' }],
+  } as unknown as User;
+  const handover =
+    isWorkingDay(parseDateSafe('2026-01-11'), user) && !isWorkingDay(parseDateSafe('2026-01-12'), user);
+  const ok = resolved === '2026-01-11' && handover;
+  if (!ok) failures++;
+  console.log(`  ${ok ? 'ok  ' : 'FAIL'} history end ${label.padEnd(36)} -> ${resolved}${handover ? '' : ' (overlaps new schedule)'}`);
+}
 
 if (failures) {
   console.error(`\n${failures} check(s) failed under TZ=${tz}`);

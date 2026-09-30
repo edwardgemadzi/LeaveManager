@@ -85,6 +85,28 @@ export const parseStoredDate = (dateInput: string | Date): Date => {
 };
 
 /**
+ * Resolve the stored *last* day of a range (e.g. a shift history endDate).
+ *
+ * Current rows store that day at UTC midnight and resolve like any other stored
+ * date. Rows written before that stored end-of-day instead: 23:59:59.999 in the
+ * writer's timezone, which is one millisecond before the *next* midnight, so
+ * nearest-midnight snapping would push the range a day too far and make the old
+ * schedule overlap the first day of its replacement. Those sentinels are
+ * recognised by their .999 milliseconds and resolved to the day they close.
+ */
+export const parseStoredEndDate = (dateInput: string | Date): Date => {
+  if (typeof dateInput !== 'string' || !DATE_ONLY_PATTERN.test(dateInput)) {
+    const time = new Date(dateInput).getTime();
+    if (((time % 1000) + 1000) % 1000 === 999) {
+      const nextDay = parseStoredDate(new Date(time + 1));
+      nextDay.setDate(nextDay.getDate() - 1);
+      return nextDay;
+    }
+  }
+  return parseStoredDate(dateInput);
+};
+
+/**
  * Normalise a calendar date to UTC midnight for persistence, so it reads back
  * as the same day regardless of the reader's timezone.
  */
