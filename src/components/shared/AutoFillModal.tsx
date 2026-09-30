@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GroupedTeamAnalytics } from '@/lib/analyticsCalculations';
 import { isWorkingDay } from '@/lib/leaveCalculations';
+import { formatDateSafe } from '@/lib/dateUtils';
 import { LeaveRequest, Team, User } from '@/types';
 import {
   SparklesIcon,
@@ -32,8 +33,10 @@ interface MemberPlan {
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
+// Days here are local-midnight Dates; toISOString() would name the previous day
+// for anyone east of UTC (Angola, Zambia) and shift every planned day back by one.
 function toYMD(d: Date): string {
-  return d.toISOString().split('T')[0];
+  return formatDateSafe(d);
 }
 
 function formatRange(start: string, end: string): string {
