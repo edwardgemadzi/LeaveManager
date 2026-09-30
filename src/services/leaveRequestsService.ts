@@ -163,7 +163,7 @@ export async function createLeaveRequest(params: {
       return {
         error: {
           status: 400,
-          body: { error: 'Validation failed', details: validation.errors },
+          body: { error: validation.errors[0] || 'Validation failed', details: validation.errors },
         },
       };
     }
@@ -285,6 +285,12 @@ export async function createLeaveRequest(params: {
   }
 
   if (!isHistorical) {
+    if (daysDifference < 0) {
+      return {
+        error: { status: 400, body: { error: 'Past dates cannot be requested.' } },
+      };
+    }
+
     const bypassActive = isBypassNoticePeriodActive(team, today);
 
     if (!bypassActive && daysDifference < team.settings.minimumNoticePeriod) {
@@ -582,7 +588,7 @@ export async function updateMemberPendingLeaveRequest(params: {
     return {
       error: {
         status: 400,
-        body: { error: 'Validation failed', details: validation.errors },
+        body: { error: validation.errors[0] || 'Validation failed', details: validation.errors },
       },
     };
   }
@@ -630,6 +636,9 @@ export async function updateMemberPendingLeaveRequest(params: {
   const daysDifference = Math.ceil(
     (requestStartDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
   );
+  if (daysDifference < 0) {
+    return { error: { status: 400, body: { error: 'Past dates cannot be requested.' } } };
+  }
   const bypassActive = isBypassNoticePeriodActive(team, today);
   if (!bypassActive && daysDifference < team.settings.minimumNoticePeriod) {
     return {

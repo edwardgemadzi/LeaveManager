@@ -292,11 +292,13 @@ export const schemas = {
 
   // Leave request schema
   leaveRequest: Joi.object({
+    // No .min('now') here: Joi reads "YYYY-MM-DD" as UTC midnight, which is
+    // already in the past for any booking made today, so same-day requests were
+    // rejected even when the team allows them. Past dates are rejected by the
+    // service against the calendar day instead.
     startDate: Joi.date()
-      .min('now')
       .required()
       .messages({
-        'date.min': 'Start date must be in the future',
         'date.base': 'Start date must be a valid date',
         'any.required': 'Start date is required'
       }),
